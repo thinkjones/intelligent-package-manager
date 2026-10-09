@@ -31,11 +31,12 @@ func Path(root string) string {
 }
 
 type Marketplace struct {
-	Schema      string  `json:"$schema"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Owner       Owner   `json:"owner"`
-	Plugins     []Entry `json:"plugins"`
+	Schema      string `json:"$schema"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Owner       Owner  `json:"owner"`
+	// Plugins are Entry values, or upstream entries as maps.
+	Plugins []any `json:"plugins"`
 }
 
 type Owner struct {
@@ -103,7 +104,7 @@ func SourceFor(repo, path, version, commit string) Source {
 }
 
 // Build assembles the marketplace.
-func Build(entries []Entry, packNames []string, o Options) Marketplace {
+func Build(entries []any, packNames []string, o Options) Marketplace {
 	owner := Owner{Name: o.Owner, URL: o.RepoURL}
 	desc := o.Description
 	if desc == "" {

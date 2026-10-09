@@ -38,7 +38,7 @@ func TestWriteAndIsOurs(t *testing.T) {
 	if IsOurs(path) {
 		t.Fatal("a missing file is not ours")
 	}
-	m := Build([]Entry{{Name: "x", Source: SourceFor("o/r", "", "", strings.Repeat("a", 40)), Tags: []string{OwnerTag}}}, []string{"p"}, Options{Name: "m", Owner: "o"})
+	m := Build([]any{Entry{Name: "x", Source: SourceFor("o/r", "", "", strings.Repeat("a", 40)), Tags: []string{OwnerTag}}}, []string{"p"}, Options{Name: "m", Owner: "o"})
 	if err := Write(path, m); err != nil {
 		t.Fatal(err)
 	}
