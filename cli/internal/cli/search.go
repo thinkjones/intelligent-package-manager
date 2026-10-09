@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/thinkjones/fs-skills/cli/internal/config"
 	"github.com/thinkjones/fs-skills/cli/internal/search"
 )
 
@@ -69,11 +68,7 @@ func interspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 const maxPage = 250
 
 func runSearch(sys System, q search.Query, all, asJSON, explain bool) error {
-	cfg, err := config.Load(sys.Getenv)
-	if err != nil {
-		return err
-	}
-	c, err := tsClient(sys, cfg.Root)
+	c, err := tsClient(sys)
 	if err != nil {
 		return err
 	}

@@ -3,14 +3,11 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"os"
-	"path/filepath"
+	"strings"
 	"text/tabwriter"
 
-	"github.com/thinkjones/fs-skills/cli/internal/config"
-	"github.com/thinkjones/fs-skills/cli/internal/marketplace"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
-	"github.com/thinkjones/fs-skills/cli/internal/upstream"
+	"github.com/thinkjones/fs-skills/cli/internal/catalog"
+	"github.com/thinkjones/fs-skills/cli/internal/sources"
 )
 
 const (
@@ -24,8 +21,8 @@ func doctorFlags() (*flag.FlagSet, func(System) error) {
 	return fs, doctor
 }
 
-// doctor reports on config, every pack manifest and the generated
-// marketplace. Problems fail it; warnings do not.
+// doctor reports where ipm keeps things and whether each piece is ready.
+// Problems (no home, no pnpm) fail it; warnings do not.
 func doctor(sys System) error {
 	problems, warnings := 0, 0
 	tw := tabwriter.NewWriter(sys.Stdout, 0, 0, 2, ' ', 0)
@@ -43,68 +40,58 @@ func doctor(sys System) error {
 		fmt.Fprintf(sys.Stdout, "\nipm doctor: %d problem(s), %d warning(s)\n", problems, warnings)
 	}()
 
-	cfg, err := config.Load(sys.Getenv)
+	p, err := ipmPaths(sys)
 	if err != nil {
-		row(bad, config.RootVar, err.Error())
+		row(bad, "home", err.Error())
 		return &ExitError{Code: 1}
 	}
-	row(ok, config.RootVar, cfg.Root)
+	row(ok, "home", p.Home)
+	row(ok, "cache", p.Cache)
 
-	dirs, err := pack.Dirs(cfg.Root)
-	if err != nil {
-		row(bad, "packs", err.Error())
-		return &ExitError{Code: 1}
-	}
-	if len(dirs) == 0 {
-		row(warn, "packs", "none — a pack is a root directory holding "+pack.ManifestFile)
-	}
-	var loaded []pack.Pack
-	for _, d := range dirs {
-		p, err := pack.Load(d)
-		switch {
-		case err != nil:
-			row(bad, filepath.Base(d), err.Error())
-		case p.Empty():
-			row(warn, p.Name, "publishes nothing: no [[plugin]], [[copilot-plugin]] or includes")
-		default:
-			loaded = append(loaded, p)
-			row(ok, p.Name, fmt.Sprintf("%d plugin(s), %d Copilot item(s), %d include(s)", len(p.Plugins), len(p.Copilot()), len(p.Meta.Includes)))
-		}
-	}
-	for _, problem := range pack.Problems(loaded) {
-		row(bad, "packs", problem)
+	if _, err := sys.LookPath("pnpm"); err != nil {
+		row(bad, "pnpm", "not on PATH — ipm fetches sources with pnpm (https://pnpm.io/installation)")
+	} else {
+		v, _ := sys.Output("", "pnpm", "--version")
+		row(ok, "pnpm", strings.TrimSpace(v))
 	}
 
-	switch lock, err := upstream.ReadLock(cfg.Root); {
+	srcs, err := sources.Load(p.Sources())
+	switch {
 	case err != nil:
-		row(bad, upstream.LockFile, err.Error())
+		row(bad, "sources", err.Error())
+	case len(srcs) == 0:
+		row(warn, "sources", "none — add some with `ipm source add owner/repo`")
 	default:
-		ups := pack.Upstreams(loaded)
-		if missing := lock.Missing(ups); len(missing) > 0 {
-			row(warn, upstream.LockFile, fmt.Sprintf("%d of %d upstream(s) not pinned — run `ipm sync`", len(missing), len(ups)))
+		if _, err := sources.Checkouts(p.Sources()); err != nil {
+			row(warn, "sources", fmt.Sprintf("%d, not all synced — run `ipm sync`", len(srcs)))
 		} else {
-			row(ok, upstream.LockFile, fmt.Sprintf("%d upstream(s) pinned", len(ups)))
+			row(ok, "sources", fmt.Sprintf("%d synced, in %s", len(srcs), p.Sources()))
 		}
 	}
 
-	path := marketplace.Path(cfg.Root)
-	switch _, err := os.Stat(path); {
-	case err != nil:
-		row(warn, "marketplace", "not generated yet — run `ipm create-plugin`")
-	case !marketplace.IsOurs(path):
-		row(warn, "marketplace", path+" was not written by ipm")
-	default:
-		row(ok, "marketplace", path)
+	records := 0
+	for _, typ := range catalog.Types {
+		recs, err := catalog.Load(p.Catalog(), typ)
+		if err != nil {
+			records = -1
+			break
+		}
+		records += len(recs)
+	}
+	if records < 0 {
+		row(warn, "catalog", "not built — run `ipm sync`")
+	} else {
+		row(ok, "catalog", fmt.Sprintf("%d record(s), in %s", records, p.Catalog()))
 	}
 
-	dockerRow, tsRow := searchHealth(sys, cfg.Root)
+	dockerRow, tsRow := searchHealth(sys)
 	row(dockerRow[0], "docker", dockerRow[1])
 	row(tsRow[0], "typesense", tsRow[1])
 
-	if p, err := sys.LookPath("claude"); err != nil {
-		row(warn, "claude", "not on PATH — create-plugin cannot validate")
+	if path, err := sys.LookPath("claude"); err != nil {
+		row(warn, "claude", "not on PATH — plugins you build can't be validated")
 	} else {
-		row(ok, "claude", p)
+		row(ok, "claude", path)
 	}
 
 	if problems > 0 {

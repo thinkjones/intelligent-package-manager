@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/config"
 	"github.com/thinkjones/fs-skills/cli/internal/github"
 	"github.com/thinkjones/fs-skills/cli/internal/pack"
 )
@@ -24,17 +23,17 @@ func statsFlags() (*flag.FlagSet, func(System) error) {
 // runStats fetches GitHub stats for every repo in catalog/repos.jsonl into
 // catalog/github.jsonl. A repo that fails keeps its previous record.
 func runStats(sys System) error {
-	cfg, err := config.Load(sys.Getenv)
+	p, err := ipmPaths(sys)
 	if err != nil {
 		return err
 	}
 	if _, err := sys.LookPath("gh"); err != nil {
 		return fmt.Errorf("ipm stats needs the GitHub CLI: install gh and run `gh auth login`")
 	}
-	if out, err := sys.Output(cfg.Root, "gh", "auth", "status"); err != nil {
+	if out, err := sys.Output("", "gh", "auth", "status"); err != nil {
 		return fmt.Errorf("gh is not logged in — run `gh auth login`: %s", strings.TrimSpace(out))
 	}
-	dir := filepath.Join(cfg.Root, "catalog")
+	dir := p.Catalog()
 	repos, err := catalog.Load(dir, catalog.TypeRepo)
 	if err != nil {
 		return err
@@ -56,7 +55,7 @@ func runStats(sys System) error {
 			fmt.Fprintf(sys.Stdout, "- %s  not on GitHub, skipped\n", repo)
 		}
 	}
-	gh := func(args ...string) (string, error) { return sys.Output(cfg.Root, "gh", args...) }
+	gh := func(args ...string) (string, error) { return sys.Output("", "gh", args...) }
 	results := make([]github.Stats, len(targets))
 	errs := make([]error, len(targets))
 	var wg sync.WaitGroup

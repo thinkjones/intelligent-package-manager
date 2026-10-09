@@ -11,15 +11,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/thinkjones/fs-skills/cli/internal/config"
+	"github.com/thinkjones/fs-skills/cli/internal/paths"
 	"github.com/thinkjones/fs-skills/cli/internal/search"
 	"github.com/thinkjones/fs-skills/cli/internal/typesense"
 )
 
 const (
 	tsImage     = "typesense/typesense:30.2"
-	tsContainer = "aihs-typesense"
-	tsURL       = "http://127.0.0.1:8108"
+	tsContainer = "ipm-typesense"
+	// legacyContainer is the name the search server had while ipm was aihs;
+	// it holds port 8108, so serve removes it.
+	legacyContainer = "aihs-typesense"
+	tsURL           = "http://127.0.0.1:8108"
 )
 
 // How often, and for how long, serve waits for Typesense to report healthy.
@@ -28,12 +31,10 @@ var (
 	healthFor   = 60 * time.Second
 )
 
-func tsDir(root string) string { return filepath.Join(root, ".aihs", "typesense") }
-
 // apiKey is the local Typesense key, kept in .aihs/typesense/api-key. With
 // create, a missing key is generated: 32 hex characters, mode 0600.
-func apiKey(root string, create bool) (string, error) {
-	path := filepath.Join(tsDir(root), "api-key")
+func apiKey(dir string, create bool) (string, error) {
+	path := filepath.Join(dir, "api-key")
 	data, err := os.ReadFile(path)
 	if err == nil {
 		return strings.TrimSpace(string(data)), nil
@@ -49,15 +50,19 @@ func apiKey(root string, create bool) (string, error) {
 		return "", err
 	}
 	key := hex.EncodeToString(b)
-	if err := os.MkdirAll(tsDir(root), 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
 	return key, os.WriteFile(path, []byte(key), 0o600)
 }
 
 // tsClient talks to the local Typesense with the stored key.
-func tsClient(sys System, root string) (*typesense.Client, error) {
-	key, err := apiKey(root, false)
+func tsClient(sys System) (*typesense.Client, error) {
+	p, err := ipmPaths(sys)
+	if err != nil {
+		return nil, err
+	}
+	key, err := apiKey(p.Typesense(), false)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +91,11 @@ func serveFlags() (*flag.FlagSet, func(System) error) {
 	return fs, func(sys System) error { return runServe(sys, stop) }
 }
 
-func dockerReady(sys System, root string) error {
+func dockerReady(sys System) error {
 	if _, err := sys.LookPath("docker"); err != nil {
 		return fmt.Errorf("ipm serve runs Typesense in Docker — install Docker (or OrbStack) first")
 	}
-	if out, err := sys.Output(root, "docker", "info", "--format", "{{.ServerVersion}}"); err != nil {
+	if out, err := sys.Output("", "docker", "info", "--format", "{{.ServerVersion}}"); err != nil {
 		return fmt.Errorf("Docker is not running — start it, then rerun: %s", strings.TrimSpace(out))
 	}
 	return nil
@@ -99,34 +104,40 @@ func dockerReady(sys System, root string) error {
 // runServe starts (or creates) the Typesense container and waits for it to
 // be healthy; with stop, it stops it.
 func runServe(sys System, stop bool) error {
-	cfg, err := config.Load(sys.Getenv)
+	p, err := ipmPaths(sys)
 	if err != nil {
 		return err
 	}
-	if err := dockerReady(sys, cfg.Root); err != nil {
+	if err := dockerReady(sys); err != nil {
 		return err
 	}
 	if stop {
-		if out, err := sys.Output(cfg.Root, "docker", "stop", tsContainer); err != nil {
+		if out, err := sys.Output("", "docker", "stop", tsContainer); err != nil {
 			return fmt.Errorf("docker stop: %v: %s", err, strings.TrimSpace(out))
 		}
-		fmt.Fprintf(sys.Stdout, "%s %s stopped (data kept in %s)\n", ok, tsContainer, tsDir(cfg.Root))
+		fmt.Fprintf(sys.Stdout, "%s %s stopped (data kept in %s)\n", ok, tsContainer, p.Typesense())
 		return nil
 	}
-	key, err := apiKey(cfg.Root, true)
+	key, err := apiKey(p.Typesense(), true)
 	if err != nil {
 		return err
 	}
-	out, err := sys.Output(cfg.Root, "docker", "inspect", "-f", "{{.State.Running}}", tsContainer)
+	if out, _ := sys.Output("", "docker", "ps", "-a", "--filter", "name=^"+legacyContainer+"$", "--format", "{{.Names}}"); strings.TrimSpace(out) == legacyContainer {
+		fmt.Fprintf(sys.Stdout, "%s removing the old %s container (ipm was called aihs); run `ipm load` after this\n", warn, legacyContainer)
+		if out, err := sys.Output("", "docker", "rm", "-f", legacyContainer); err != nil {
+			return fmt.Errorf("docker rm %s: %v: %s", legacyContainer, err, strings.TrimSpace(out))
+		}
+	}
+	out, err := sys.Output("", "docker", "inspect", "-f", "{{.State.Running}}", tsContainer)
 	was := state(out, err)
 	switch was {
 	case "running":
 	case "stopped":
-		if out, err := sys.Output(cfg.Root, "docker", "start", tsContainer); err != nil {
+		if out, err := sys.Output("", "docker", "start", tsContainer); err != nil {
 			return fmt.Errorf("docker start: %v: %s", err, strings.TrimSpace(out))
 		}
 	default:
-		if err := dockerRun(sys, cfg.Root, key); err != nil {
+		if err := dockerRun(sys, p, key); err != nil {
 			return err
 		}
 	}
@@ -140,10 +151,10 @@ func runServe(sys System, stop bool) error {
 		// .aihs was cleaned): recreate it with the current one. Typesense
 		// takes the bootstrap key from its command line, so data survives.
 		fmt.Fprintf(sys.Stdout, "%s %s holds an old API key — recreating it\n", warn, tsContainer)
-		if out, err := sys.Output(cfg.Root, "docker", "rm", "-f", tsContainer); err != nil {
+		if out, err := sys.Output("", "docker", "rm", "-f", tsContainer); err != nil {
 			return fmt.Errorf("docker rm: %v: %s", err, strings.TrimSpace(out))
 		}
-		if err := dockerRun(sys, cfg.Root, key); err != nil {
+		if err := dockerRun(sys, p, key); err != nil {
 			return err
 		}
 		if err := waitHealthy(c); err != nil {
@@ -172,12 +183,12 @@ func state(out string, err error) string {
 	return "missing"
 }
 
-func dockerRun(sys System, root, key string) error {
-	data := filepath.Join(tsDir(root), "data")
+func dockerRun(sys System, p paths.Paths, key string) error {
+	data := filepath.Join(p.Typesense(), "data")
 	if err := os.MkdirAll(data, 0o755); err != nil {
 		return err
 	}
-	if out, err := sys.Output(root, "docker", "run", "-d", "--name", tsContainer, "-p", "127.0.0.1:8108:8108",
+	if out, err := sys.Output("", "docker", "run", "-d", "--name", tsContainer, "-p", "127.0.0.1:8108:8108",
 		"-v", data+":/data", tsImage, "--data-dir", "/data", "--api-key", key); err != nil {
 		return fmt.Errorf("docker run: %v: %s", err, strings.TrimSpace(out))
 	}
@@ -200,12 +211,12 @@ func waitHealthy(c *typesense.Client) error {
 
 // searchHealth is doctor's docker and typesense rows: [mark, detail]. Both
 // are warnings at worst — search is optional.
-func searchHealth(sys System, root string) ([2]string, [2]string) {
-	if err := dockerReady(sys, root); err != nil {
+func searchHealth(sys System) ([2]string, [2]string) {
+	if err := dockerReady(sys); err != nil {
 		return [2]string{warn, err.Error()}, [2]string{warn, "not running — run `ipm serve`"}
 	}
 	dockerRow := [2]string{ok, "available"}
-	c, err := tsClient(sys, root)
+	c, err := tsClient(sys)
 	if err != nil {
 		return dockerRow, [2]string{warn, err.Error()}
 	}

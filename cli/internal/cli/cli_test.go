@@ -43,9 +43,12 @@ type result struct {
 	err error
 }
 
+// cacheOf is the IPM_CACHE_DIR newFake gives a checkout root.
+func cacheOf(root string) string { return filepath.Join(root, ".ipm-cache") }
+
 func newFake(root string) *fake {
 	return &fake{
-		env:    map[string]string{"IPM_ROOT": root, "IPM_HOME": filepath.Join(root, ".ipm-home"), "IPM_CACHE_DIR": filepath.Join(root, ".ipm-cache")},
+		env:    map[string]string{"IPM_ROOT": root, "IPM_HOME": filepath.Join(root, ".ipm-home"), "IPM_CACHE_DIR": cacheOf(root)},
 		onPath: map[string]bool{},
 		results: map[string]result{
 			"git conf":    {"Ada Lovelace\n", nil},
@@ -155,29 +158,42 @@ func TestUsageErrors(t *testing.T) {
 	}
 }
 
-func TestDoctor(t *testing.T) {
-	root := checkout(t)
-	f := newFake(root)
+func TestDoctorRows(t *testing.T) {
+	f := newFake(checkout(t))
+	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"10.33.2\n", nil}
+	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
+	f.run("sync")
+	f.out.Reset()
 	if err := f.run("doctor"); err != nil {
-		t.Fatalf("healthy checkout: %v\n%s", err, f.out.String())
+		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	for _, want := range []string{"✓ eng", "! idle", "✓ aihs.lock", "2 upstream(s) pinned", "! marketplace", "! claude", "! docker", "! typesense", "0 problem(s), 5 warning(s)"} {
-		if !strings.Contains(f.out.String(), want) {
-			t.Errorf("doctor missing %q:\n%s", want, f.out.String())
+	out := f.out.String()
+	for _, want := range []string{"✓ home", "✓ cache", "✓ pnpm", "10.33.2", "✓ sources", "1 synced", "✓ catalog", "! docker", "! typesense", "! claude", "0 problem(s)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("doctor missing %q:\n%s", want, out)
 		}
 	}
-
-	write(t, filepath.Join(root, "broken", "manifest.toml"), "[[plugin]]\nname = \"x\"\n")
-	f = newFake(root)
+	f = newFake(checkout(t))
 	var exit *ExitError
-	if err := f.run("doctor"); !errors.As(err, &exit) || exit.Code != 1 {
-		t.Fatalf("broken manifest: got %v", err)
-	}
-	if !strings.Contains(f.out.String(), "✗ broken") || !strings.Contains(f.out.String(), "`repo` is required") {
-		t.Fatalf("doctor:\n%s", f.out.String())
+	if err := f.run("doctor"); !errors.As(err, &exit) || !strings.Contains(f.out.String(), "✗ pnpm") || !strings.Contains(f.out.String(), "! sources") || !strings.Contains(f.out.String(), "! catalog") {
+		t.Errorf("bare machine: %v\n%s", err, f.out.String())
 	}
 }
 
+func TestServeRemovesLegacyContainer(t *testing.T) {
+	f, _ := dockerFake(t, result{"Error: No such object", errors.New("exit 1")})
+	f.results["docker ps"] = result{"aihs-typesense\n", nil}
+	if err := f.run("serve"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if callWith(f, "docker rm -f aihs-typesense") == "" || callWith(f, "docker run -d --name ipm-typesense") == "" {
+		t.Errorf("calls %v", f.calls)
+	}
+	if !strings.Contains(f.out.String(), "ipm load") {
+		t.Errorf("output:\n%s", f.out.String())
+	}
+}
 func cached(t *testing.T, root, repo, commit string, rels ...string) {
 	t.Helper()
 	dir := upstream.Dir(root, repo, commit)
@@ -196,7 +212,7 @@ func withRepos(t *testing.T, root string, repos ...string) {
 	for _, r := range repos {
 		fmt.Fprintf(&b, "{\"id\":\"repo:%s\",\"type\":\"repo\",\"repo\":%q}\n", r, r)
 	}
-	write(t, filepath.Join(root, "catalog", "repos.jsonl"), b.String())
+	write(t, filepath.Join(cacheOf(root), "catalog", "repos.jsonl"), b.String())
 }
 
 const ghRepoJSON = `{"stargazers_count":7,"forks_count":1,"description":"d","topics":[],"license":{"spdx_id":"MIT"},"pushed_at":"2026-10-01T00:00:00Z","archived":false,"default_branch":"main"}`
@@ -211,7 +227,7 @@ func TestStatsCommand(t *testing.T) {
 	if err := f.run("stats"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	data, _ := os.ReadFile(filepath.Join(root, "catalog", "github.jsonl"))
+	data, _ := os.ReadFile(filepath.Join(cacheOf(root), "catalog", "github.jsonl"))
 	if strings.Count(string(data), "\n") != 1 || !strings.Contains(string(data), `"repo":"o/r","stars":7`) ||
 		!strings.Contains(string(data), `"fetched_at":"2026-10-09T00:00:00Z"`) {
 		t.Errorf("github.jsonl:\n%s", data)
@@ -225,7 +241,7 @@ func TestStatsKeepsPreviousRecordOnFailure(t *testing.T) {
 	root := checkout(t)
 	withRepos(t, root, "o/r")
 	prev := `{"archived":false,"default_branch":"main","description":"old","fetched_at":"2026-01-01T00:00:00Z","forks":0,"license":"","pushed_at":"","repo":"o/r","stars":1,"topics":[]}` + "\n"
-	write(t, filepath.Join(root, "catalog", "github.jsonl"), prev)
+	write(t, filepath.Join(cacheOf(root), "catalog", "github.jsonl"), prev)
 	f := newFake(root)
 	f.onPath["gh"] = true
 	f.results["gh api"] = result{"HTTP 502", errors.New("exit 1")}
@@ -233,7 +249,7 @@ func TestStatsKeepsPreviousRecordOnFailure(t *testing.T) {
 	if err := f.run("stats"); !errors.As(err, &exit) || exit.Code != 1 {
 		t.Errorf("want exit 1, got %v", err)
 	}
-	if data, _ := os.ReadFile(filepath.Join(root, "catalog", "github.jsonl")); string(data) != prev {
+	if data, _ := os.ReadFile(filepath.Join(cacheOf(root), "catalog", "github.jsonl")); string(data) != prev {
 		t.Errorf("previous record changed:\n%s", data)
 	}
 }
@@ -245,7 +261,7 @@ func TestStatsNeedsGh(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "gh") {
 		t.Errorf("got %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, "catalog", "github.jsonl")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(cacheOf(root), "catalog", "github.jsonl")); !os.IsNotExist(err) {
 		t.Errorf("github.jsonl should not exist")
 	}
 }
@@ -305,13 +321,13 @@ func TestServeCreatesContainer(t *testing.T) {
 	if err := f.run("serve"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	keyFile := filepath.Join(root, ".aihs", "typesense", "api-key")
+	keyFile := filepath.Join(cacheOf(root), "typesense", "api-key")
 	key, err := os.ReadFile(keyFile)
 	info, _ := os.Stat(keyFile)
 	if err != nil || !regexpMatch(`^[0-9a-f]{32}$`, string(key)) || info.Mode().Perm() != 0o600 {
 		t.Fatalf("key %q %v %v", key, err, info.Mode())
 	}
-	want := "docker run -d --name aihs-typesense -p 127.0.0.1:8108:8108 -v " + filepath.Join(root, ".aihs", "typesense", "data") +
+	want := "docker run -d --name ipm-typesense -p 127.0.0.1:8108:8108 -v " + filepath.Join(cacheOf(root), "typesense", "data") +
 		":/data typesense/typesense:30.2 --data-dir /data --api-key " + string(key)
 	if got := callWith(f, "docker run"); got != want {
 		t.Errorf("got  %s\nwant %s", got, want)
@@ -339,7 +355,7 @@ func TestServeStartsStoppedContainer(t *testing.T) {
 	if err := f.run("serve"); err != nil {
 		t.Fatal(err)
 	}
-	if callWith(f, "docker start aihs-typesense") == "" {
+	if callWith(f, "docker start ipm-typesense") == "" {
 		t.Errorf("calls %v", f.calls)
 	}
 }
@@ -349,7 +365,7 @@ func TestServeStop(t *testing.T) {
 	if err := f.run("serve", "--stop"); err != nil {
 		t.Fatal(err)
 	}
-	if callWith(f, "docker stop aihs-typesense") == "" {
+	if callWith(f, "docker stop ipm-typesense") == "" {
 		t.Errorf("calls %v", f.calls)
 	}
 }
@@ -373,15 +389,15 @@ func TestServeHealthTimeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
 	defer srv.Close()
 	typesenseAt(f, srv)
-	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "docker logs aihs-typesense") {
+	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "docker logs ipm-typesense") {
 		t.Errorf("got %v", err)
 	}
 }
 
 func TestDoctorReportsTypesense(t *testing.T) {
 	f, root := dockerFake(t, result{"true", nil})
-	os.MkdirAll(filepath.Join(root, ".aihs", "typesense"), 0o755)
-	os.WriteFile(filepath.Join(root, ".aihs", "typesense", "api-key"), []byte("k"), 0o600)
+	os.MkdirAll(filepath.Join(cacheOf(root), "typesense"), 0o755)
+	os.WriteFile(filepath.Join(cacheOf(root), "typesense", "api-key"), []byte("k"), 0o600)
 	typesenseAt(f, healthy(t, 42))
 	f.run("doctor")
 	if !strings.Contains(f.out.String(), "✓ docker") || !strings.Contains(f.out.String(), "42 document(s)") {
@@ -402,9 +418,9 @@ func withCatalog(t *testing.T, root string, n int) {
 		if typ == catalog.TypeSkill {
 			body = skills.String()
 		}
-		write(t, filepath.Join(root, "catalog", catalog.Files[typ]), body)
+		write(t, filepath.Join(cacheOf(root), "catalog", catalog.Files[typ]), body)
 	}
-	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
 }
 
 // tsRecorder is a fake Typesense that records requests and answers imports
@@ -486,7 +502,7 @@ func TestLoadReportsFailures(t *testing.T) {
 func TestLoadNeedsServer(t *testing.T) {
 	root := checkout(t)
 	withCatalog(t, root, 1)
-	os.Remove(filepath.Join(root, ".aihs", "typesense", "api-key"))
+	os.Remove(filepath.Join(cacheOf(root), "typesense", "api-key"))
 	if err := newFake(root).run("load"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
 		t.Errorf("no key: %v", err)
 	}
@@ -509,7 +525,7 @@ func TestLoadWrongKey(t *testing.T) {
 
 func TestLoadWithoutCatalog(t *testing.T) {
 	f, rec := loadFake(t, 1)
-	os.RemoveAll(filepath.Join(f.env["IPM_ROOT"], "catalog"))
+	os.RemoveAll(filepath.Join(f.env["IPM_CACHE_DIR"], "catalog"))
 	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "ipm index") {
 		t.Errorf("got %v", err)
 	}
@@ -522,7 +538,7 @@ func TestLoadWithoutCatalog(t *testing.T) {
 func searchFake(t *testing.T, status int) (*fake, *url.Values) {
 	t.Helper()
 	root := checkout(t)
-	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
 	var last url.Values
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		last = r.URL.Query()
@@ -628,7 +644,7 @@ func withGraphCatalog(t *testing.T, root string) {
 		}
 	}
 	for name, body := range files {
-		write(t, filepath.Join(root, "catalog", name), body)
+		write(t, filepath.Join(cacheOf(root), "catalog", name), body)
 	}
 }
 
@@ -723,7 +739,7 @@ func TestServeRecreatesContainerWithStaleKey(t *testing.T) {
 			return
 		}
 		f.mu.Lock()
-		recreated := callWithLocked(f, "docker rm -f aihs-typesense") != ""
+		recreated := callWithLocked(f, "docker rm -f ipm-typesense") != ""
 		f.mu.Unlock()
 		if !recreated {
 			w.WriteHeader(401)
@@ -736,7 +752,7 @@ func TestServeRecreatesContainerWithStaleKey(t *testing.T) {
 	if err := f.run("serve"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if callWith(f, "docker rm -f aihs-typesense") == "" || callWith(f, "docker run") == "" {
+	if callWith(f, "docker rm -f ipm-typesense") == "" || callWith(f, "docker run") == "" {
 		t.Errorf("calls %v", f.calls)
 	}
 	if strings.Contains(f.out.String(), "ipm load") {
@@ -776,7 +792,7 @@ func TestSearchRejectsBlankQueryAndBacktickFilters(t *testing.T) {
 
 func TestDoctorWarnsOnEmptyIndex(t *testing.T) {
 	f, root := dockerFake(t, result{"true", nil})
-	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
 	typesenseAt(f, healthy(t, 0))
 	f.run("doctor")
 	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "ipm load") {
@@ -788,7 +804,7 @@ func TestDoctorWarnsOnEmptyIndex(t *testing.T) {
 func pagedFake(t *testing.T, found int) (*fake, *[]url.Values) {
 	t.Helper()
 	root := checkout(t)
-	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
 	var seen []url.Values
 	var mu sync.Mutex
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

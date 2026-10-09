@@ -11,7 +11,6 @@ import (
 
 	"github.com/thinkjones/fs-skills/cli/internal/catalog"
 	"github.com/thinkjones/fs-skills/cli/internal/catgraph"
-	"github.com/thinkjones/fs-skills/cli/internal/config"
 	"github.com/thinkjones/fs-skills/cli/internal/github"
 	"github.com/thinkjones/fs-skills/cli/internal/pack"
 	"github.com/thinkjones/fs-skills/cli/internal/search"
@@ -28,11 +27,11 @@ func oneID(name string, fs *flag.FlagSet) (string, error) {
 }
 
 func loadGraph(sys System) (*catgraph.Graph, string, error) {
-	cfg, err := config.Load(sys.Getenv)
+	p, err := ipmPaths(sys)
 	if err != nil {
 		return nil, "", err
 	}
-	dir := filepath.Join(cfg.Root, "catalog")
+	dir := p.Catalog()
 	g, err := catgraph.Load(dir)
 	return g, dir, err
 }

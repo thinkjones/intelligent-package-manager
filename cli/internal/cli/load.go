@@ -3,12 +3,10 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"path/filepath"
 	"text/tabwriter"
 	"time"
 
 	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/config"
 	"github.com/thinkjones/fs-skills/cli/internal/search"
 )
 
@@ -22,15 +20,15 @@ func loadFlags() (*flag.FlagSet, func(System) error) {
 
 // runLoad rebuilds the search index from catalog/: drop, create, import.
 func runLoad(sys System) error {
-	cfg, err := config.Load(sys.Getenv)
+	p, err := ipmPaths(sys)
 	if err != nil {
 		return err
 	}
-	docs, err := search.Documents(filepath.Join(cfg.Root, "catalog"))
+	docs, err := search.Documents(p.Catalog())
 	if err != nil {
 		return err
 	}
-	c, err := tsClient(sys, cfg.Root)
+	c, err := tsClient(sys)
 	if err != nil {
 		return err
 	}

@@ -61,7 +61,7 @@ func init() {
 	commands = []command{
 		{"source", "add, remove, list or import your repos of interest", "<add|remove|list|import> …", sourceFlags},
 		{"sync", "fetch and pin every source with pnpm, then reindex", "", syncFlags},
-		{"doctor", "check config and every pack manifest — exits 1 on problems", "", doctorFlags},
+		{"doctor", "check home, pnpm, sources, catalog and search — exits 1 on problems", "", doctorFlags},
 		{"index", "rebuild the catalog from your synced sources", "", indexFlags},
 		{"serve", "start the local Typesense search server in Docker (--stop to stop it)", "", serveFlags},
 		{"load", "rebuild the search index from catalog/", "", loadFlags},
