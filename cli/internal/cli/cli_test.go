@@ -904,3 +904,111 @@ func TestSearchFlagsAnywhere(t *testing.T) {
 		t.Errorf("query %v", *last)
 	}
 }
+
+// withGraphCatalog writes a small linked catalog: repo o/r (10★) → marketplace
+// m → plugin p → skill s1, an external plugin e from x/c, and a chain
+// deep enough to test tree depth.
+func withGraphCatalog(t *testing.T, root string) {
+	t.Helper()
+	files := map[string]string{
+		"repos.jsonl": `{"id":"repo:o/r","type":"repo","name":"o/r","repo":"o/r","commit":"c1","followed":true}` + "\n" +
+			`{"id":"repo:x/c","type":"repo","name":"x/c","repo":"x/c","followed":false}` + "\n",
+		"marketplaces.jsonl": `{"id":"marketplace:o/r:.","type":"marketplace","name":"m","repo":"o/r","plugins":["plugin:o/r:p","plugin:o/r#e"]}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:o/r#e","type":"plugin","name":"e","repo":"o/r","source_repo":"x/c"}` + "\n" +
+			`{"id":"plugin:o/r:p","type":"plugin","name":"p","repo":"o/r","commit":"c1","path":"p","skills":["skill:o/r:p/skills/s1"],"hooks":["hook:o/r:p/hooks/hooks.json"]}` + "\n",
+		"skills.jsonl": `{"id":"skill:o/r:p/skills/s1","type":"skill","name":"s1","description":"Test first","tags":["testing"],"repo":"o/r","commit":"c1","path":"p/skills/s1","plugins":["plugin:o/r:p"]}` + "\n",
+		"hooks.jsonl":  `{"id":"hook:o/r:p/hooks/hooks.json","type":"hook","name":"p","repo":"o/r","plugins":["plugin:o/r:p"]}` + "\n",
+		"github.jsonl": `{"repo":"o/r","stars":10,"forks":2,"license":"MIT","pushed_at":"2026-10-01T00:00:00Z","topics":["t"]}` + "\n",
+	}
+	for _, typ := range catalog.Types {
+		if _, ok := files[catalog.Files[typ]]; !ok {
+			files[catalog.Files[typ]] = ""
+		}
+	}
+	for name, body := range files {
+		write(t, filepath.Join(root, "catalog", name), body)
+	}
+}
+
+func graphFake(t *testing.T) *fake {
+	t.Helper()
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	return newFake(root)
+}
+
+func TestShow(t *testing.T) {
+	f := graphFake(t)
+	if err := f.run("show", "skill:o/r:p/skills/s1"); err != nil {
+		t.Fatal(err)
+	}
+	out := f.out.String()
+	for _, want := range []string{"name", "s1", "type", "skill", "commit", "c1", "stars", "10", "MIT", "up:", "plugin      p", "down:"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestShowExternalPlugin(t *testing.T) {
+	f := graphFake(t)
+	f.run("show", "plugin:o/r#e")
+	lines := strings.Split(strings.TrimSpace(f.out.String()), "\n")
+	if lines[len(lines)-1] != "promote: aihs promote plugin:o/r#e" {
+		t.Errorf("output:\n%s", f.out.String())
+	}
+}
+
+func TestShowJSON(t *testing.T) {
+	f := graphFake(t)
+	f.run("show", "--json", "skill:o/r:p/skills/s1")
+	var m map[string]any
+	if err := json.Unmarshal(f.out.Bytes(), &m); err != nil || m["id"] != "skill:o/r:p/skills/s1" || m["description"] != "Test first" {
+		t.Errorf("got %v %v\n%s", m, err, f.out.String())
+	}
+}
+
+func TestTreeAndGraphCommands(t *testing.T) {
+	f := graphFake(t)
+	if err := f.run("tree", "--up", "skill:o/r:p/skills/s1"); err != nil || !strings.HasPrefix(f.out.String(), "skill       s1\n└─ plugin      p") {
+		t.Errorf("tree --up: %v\n%s", err, f.out.String())
+	}
+	f.out.Reset()
+	if err := f.run("graph", "--format", "dot", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "digraph") {
+		t.Errorf("graph dot: %v\n%s", err, f.out.String())
+	}
+	f.out.Reset()
+	if err := f.run("graph", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "flowchart LR") {
+		t.Errorf("graph default: %v\n%s", err, f.out.String())
+	}
+	var usage *UsageError
+	if err := f.run("graph", "--format", "svg", "plugin:o/r:p"); !errors.As(err, &usage) {
+		t.Errorf("svg: %v", err)
+	}
+	if err := f.run("tree"); !errors.As(err, &usage) {
+		t.Errorf("no id: %v", err)
+	}
+}
+
+func TestShowWithoutCatalog(t *testing.T) {
+	f := newFake(checkout(t))
+	for _, cmd := range []string{"show", "tree", "graph"} {
+		if err := f.run(cmd, "skill:o/r:x"); err == nil || !strings.Contains(err.Error(), "aihs index") {
+			t.Errorf("%s: %v", cmd, err)
+		}
+	}
+}
+
+func TestTreeDefaultDepth(t *testing.T) {
+	f := graphFake(t)
+	f.run("tree", "repo:o/r")
+	// repo (0) → marketplace (1) → plugin p (2) → skill/hook (3): depth 3 shows s1
+	if !strings.Contains(f.out.String(), "skill       s1") {
+		t.Errorf("repo tree:\n%s", f.out.String())
+	}
+	f.out.Reset()
+	f.run("tree", "--depth", "1", "repo:o/r")
+	if strings.Contains(f.out.String(), "plugin      p") {
+		t.Errorf("--depth 1 shows grandchildren:\n%s", f.out.String())
+	}
+}
