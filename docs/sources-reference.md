@@ -18,6 +18,8 @@ Your **sources** are the repos of interest `ipm` fetches, pins and catalogs. The
 
 The home holds what you would lose (your list of sources and its pins); the cache holds only what `ipm` can rebuild.
 
+A project's `.ipm/` (`package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs`, `node_modules/`) is a second pnpm project of the same shape, written by `ipm install` from your packs and pinned to the commits in `.ipm/ipm.lock`; see [Build your own plugin](user-guide.md#build-your-own-plugin).
+
 ## `package.json`
 
 ```json
