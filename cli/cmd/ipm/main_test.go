@@ -37,7 +37,7 @@ func ipm(t *testing.T, root string, args ...string) (stdout, stderr string, code
 	cmd := exec.Command(bin, args...)
 	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + t.TempDir()}
 	if root != "" {
-		cmd.Env = append(cmd.Env, "IPM_ROOT="+root)
+		cmd.Env = append(cmd.Env, "IPM_HOME="+filepath.Join(root, "home"), "IPM_CACHE_DIR="+filepath.Join(root, "cache"))
 	}
 	var o, e bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &o, &e

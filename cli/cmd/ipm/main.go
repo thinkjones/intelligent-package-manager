@@ -1,15 +1,16 @@
-// ipm is local tooling for this checkout's packs. Every command is Go code
-// in internal/cli:
+// ipm is an intelligent package manager for agent skills, agents, commands
+// and plugins. Every command is Go code in internal/cli:
 //
-//	ipm create-plugin [flags]   write .claude-plugin/marketplace.json
-//	ipm doctor                  check config and every pack manifest
-//	ipm index | stats | promote build the artifact catalog in catalog/
-//	ipm serve | load | search   local hybrid search over the catalog
-//	ipm show | tree | graph     an artifact and its relationships
+//	ipm source | sync | index    your repos of interest, fetched by pnpm
+//	ipm stats                    GitHub stats for the catalog
+//	ipm serve | load | search    local hybrid search over the catalog
+//	ipm show | tree | graph      an artifact and its relationships
+//	ipm scan | doctor            quick checks
 //	ipm version | help [command]
 //
-// bin/ipm at the checkout root builds this binary on demand and sets
-// IPM_ROOT. main only wires the process into cli.Run. See cli/README.md.
+// Data lives in IPM_HOME and IPM_CACHE_DIR (see internal/paths). bin/ipm in
+// the source checkout builds this binary on demand. main only wires the
+// process into cli.Run. See cli/README.md.
 package main
 
 import (

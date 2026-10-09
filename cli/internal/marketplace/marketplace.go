@@ -1,18 +1,9 @@
-// Package marketplace builds and writes a Claude Code marketplace.json from
-// loaded packs.
-//
-// Each plugin becomes an entry whose source points at its upstream repo — a
-// `github` source for a whole repo, `git-subdir` (a sparse checkout) when a
-// path is set, `url` for a non-GitHub git URL — pinned to the commit in
-// aihs.lock. Nothing is copied: Claude Code fetches the plugin at install
-// time. A plugin listed by several packs is published once.
-//
-// Every pack also becomes a stack entry named after it, referenced in place
-// ("./<pack>", which holds only manifest.toml): it has no components of its
-// own and depends on the pack's plugins and on the packs it includes, so
-// installing it installs the whole stack. The file lives at
-// <root>/.claude-plugin/marketplace.json because Claude Code resolves
-// relative sources against that root and forbids "../".
+// Package marketplace builds and writes a Claude Code marketplace.json:
+// entries whose source points at an upstream repo — `github` for a whole
+// repo, `git-subdir` (a sparse checkout) for a path, `url` for a non-GitHub
+// git URL — pinned to a commit. Every entry carries OwnerTag, which is how an
+// existing file is recognised as ipm's to overwrite. Part 3 of the ipm design
+// (packs and `ipm install`) builds on it.
 package marketplace
 
 import (
@@ -23,8 +14,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
 )
 
 const Schema = "https://anthropic.com/claude-code/marketplace.schema.json"
@@ -96,103 +85,21 @@ var commitRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // SourceFor maps a plugin onto a Claude Code plugin source at commit. A
 // version that names a branch or tag is kept as `ref`, for readers.
-func SourceFor(pl pack.Plugin, commit string) Source {
-	var s Source
+func SourceFor(repo, path, version, commit string) Source {
+	var src Source
 	switch {
-	case pl.Path != "":
-		s = Source{Source: "git-subdir", URL: pl.Repo, Path: pl.Path}
-	case ownerRepo.MatchString(pl.Repo):
-		s = Source{Source: "github", Repo: pl.Repo}
+	case path != "":
+		src = Source{Source: "git-subdir", URL: repo, Path: path}
+	case ownerRepo.MatchString(repo):
+		src = Source{Source: "github", Repo: repo}
 	default:
-		s = Source{Source: "url", URL: pl.Repo}
+		src = Source{Source: "url", URL: repo}
 	}
-	if pl.Version != "" && !commitRE.MatchString(pl.Version) {
-		s.Ref = pl.Version
+	if version != "" && !commitRE.MatchString(version) {
+		src.Ref = version
 	}
-	s.SHA = commit
-	return s
-}
-
-// Entries is every entry the packs publish, in pack order: each pack's stack
-// entry, then those of its plugins not already published by an earlier pack,
-// each pinned to its commit in lock. Callers check pack.Problems first: a
-// name defined two ways would be published as the first definition.
-func Entries(packs []pack.Pack, lock map[string]string) []Entry {
-	var out []Entry
-	published := map[string]bool{}
-	for _, p := range packs {
-		tags := []string{OwnerTag, p.Name}
-		out = append(out, stack(p, tags))
-		for _, pl := range p.Plugins {
-			if published[pl.Name] {
-				continue
-			}
-			published[pl.Name] = true
-			e := Entry{
-				Name:         pl.Name,
-				Description:  pl.Description,
-				Source:       SourceFor(pl, lock[pl.Upstream().Key()]),
-				Category:     p.Name,
-				Tags:         tags,
-				Skills:       pl.Skills,
-				Dependencies: pl.Dependencies,
-				Pack:         p.Name,
-			}
-			if len(pl.Agents) > 0 {
-				agents := pl.Agents
-				e.Agents = &agents
-			}
-			out = append(out, e)
-		}
-	}
-	return out
-}
-
-// stack is the entry for the pack itself: a dependency on every plugin it
-// lists and every pack it includes.
-func stack(p pack.Pack, tags []string) Entry {
-	var parts []string
-	if n := len(p.Plugins); n > 0 {
-		parts = append(parts, plural(n, "plugin"))
-	}
-	if len(p.Meta.Includes) > 0 {
-		parts = append(parts, "includes "+strings.Join(p.Meta.Includes, ", "))
-	}
-	desc := p.Meta.Description
-	if desc == "" {
-		desc = "The " + p.Name + " pack"
-	}
-	desc = fmt.Sprintf("%s (%s)", desc, strings.Join(parts, "; "))
-
-	var deps []string
-	for _, pl := range p.Plugins {
-		deps = append(deps, pl.Name)
-	}
-	deps = append(deps, p.Meta.Includes...)
-
-	// The pack directory holds only manifest.toml; strict:false with empty
-	// component lists states that the stack itself contributes nothing.
-	strict, none := false, []string{}
-	return Entry{
-		Name:         p.Name,
-		Description:  desc,
-		Source:       "./" + p.Name,
-		Category:     p.Name,
-		Tags:         tags,
-		Strict:       &strict,
-		Dependencies: deps,
-		Commands:     &none,
-		Agents:       &none,
-		Version:      p.Meta.Version,
-		Pack:         p.Name,
-	}
-}
-
-func plural(n int, noun string) string {
-	if n == 1 {
-		return "1 " + noun
-	}
-	return fmt.Sprintf("%d %ss", n, noun)
+	src.SHA = commit
+	return src
 }
 
 // Build assembles the marketplace.

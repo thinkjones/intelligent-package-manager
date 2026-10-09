@@ -58,20 +58,6 @@ func LoadInterest(root string) ([]Upstream, error) {
 	return ups, nil
 }
 
-// Merge is every upstream in a and b, each once, sorted by key.
-func Merge(a, b []Upstream) []Upstream {
-	seen := map[string]Upstream{}
-	for _, u := range append(append([]Upstream(nil), a...), b...) {
-		seen[u.Key()] = u
-	}
-	out := make([]Upstream, 0, len(seen))
-	for _, u := range seen {
-		out = append(out, u)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].Key() < out[j].Key() })
-	return out
-}
-
 // NormalizeRepo writes a GitHub repo as owner/repo, whether given as that,
 // an https URL (with or without .git) or an ssh URL. Anything else is
 // returned unchanged.
@@ -86,39 +72,4 @@ func NormalizeRepo(s string) string {
 		}
 	}
 	return s
-}
-
-// AppendInterest adds a [[repo]] entry per repo to root's manifest.toml,
-// creating it if missing. Existing bytes, comments included, are kept as
-// they are. A repo already listed (in any GitHub spelling) is refused and
-// nothing is written.
-func AppendInterest(root string, repos []string) error {
-	listed, err := LoadInterest(root)
-	if err != nil {
-		return err
-	}
-	seen := map[string]bool{}
-	for _, u := range listed {
-		seen[NormalizeRepo(u.Repo)] = true
-	}
-	for _, r := range repos {
-		if seen[NormalizeRepo(r)] {
-			return fmt.Errorf("%s is already a repo of interest", r)
-		}
-		seen[NormalizeRepo(r)] = true
-	}
-	path := filepath.Join(root, ManifestFile)
-	data, err := os.ReadFile(path)
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	var b strings.Builder
-	b.Write(data)
-	if len(data) > 0 && !strings.HasSuffix(string(data), "\n") {
-		b.WriteString("\n")
-	}
-	for _, r := range repos {
-		fmt.Fprintf(&b, "\n[[repo]]\nrepo = %q\n", r)
-	}
-	return os.WriteFile(path, []byte(b.String()), 0o644)
 }

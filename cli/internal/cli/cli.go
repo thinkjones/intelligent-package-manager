@@ -148,7 +148,7 @@ func runHelp(args []string, sys System) error {
 }
 
 func printHelp(w io.Writer) {
-	fmt.Fprintln(w, "ipm — local tooling for this checkout's packs")
+	fmt.Fprintln(w, "ipm — intelligent package manager for agent skills, agents, commands and plugins")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage")
 	fmt.Fprintln(w, "  ipm <command> [flags]")
@@ -159,7 +159,8 @@ func printHelp(w io.Writer) {
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Config")
-	fmt.Fprintln(w, "  IPM_ROOT        this checkout's root, set by bin/ipm (on PATH after direnv allow)")
+	fmt.Fprintln(w, "  IPM_HOME        sources and the pnpm store (default ~/Library/ipm, ~/.local/share/ipm)")
+	fmt.Fprintln(w, "  IPM_CACHE_DIR   catalog and search data (default ~/Library/Caches/ipm, ~/.cache/ipm)")
 }
 
 func printCommandHelp(w io.Writer, cmd command) {

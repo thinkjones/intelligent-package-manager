@@ -22,7 +22,6 @@ import (
 
 	"github.com/thinkjones/fs-skills/cli/internal/catalog"
 	"github.com/thinkjones/fs-skills/cli/internal/sources"
-	"github.com/thinkjones/fs-skills/cli/internal/upstream"
 )
 
 // fake is a System with no real environment, git or claude. Output answers
@@ -48,7 +47,7 @@ func cacheOf(root string) string { return filepath.Join(root, ".ipm-cache") }
 
 func newFake(root string) *fake {
 	return &fake{
-		env:    map[string]string{"IPM_ROOT": root, "IPM_HOME": filepath.Join(root, ".ipm-home"), "IPM_CACHE_DIR": cacheOf(root)},
+		env:    map[string]string{"IPM_HOME": filepath.Join(root, ".ipm-home"), "IPM_CACHE_DIR": cacheOf(root)},
 		onPath: map[string]bool{},
 		results: map[string]result{
 			"git conf":    {"Ada Lovelace\n", nil},
@@ -103,24 +102,15 @@ func write(t *testing.T, path, body string) {
 	}
 }
 
-// checkout is a root with two packs: one upstream plugin each.
+// checkout is an empty working directory; newFake puts IPM_HOME and
+// IPM_CACHE_DIR inside it.
 func checkout(t *testing.T) string {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "skills-repo")
-	write(t, filepath.Join(root, "eng", "manifest.toml"), "[[plugin]]\nname = \"cflr\"\nrepo = \"cloudflare/skills\"\npath = \"skills\"\nskills = [\"./\"]\n")
-	write(t, filepath.Join(root, "notes", "manifest.toml"), "[[plugin]]\nname = \"obsidian\"\nrepo = \"kepano/obsidian-skills\"\n")
-	write(t, filepath.Join(root, "idle", "manifest.toml"), "")
-	write(t, filepath.Join(root, "aihs.lock"), lockFor("cloudflare/skills", "kepano/obsidian-skills"))
-	return root
-}
-
-// lockFor pins each repo to a fake commit: "a…a", "b…b", ….
-func lockFor(repos ...string) string {
-	var b strings.Builder
-	for i, r := range repos {
-		fmt.Fprintf(&b, "[[repo]]\nrepo = %q\ncommit = %q\n", r, strings.Repeat(string(rune('a'+i)), 40))
+	root := filepath.Join(t.TempDir(), "work")
+	if err := os.MkdirAll(root, 0o755); err != nil {
+		t.Fatal(err)
 	}
-	return b.String()
+	return root
 }
 
 func TestHelpAndVersion(t *testing.T) {
@@ -178,28 +168,6 @@ func TestDoctorRows(t *testing.T) {
 	var exit *ExitError
 	if err := f.run("doctor"); !errors.As(err, &exit) || !strings.Contains(f.out.String(), "✗ pnpm") || !strings.Contains(f.out.String(), "! sources") || !strings.Contains(f.out.String(), "! catalog") {
 		t.Errorf("bare machine: %v\n%s", err, f.out.String())
-	}
-}
-
-func TestServeRemovesLegacyContainer(t *testing.T) {
-	f, _ := dockerFake(t, result{"Error: No such object", errors.New("exit 1")})
-	f.results["docker ps"] = result{"aihs-typesense\n", nil}
-	if err := f.run("serve"); err != nil {
-		t.Fatalf("%v\n%s", err, f.out.String())
-	}
-	if callWith(f, "docker rm -f aihs-typesense") == "" || callWith(f, "docker run -d --name ipm-typesense") == "" {
-		t.Errorf("calls %v", f.calls)
-	}
-	if !strings.Contains(f.out.String(), "ipm load") {
-		t.Errorf("output:\n%s", f.out.String())
-	}
-}
-func cached(t *testing.T, root, repo, commit string, rels ...string) {
-	t.Helper()
-	dir := upstream.Dir(root, repo, commit)
-	write(t, filepath.Join(dir, ".git", "HEAD"), commit+"\n")
-	for _, rel := range rels {
-		write(t, filepath.Join(dir, rel), "")
 	}
 }
 
