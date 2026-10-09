@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"flag"
+	"slices"
 	"strings"
 
 	"github.com/thinkjones/fs-skills/cli/internal/config"
@@ -21,21 +22,27 @@ func searchFlags() (*flag.FlagSet, func(System) error) {
 	fs.IntVar(&q.Limit, "limit", 20, "results to show (max 250)")
 	fs.BoolVar(&asJSON, "json", false, "print each hit as a JSON line")
 	return fs, func(sys System) error {
-		words, err := interspersed(fs, fs.Args())
-		if err != nil {
-			return usagef("search: %v. Try `aihs help search`.", err)
-		}
-		if len(words) == 0 {
+		q.Text = strings.TrimSpace(strings.Join(fs.Args(), " "))
+		if q.Text == "" {
 			return usagef("search: give a query (or * for everything). Try `aihs help search`.")
 		}
-		q.Text = strings.Join(words, " ")
+		for _, v := range slices.Concat(types, repos, tags) {
+			if strings.Contains(v, "`") {
+				return usagef("search: filter value %q contains a backtick, which Typesense filters cannot express", v)
+			}
+		}
 		q.Types, q.Repos, q.Tags = types, repos, tags
 		return runSearch(sys, q, asJSON)
 	}
 }
 
-// interspersed lets flags follow query words: `search c# --type skill tests`.
-func interspersed(fs *flag.FlagSet, rest []string) ([]string, error) {
+// interspersed lets flags follow positional words (`search c# --type skill
+// tests`); everything after "--" is a word, even if it starts with "-".
+func interspersed(fs *flag.FlagSet, args []string) ([]string, error) {
+	rest, tail := args, []string(nil)
+	if i := slices.Index(args, "--"); i >= 0 {
+		rest, tail = args[:i], args[i+1:]
+	}
 	var words []string
 	for len(rest) > 0 {
 		if strings.HasPrefix(rest[0], "-") && rest[0] != "-" {
@@ -48,7 +55,7 @@ func interspersed(fs *flag.FlagSet, rest []string) ([]string, error) {
 		words = append(words, rest[0])
 		rest = rest[1:]
 	}
-	return words, nil
+	return append(words, tail...), nil
 }
 
 func runSearch(sys System, q search.Query, asJSON bool) error {

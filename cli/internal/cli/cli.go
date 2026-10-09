@@ -108,7 +108,18 @@ func Run(args []string, sys System) error {
 	}
 	fs, run := cmd.flags()
 	fs.SetOutput(io.Discard)
-	if err := fs.Parse(rest); err != nil {
+	parse := fs.Parse
+	if cmd.args != "" {
+		parse = func(args []string) error {
+			words, err := interspersed(fs, args)
+			if err != nil {
+				return err
+			}
+			// Leave exactly the positional words in fs.Args().
+			return fs.Parse(append([]string{"--"}, words...))
+		}
+	}
+	if err := parse(rest); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			printCommandHelp(sys.Stdout, cmd)
 			return nil

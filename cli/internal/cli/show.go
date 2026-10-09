@@ -20,10 +20,7 @@ import (
 // oneID is the single artifact ID a relationship command takes; flags may
 // come after it.
 func oneID(name string, fs *flag.FlagSet) (string, error) {
-	words, err := interspersed(fs, fs.Args())
-	if err != nil {
-		return "", usagef("%s: %v. Try `aihs help %s`.", name, err, name)
-	}
+	words := fs.Args()
 	if len(words) != 1 {
 		return "", usagef("%s: give one artifact ID (find IDs with `aihs search`). Try `aihs help %s`.", name, name)
 	}

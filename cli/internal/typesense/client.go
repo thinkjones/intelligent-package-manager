@@ -22,6 +22,8 @@ var (
 	ErrUnreachable = errors.New("typesense is not reachable")
 	// ErrUnauthorized is a server that rejected the API key.
 	ErrUnauthorized = errors.New("typesense rejected the API key")
+	// ErrTimeout is a server that took too long to answer — busy, not gone.
+	ErrTimeout = errors.New("typesense did not answer in time")
 	// ErrNoCollection is a request for a collection that does not exist.
 	ErrNoCollection = errors.New("typesense has no such collection")
 )
@@ -46,14 +48,18 @@ func (c *Client) do(method, path string, query url.Values, body io.Reader, timeo
 	hc := http.Client{Timeout: timeout}
 	if c.HTTP != nil {
 		hc = *c.HTTP
-		if hc.Timeout == 0 || hc.Timeout < timeout {
+		if hc.Timeout == 0 {
 			hc.Timeout = timeout
 		}
 	}
 	resp, err := hc.Do(req)
 	if err != nil {
 		var ne net.Error
-		if errors.As(err, &ne) || errors.Is(err, io.EOF) || strings.Contains(err.Error(), "connection refused") {
+		var op *net.OpError
+		switch {
+		case errors.As(err, &ne) && ne.Timeout():
+			return nil, fmt.Errorf("%w (after %s)", ErrTimeout, hc.Timeout)
+		case errors.As(err, &op) && op.Op == "dial", errors.Is(err, io.EOF), strings.Contains(err.Error(), "connection refused"):
 			return nil, fmt.Errorf("%w at %s: %v", ErrUnreachable, c.BaseURL, err)
 		}
 		return nil, err
@@ -153,7 +159,13 @@ func (c *Client) Import(collection string, docs []map[string]any) ([]ImportResul
 		}
 		out = append(out, r)
 	}
-	return out, sc.Err()
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) != len(docs) {
+		return nil, fmt.Errorf("typesense import answered %d result(s) for %d document(s)", len(out), len(docs))
+	}
+	return out, nil
 }
 
 // Hit is one search result.

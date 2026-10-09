@@ -71,6 +71,8 @@ func tsError(err error) error {
 		return fmt.Errorf("the search server is not running — run `aihs serve`")
 	case errors.Is(err, typesense.ErrUnauthorized):
 		return fmt.Errorf("the search server rejected the API key — another Typesense may be using port 8108 (check `docker ps`)")
+	case errors.Is(err, typesense.ErrTimeout):
+		return fmt.Errorf("the search server did not answer in time — it may still be busy (see `docker logs %s`)", tsContainer)
 	case errors.Is(err, typesense.ErrNoCollection):
 		return fmt.Errorf("the search index is empty — run `aihs load`")
 	}
@@ -116,39 +118,84 @@ func runServe(sys System, stop bool) error {
 		return err
 	}
 	out, err := sys.Output(cfg.Root, "docker", "inspect", "-f", "{{.State.Running}}", tsContainer)
-	switch state := strings.TrimSpace(out); {
-	case err == nil && state == "true":
-	case err == nil && state == "false":
+	was := state(out, err)
+	switch was {
+	case "running":
+	case "stopped":
 		if out, err := sys.Output(cfg.Root, "docker", "start", tsContainer); err != nil {
 			return fmt.Errorf("docker start: %v: %s", err, strings.TrimSpace(out))
 		}
 	default:
-		data := filepath.Join(tsDir(cfg.Root), "data")
-		if err := os.MkdirAll(data, 0o755); err != nil {
+		if err := dockerRun(sys, cfg.Root, key); err != nil {
 			return err
-		}
-		if out, err := sys.Output(cfg.Root, "docker", "run", "-d", "--name", tsContainer, "-p", "127.0.0.1:8108:8108",
-			"-v", data+":/data", tsImage, "--data-dir", "/data", "--api-key", key); err != nil {
-			return fmt.Errorf("docker run: %v: %s", err, strings.TrimSpace(out))
 		}
 	}
 	c := &typesense.Client{BaseURL: tsURL, APIKey: key, HTTP: sys.HTTP}
+	if err := waitHealthy(c); err != nil {
+		return err
+	}
+	n, err := c.NumDocuments(search.Collection)
+	if errors.Is(err, typesense.ErrUnauthorized) && was != "missing" {
+		// Our container was started with a key we no longer hold (e.g.
+		// .aihs was cleaned): recreate it with the current one. Typesense
+		// takes the bootstrap key from its command line, so data survives.
+		fmt.Fprintf(sys.Stdout, "%s %s holds an old API key — recreating it\n", warn, tsContainer)
+		if out, err := sys.Output(cfg.Root, "docker", "rm", "-f", tsContainer); err != nil {
+			return fmt.Errorf("docker rm: %v: %s", err, strings.TrimSpace(out))
+		}
+		if err := dockerRun(sys, cfg.Root, key); err != nil {
+			return err
+		}
+		if err := waitHealthy(c); err != nil {
+			return err
+		}
+		n, err = c.NumDocuments(search.Collection)
+	}
+	if err != nil && !errors.Is(err, typesense.ErrNoCollection) {
+		return tsError(err)
+	}
+	fmt.Fprintf(sys.Stdout, "%s Typesense running at %s (container %s)\n", ok, tsURL, tsContainer)
+	if n == 0 {
+		fmt.Fprintln(sys.Stdout, "Next: aihs load")
+	}
+	return nil
+}
+
+// state reads `docker inspect` of the container: running, stopped or missing.
+func state(out string, err error) string {
+	switch s := strings.TrimSpace(out); {
+	case err == nil && s == "true":
+		return "running"
+	case err == nil && s == "false":
+		return "stopped"
+	}
+	return "missing"
+}
+
+func dockerRun(sys System, root, key string) error {
+	data := filepath.Join(tsDir(root), "data")
+	if err := os.MkdirAll(data, 0o755); err != nil {
+		return err
+	}
+	if out, err := sys.Output(root, "docker", "run", "-d", "--name", tsContainer, "-p", "127.0.0.1:8108:8108",
+		"-v", data+":/data", tsImage, "--data-dir", "/data", "--api-key", key); err != nil {
+		return fmt.Errorf("docker run: %v: %s", err, strings.TrimSpace(out))
+	}
+	return nil
+}
+
+func waitHealthy(c *typesense.Client) error {
 	deadline := time.Now().Add(healthFor)
 	for {
 		err := c.Health()
 		if err == nil {
-			break
+			return nil
 		}
 		if time.Now().After(deadline) {
 			return fmt.Errorf("Typesense did not become healthy within %s (%v) — see `docker logs %s`", healthFor, err, tsContainer)
 		}
 		time.Sleep(healthEvery)
 	}
-	fmt.Fprintf(sys.Stdout, "%s Typesense running at %s (container %s)\n", ok, tsURL, tsContainer)
-	if n, err := c.NumDocuments(search.Collection); err != nil || n == 0 {
-		fmt.Fprintln(sys.Stdout, "Next: aihs load")
-	}
-	return nil
 }
 
 // searchHealth is doctor's docker and typesense rows: [mark, detail]. Both
@@ -165,6 +212,9 @@ func searchHealth(sys System, root string) ([2]string, [2]string) {
 	n, err := c.NumDocuments(search.Collection)
 	if err != nil {
 		return dockerRow, [2]string{warn, tsError(err).Error()}
+	}
+	if n == 0 {
+		return dockerRow, [2]string{warn, "running, but the index is empty — run `aihs load`"}
 	}
 	return dockerRow, [2]string{ok, fmt.Sprintf("%s, %d document(s)", tsURL, n)}
 }

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func serve(t *testing.T, h http.HandlerFunc) (*Client, *httptest.Server) {
@@ -128,5 +129,21 @@ func TestSearch(t *testing.T) {
 	}
 	if _, err := c.Search("nope", url.Values{}); !errors.Is(err, ErrNoCollection) {
 		t.Errorf("missing: %v", err)
+	}
+}
+
+func TestTimeoutIsNotUnreachable(t *testing.T) {
+	c, _ := serve(t, func(w http.ResponseWriter, r *http.Request) { time.Sleep(200 * time.Millisecond) })
+	c.HTTP = &http.Client{Timeout: 50 * time.Millisecond}
+	err := c.Health()
+	if !errors.Is(err, ErrTimeout) || errors.Is(err, ErrUnreachable) {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestImportResultCountMismatch(t *testing.T) {
+	c, _ := serve(t, func(w http.ResponseWriter, r *http.Request) { io.WriteString(w, "{\"success\":true}\n") })
+	if _, err := c.Import("artifacts", []map[string]any{{"id": "a"}, {"id": "b"}}); err == nil || !strings.Contains(err.Error(), "1 result(s) for 2") {
+		t.Errorf("got %v", err)
 	}
 }

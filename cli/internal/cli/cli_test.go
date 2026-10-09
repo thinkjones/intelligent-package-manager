@@ -1012,3 +1012,72 @@ func TestTreeDefaultDepth(t *testing.T) {
 		t.Errorf("--depth 1 shows grandchildren:\n%s", f.out.String())
 	}
 }
+
+func TestServeRecreatesContainerWithStaleKey(t *testing.T) {
+	f, _ := dockerFake(t, result{"true", nil})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"ok":true}`)
+			return
+		}
+		f.mu.Lock()
+		recreated := callWithLocked(f, "docker rm -f aihs-typesense") != ""
+		f.mu.Unlock()
+		if !recreated {
+			w.WriteHeader(401)
+			return
+		}
+		fmt.Fprint(w, `{"num_documents":3}`)
+	}))
+	defer srv.Close()
+	typesenseAt(f, srv)
+	if err := f.run("serve"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if callWith(f, "docker rm -f aihs-typesense") == "" || callWith(f, "docker run") == "" {
+		t.Errorf("calls %v", f.calls)
+	}
+	if strings.Contains(f.out.String(), "aihs load") {
+		t.Errorf("a populated index needs no load hint:\n%s", f.out.String())
+	}
+}
+
+func callWithLocked(f *fake, prefix string) string {
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, prefix) {
+			return c
+		}
+	}
+	return ""
+}
+
+func TestSearchDoubleDashStopsFlags(t *testing.T) {
+	f, last := searchFake(t, 0)
+	if err := f.run("search", "--", "-x"); err != nil || last.Get("q") != "-x" {
+		t.Errorf("-- -x: %v q=%q", err, last.Get("q"))
+	}
+	if err := f.run("search", "--type", "skill", "foo", "--", "--type"); err != nil || last.Get("q") != "foo --type" || !strings.Contains(last.Get("filter_by"), "`skill`") {
+		t.Errorf("foo -- --type: %v q=%q filter=%q", err, last.Get("q"), last.Get("filter_by"))
+	}
+}
+
+func TestSearchRejectsBlankQueryAndBacktickFilters(t *testing.T) {
+	f, _ := searchFake(t, 0)
+	var usage *UsageError
+	if err := f.run("search", "   "); !errors.As(err, &usage) {
+		t.Errorf("blank: %v", err)
+	}
+	if err := f.run("search", "--type", "sk`ill", "x"); !errors.As(err, &usage) {
+		t.Errorf("backtick: %v", err)
+	}
+}
+
+func TestDoctorWarnsOnEmptyIndex(t *testing.T) {
+	f, root := dockerFake(t, result{"true", nil})
+	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
+	typesenseAt(f, healthy(t, 0))
+	f.run("doctor")
+	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "aihs load") {
+		t.Errorf("doctor:\n%s", f.out.String())
+	}
+}
