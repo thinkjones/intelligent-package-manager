@@ -129,3 +129,75 @@ func TestExitCodes(t *testing.T) {
 		})
 	}
 }
+
+// TestSyncUpgradeMovesBranchesNotTags: with real pnpm, `sync --upgrade`
+// moves a source tracking a branch to its new commit, leaves a tag-pinned
+// source on the tag, and leaves package.json's specs alone.
+func TestSyncUpgradeMovesBranchesNotTags(t *testing.T) {
+	pnpm, err := exec.LookPath("pnpm")
+	if err != nil {
+		t.Skip("pnpm not installed")
+	}
+	node, _ := exec.LookPath("node")
+	repo := func(tag string) (dir string, commit func(msg string) string) {
+		dir = t.TempDir()
+		git := func(args ...string) string {
+			t.Helper()
+			base := []string{"-c", "user.name=t", "-c", "user.email=t@t", "-C", dir}
+			out, err := exec.Command("git", append(base, args...)...).CombinedOutput()
+			if err != nil {
+				t.Fatalf("git %v: %v\n%s", args, err, out)
+			}
+			return strings.TrimSpace(string(out))
+		}
+		git("init", "-q", "-b", "main")
+		commit = func(msg string) string {
+			os.MkdirAll(filepath.Join(dir, "skills", msg), 0o755)
+			os.WriteFile(filepath.Join(dir, "skills", msg, "SKILL.md"), []byte("---\nname: "+msg+"\n---\n"), 0o644)
+			git("add", ".")
+			git("commit", "-q", "-m", msg)
+			return git("rev-parse", "HEAD")
+		}
+		commit("one")
+		if tag != "" {
+			git("tag", tag)
+		}
+		return dir, commit
+	}
+	branchRepo, branchCommit := repo("")
+	tagRepo, tagCommit := repo("v1")
+	tagged := strings.TrimSpace(func() string {
+		out, _ := exec.Command("git", "-C", tagRepo, "rev-parse", "v1").Output()
+		return string(out)
+	}())
+
+	home, cache := t.TempDir(), t.TempDir()
+	path := filepath.Dir(pnpm) + ":" + filepath.Dir(node) + ":/usr/bin:/bin"
+	run := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command(bin, args...)
+		cmd.Env = []string{"PATH=" + path, "HOME=" + t.TempDir(), "IPM_HOME=" + home, "IPM_CACHE_DIR=" + cache}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("ipm %v: %v\n%s", args, err, out)
+		}
+		return string(out)
+	}
+	run("source", "add", "file://"+branchRepo, "file://"+tagRepo+"#v1")
+	run("sync")
+	specs, _ := os.ReadFile(filepath.Join(home, "sources", "package.json"))
+	newBranch := branchCommit("two")
+	tagCommit("two")
+	run("sync", "--upgrade")
+	lock, _ := os.ReadFile(filepath.Join(home, "sources", "pnpm-lock.yaml"))
+	if !strings.Contains(string(lock), newBranch) {
+		t.Errorf("branch source did not move to %s:\n%s", newBranch, lock)
+	}
+	if !strings.Contains(string(lock), tagged) {
+		t.Errorf("tag source moved off v1 (%s):\n%s", tagged, lock)
+	}
+	after, _ := os.ReadFile(filepath.Join(home, "sources", "package.json"))
+	if string(after) != string(specs) {
+		t.Errorf("package.json changed:\nbefore %s\nafter  %s", specs, after)
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -28,8 +29,9 @@ func TestAddLoadRemove(t *testing.T) {
 		t.Fatalf("add: %v %v", added, err)
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, "package.json"))
+	data = regexp.MustCompile(`"name": "ipm-sources-[0-9a-f]+"`).ReplaceAll(data, []byte(`"name": "ROOT"`))
 	want := `{
-  "name": "ipm-sources",
+  "name": "ROOT",
   "private": true,
   "dependencies": {
     "anthropics--skills": "github:anthropics/skills#v1.2",
@@ -157,5 +159,43 @@ func TestCheckoutsResolvePnpmSymlinks(t *testing.T) {
 		if c.Alias == "obra--superpowers" && c.Dir != want {
 			t.Errorf("Dir = %s, want the real folder %s", c.Dir, want)
 		}
+	}
+}
+
+func TestRootNameIsUnguessable(t *testing.T) {
+	a, b := t.TempDir(), t.TempDir()
+	Add(a, []string{"o/r"})
+	Add(b, []string{"o/r"})
+	na, err := RootName(a)
+	nb, _ := RootName(b)
+	if err != nil || !strings.HasPrefix(na, "ipm-sources-") || len(na) < len("ipm-sources-")+8 || na == nb {
+		t.Errorf("names %q %q %v", na, nb, err)
+	}
+	Add(a, []string{"x/y"})
+	if again, _ := RootName(a); again != na {
+		t.Errorf("name changed on write: %q → %q", na, again)
+	}
+}
+
+func TestRemoveParsesLikeAdd(t *testing.T) {
+	dir := t.TempDir()
+	in := []string{"git@gitlab.com:g/p.git", "https://gitlab.com/g/q.git#main", "o/r@v1"}
+	if _, err := Add(dir, in); err != nil {
+		t.Fatal(err)
+	}
+	if err := Remove(dir, in); err != nil {
+		t.Errorf("remove by the add strings: %v", err)
+	}
+	if got, _ := Load(dir); len(got) != 0 {
+		t.Errorf("left %+v", got)
+	}
+}
+
+func TestAddSkippingExisting(t *testing.T) {
+	dir := t.TempDir()
+	Add(dir, []string{"o/r"})
+	added, skipped, err := AddSkippingExisting(dir, []string{"o/r", "x/y"})
+	if err != nil || len(added) != 1 || added[0].Repo != "x/y" || len(skipped) != 1 || skipped[0] != "o/r" {
+		t.Errorf("added %+v skipped %v err %v", added, skipped, err)
 	}
 }

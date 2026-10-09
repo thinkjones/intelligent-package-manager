@@ -5,6 +5,8 @@
 package sources
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,8 +88,19 @@ type packageJSON struct {
 	Dependencies map[string]string `json:"dependencies"`
 }
 
+// rootPrefix starts the sources project's own name. A random suffix makes it
+// unguessable, so no source can pass for the root in the pnpmfile's
+// readPackage guard.
+const rootPrefix = "ipm-sources-"
+
+func newRootName() string {
+	b := make([]byte, 8)
+	rand.Read(b)
+	return rootPrefix + hex.EncodeToString(b)
+}
+
 func read(dir string) (packageJSON, error) {
-	pj := packageJSON{Name: "ipm-sources", Private: true, Dependencies: map[string]string{}}
+	pj := packageJSON{Name: newRootName(), Private: true, Dependencies: map[string]string{}}
 	data, err := os.ReadFile(filepath.Join(dir, "package.json"))
 	if errors.Is(err, os.ErrNotExist) {
 		return pj, nil
@@ -101,7 +114,27 @@ func read(dir string) (packageJSON, error) {
 	if pj.Dependencies == nil {
 		pj.Dependencies = map[string]string{}
 	}
+	if !strings.HasPrefix(pj.Name, rootPrefix) {
+		pj.Name = newRootName() // also migrates the guessable "ipm-sources"
+	}
 	return pj, nil
+}
+
+// RootName is the sources project's own package name, which the pnpmfile
+// exempts from its readPackage hook. It is written to package.json if the
+// file exists but lacks one.
+func RootName(dir string) (string, error) {
+	data, statErr := os.ReadFile(filepath.Join(dir, "package.json"))
+	pj, err := read(dir)
+	if err != nil {
+		return "", err
+	}
+	if statErr == nil && !strings.Contains(string(data), `"`+pj.Name+`"`) {
+		if err := write(dir, pj); err != nil {
+			return "", err
+		}
+	}
+	return pj.Name, nil
 }
 
 func write(dir string, pj packageJSON) error {
@@ -178,6 +211,33 @@ func Add(dir string, repos []string) ([]Source, error) {
 	return added, write(dir, pj)
 }
 
+// AddSkippingExisting adds repos, skipping any already listed (same repo,
+// in any spelling); it returns what it added and what it skipped. A
+// different repo that collides on alias is still an error.
+func AddSkippingExisting(dir string, repos []string) ([]Source, []string, error) {
+	pj, err := read(dir)
+	if err != nil {
+		return nil, nil, err
+	}
+	var fresh, skipped []string
+	for _, r := range repos {
+		s, err := parse(r)
+		if err != nil {
+			return nil, nil, err
+		}
+		if spec, taken := pj.Dependencies[s.Alias]; taken && strings.EqualFold(fromSpec(s.Alias, spec).Repo, s.Repo) {
+			skipped = append(skipped, r)
+			continue
+		}
+		fresh = append(fresh, r)
+	}
+	if len(fresh) == 0 {
+		return nil, skipped, nil
+	}
+	added, err := Add(dir, fresh)
+	return added, skipped, err
+}
+
 // Remove drops repos, matched by alias; an unknown repo is an error and
 // nothing is written.
 func Remove(dir string, repos []string) error {
@@ -186,12 +246,14 @@ func Remove(dir string, repos []string) error {
 		return err
 	}
 	for _, r := range repos {
-		repo, _, _ := strings.Cut(r, "@")
-		a := Alias(repo)
-		if _, ok := pj.Dependencies[a]; !ok {
+		s, err := parse(r)
+		if err != nil {
+			return err
+		}
+		if _, ok := pj.Dependencies[s.Alias]; !ok {
 			return fmt.Errorf("%s is not a source", r)
 		}
-		delete(pj.Dependencies, a)
+		delete(pj.Dependencies, s.Alias)
 	}
 	return write(dir, pj)
 }

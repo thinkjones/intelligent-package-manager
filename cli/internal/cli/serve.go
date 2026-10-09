@@ -31,7 +31,7 @@ var (
 	healthFor   = 60 * time.Second
 )
 
-// apiKey is the local Typesense key, kept in .aihs/typesense/api-key. With
+// apiKey is the local Typesense key, kept in <cache>/typesense/api-key. With
 // create, a missing key is generated: 32 hex characters, mode 0600.
 func apiKey(dir string, create bool) (string, error) {
 	path := filepath.Join(dir, "api-key")
@@ -148,7 +148,7 @@ func runServe(sys System, stop bool) error {
 	n, err := c.NumDocuments(search.Collection)
 	if errors.Is(err, typesense.ErrUnauthorized) && was != "missing" {
 		// Our container was started with a key we no longer hold (e.g.
-		// .aihs was cleaned): recreate it with the current one. Typesense
+		// cache dir was cleaned): recreate it with the current one. Typesense
 		// takes the bootstrap key from its command line, so data survives.
 		fmt.Fprintf(sys.Stdout, "%s %s holds an old API key — recreating it\n", warn, tsContainer)
 		if out, err := sys.Output("", "docker", "rm", "-f", tsContainer); err != nil {

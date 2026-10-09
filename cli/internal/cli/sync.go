@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/thinkjones/fs-skills/cli/internal/sources"
 )
 
 func syncFlags() (*flag.FlagSet, func(System) error) {
@@ -33,10 +35,23 @@ func runSync(sys System, upgrade bool) error {
 	if upgrade {
 		args = []string{"update", "--latest"}
 	}
-	args = append(args, "--ignore-scripts", "--store-dir", p.Store(), "--dir", p.Sources())
-	if err := writePnpmfile(p.Sources()); err != nil {
+	root, err := sources.RootName(p.Sources())
+	if err != nil {
 		return err
 	}
+	hooks, err := writePnpmfile(p.Sources(), root)
+	if err != nil {
+		return err
+	}
+	// The hooks are what keep upstream files intact and sources' npm
+	// dependencies out; pass them explicitly (pnpm 12 has no --pnpmfile flag,
+	// so as config) so a user's pnpm config can't switch them off. CI=true
+	// would otherwise freeze the lockfile.
+	if !upgrade {
+		args = append(args, "--no-frozen-lockfile") // update always rewrites the lockfile; install takes this
+	}
+	args = append(args, "--ignore-scripts", "--config.ignore-pnpmfile=false", "--config.pnpmfile="+hooks,
+		"--store-dir", p.Store(), "--dir", p.Sources())
 	fmt.Fprintf(sys.Stdout, "%s %s  (pnpm %s)\n", pn, strings.Join(args, " "), pn.version)
 	out, err := sys.Output(p.Sources(), pn.name, append(append([]string{}, pn.prefix...), args...)...)
 	if err != nil {

@@ -160,10 +160,14 @@ func sourceImport(sys System, p paths.Paths, file string) error {
 		}
 		repos = append(repos, r)
 	}
-	if _, err := sources.Add(p.Sources(), repos); err != nil {
+	added, skipped, err := sources.AddSkippingExisting(p.Sources(), repos)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(sys.Stdout, "%s imported %d source(s) from %s\n", ok, len(repos), file)
+	fmt.Fprintf(sys.Stdout, "%s imported %d source(s) from %s\n", ok, len(added), file)
+	if len(skipped) > 0 {
+		fmt.Fprintf(sys.Stdout, "- %d already a source: %s\n", len(skipped), strings.Join(skipped, ", "))
+	}
 	stats := filepath.Join(filepath.Dir(file), "catalog", "github.jsonl")
 	dest := filepath.Join(p.Catalog(), "github.jsonl")
 	if _, err := os.Stat(dest); err != nil {

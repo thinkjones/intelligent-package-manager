@@ -943,7 +943,8 @@ func TestSyncRunsPnpmThenIndexes(t *testing.T) {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	home := f.env["IPM_HOME"]
-	want := "pnpm install --ignore-scripts --store-dir " + filepath.Join(home, "store") + " --dir " + filepath.Join(home, "sources")
+	src := filepath.Join(home, "sources")
+	want := "pnpm install --no-frozen-lockfile --ignore-scripts --config.ignore-pnpmfile=false --config.pnpmfile=" + filepath.Join(src, ".pnpmfile.cjs") + " --store-dir " + filepath.Join(home, "store") + " --dir " + src
 	if got := callWith(f, "pnpm install"); got != want {
 		t.Errorf("got  %s\nwant %s", got, want)
 	}
@@ -1027,7 +1028,8 @@ func TestSyncWritesPnpmfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(f.env["IPM_HOME"], "sources", ".pnpmfile.cjs"))
-	for _, want := range []string{"readPackage", `"ipm-sources"`, "codeload", "delegate", "/archive/"} {
+	root, _ := sources.RootName(filepath.Join(f.env["IPM_HOME"], "sources"))
+	for _, want := range []string{"readPackage", `"` + root + `"`, "codeload", "delegate", "/archive/"} {
 		if err != nil || !strings.Contains(string(data), want) {
 			t.Errorf("pnpmfile missing %q (%v):\n%s", want, err, data)
 		}
@@ -1042,7 +1044,7 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 	if err := f.run("sync"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if !strings.HasPrefix(callWith(f, "npx "), "npx -y pnpm@12.10.1 install --ignore-scripts") {
+	if !strings.HasPrefix(callWith(f, "npx "), "npx -y pnpm@12.10.1 install --no-frozen-lockfile --ignore-scripts") {
 		t.Errorf("calls %v", f.calls)
 	}
 	f = newFake(checkout(t))
@@ -1065,5 +1067,32 @@ func TestServeRemovesLegacyContainer(t *testing.T) {
 	}
 	if !strings.Contains(f.out.String(), "ipm load") {
 		t.Errorf("output:\n%s", f.out.String())
+	}
+}
+
+func TestFindPnpmIgnoresWarnings(t *testing.T) {
+	f := newFake(checkout(t))
+	f.onPath["pnpm"], f.onPath["npx"] = true, true
+	f.results["pnpm --ve"] = result{"WARN corepack is enabled\n12.3.0\n", nil}
+	pn, err := findPnpm(f.system())
+	if err != nil || pn.name != "pnpm" || pn.version != "12.3.0" {
+		t.Errorf("got %+v %v", pn, err)
+	}
+	f.results["pnpm --ve"] = result{"boom", errors.New("exit 1")}
+	f.onPath["npx"] = false
+	if _, err := findPnpm(f.system()); err == nil || !strings.Contains(err.Error(), "boom") {
+		t.Errorf("a failing pnpm --version should be reported: %v", err)
+	}
+}
+
+func TestSourceImportIsRepeatable(t *testing.T) {
+	root := checkout(t)
+	write(t, filepath.Join(root, "old", "manifest.toml"), "[[repo]]\nrepo = \"o/r\"\n")
+	f := newFake(root)
+	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil || !strings.Contains(f.out.String(), "already") {
+		t.Errorf("second import: %v\n%s", err, f.out.String())
 	}
 }
