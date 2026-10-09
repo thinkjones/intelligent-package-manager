@@ -3,7 +3,6 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"strings"
 	"text/tabwriter"
 
 	"github.com/thinkjones/fs-skills/cli/internal/catalog"
@@ -48,11 +47,12 @@ func doctor(sys System) error {
 	row(ok, "home", p.Home)
 	row(ok, "cache", p.Cache)
 
-	if _, err := sys.LookPath("pnpm"); err != nil {
-		row(bad, "pnpm", "not on PATH — ipm fetches sources with pnpm (https://pnpm.io/installation)")
+	if pn, err := findPnpm(sys); err != nil {
+		row(bad, "pnpm", err.Error())
+	} else if pn.name == "pnpm" {
+		row(ok, "pnpm", pn.version)
 	} else {
-		v, _ := sys.Output("", "pnpm", "--version")
-		row(ok, "pnpm", strings.TrimSpace(v))
+		row(ok, "pnpm", fmt.Sprintf("%s via `%s` (pnpm on PATH is older than %d or missing)", pn.version, pn, pnpmMajor))
 	}
 
 	srcs, err := sources.Load(p.Sources())

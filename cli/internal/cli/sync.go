@@ -22,8 +22,9 @@ func runSync(sys System, upgrade bool) error {
 	if err != nil {
 		return err
 	}
-	if _, err := sys.LookPath("pnpm"); err != nil {
-		return fmt.Errorf("ipm fetches sources with pnpm — install it (https://pnpm.io/installation), then rerun")
+	pn, err := findPnpm(sys)
+	if err != nil {
+		return err
 	}
 	if _, err := os.Stat(filepath.Join(p.Sources(), "package.json")); err != nil {
 		return fmt.Errorf("no sources yet — add some with `ipm source add owner/repo`")
@@ -33,8 +34,11 @@ func runSync(sys System, upgrade bool) error {
 		args = []string{"update", "--latest"}
 	}
 	args = append(args, "--ignore-scripts", "--store-dir", p.Store(), "--dir", p.Sources())
-	fmt.Fprintf(sys.Stdout, "pnpm %s\n", strings.Join(args, " "))
-	out, err := sys.Output(p.Sources(), "pnpm", args...)
+	if err := writePnpmfile(p.Sources()); err != nil {
+		return err
+	}
+	fmt.Fprintf(sys.Stdout, "%s %s  (pnpm %s)\n", pn, strings.Join(args, " "), pn.version)
+	out, err := sys.Output(p.Sources(), pn.name, append(append([]string{}, pn.prefix...), args...)...)
 	if err != nil {
 		fmt.Fprintln(sys.Stdout, strings.TrimSpace(out))
 		fmt.Fprintf(sys.Stdout, "%s pnpm failed — the catalog is unchanged\n", bad)

@@ -151,7 +151,7 @@ func TestUsageErrors(t *testing.T) {
 func TestDoctorRows(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"10.33.2\n", nil}
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
 	f.run("sync")
 	f.out.Reset()
@@ -159,7 +159,7 @@ func TestDoctorRows(t *testing.T) {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	out := f.out.String()
-	for _, want := range []string{"✓ home", "✓ cache", "✓ pnpm", "10.33.2", "✓ sources", "1 synced", "✓ catalog", "! docker", "! typesense", "! claude", "0 problem(s)"} {
+	for _, want := range []string{"✓ home", "✓ cache", "✓ pnpm", "12.10.1", "✓ sources", "1 synced", "✓ catalog", "! docker", "! typesense", "! claude", "0 problem(s)"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor missing %q:\n%s", want, out)
 		}
@@ -937,13 +937,14 @@ func TestSourceImport(t *testing.T) {
 func TestSyncRunsPnpmThenIndexes(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {".claude-plugin/plugin.json": `{"name":"p"}`, "skills/one/SKILL.md": "---\nname: one\n---\n"}})
 	if err := f.run("sync"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	home := f.env["IPM_HOME"]
 	want := "pnpm install --ignore-scripts --store-dir " + filepath.Join(home, "store") + " --dir " + filepath.Join(home, "sources")
-	if got := callWith(f, "pnpm "); got != want {
+	if got := callWith(f, "pnpm install"); got != want {
 		t.Errorf("got  %s\nwant %s", got, want)
 	}
 	data, err := os.ReadFile(filepath.Join(f.env["IPM_CACHE_DIR"], "catalog", "skills.jsonl"))
@@ -955,9 +956,10 @@ func TestSyncRunsPnpmThenIndexes(t *testing.T) {
 func TestSyncUpgrade(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
 	f.run("sync", "--upgrade")
-	if !strings.HasPrefix(callWith(f, "pnpm "), "pnpm update --latest --ignore-scripts") {
+	if !strings.HasPrefix(callWith(f, "pnpm update"), "pnpm update --latest --ignore-scripts") {
 		t.Errorf("calls %v", f.calls)
 	}
 }
@@ -965,6 +967,7 @@ func TestSyncUpgrade(t *testing.T) {
 func TestSyncPnpmFailureKeepsCatalog(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
 	cat := filepath.Join(f.env["IPM_CACHE_DIR"], "catalog", "skills.jsonl")
 	write(t, cat, "old\n")
@@ -984,6 +987,7 @@ func TestSyncNeedsPnpmAndSources(t *testing.T) {
 		t.Errorf("no pnpm: %v", err)
 	}
 	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	if err := f.run("sync"); err == nil || !strings.Contains(err.Error(), "ipm source add") {
 		t.Errorf("no sources: %v", err)
 	}
@@ -1011,5 +1015,41 @@ func TestScanSources(t *testing.T) {
 	}
 	if err := f.run("scan", "x/y"); err == nil || !strings.Contains(err.Error(), "ipm source add") {
 		t.Errorf("unknown: %v", err)
+	}
+}
+
+func TestSyncWritesPnpmfile(t *testing.T) {
+	f := newFake(checkout(t))
+	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
+	if err := f.run("sync"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(f.env["IPM_HOME"], "sources", ".pnpmfile.cjs"))
+	for _, want := range []string{"readPackage", `"ipm-sources"`, "codeload", "delegate", "/archive/"} {
+		if err != nil || !strings.Contains(string(data), want) {
+			t.Errorf("pnpmfile missing %q (%v):\n%s", want, err, data)
+		}
+	}
+}
+
+func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
+	f := newFake(checkout(t))
+	f.onPath["pnpm"], f.onPath["npx"] = true, true
+	f.results["pnpm --ve"] = result{"10.33.2\n", nil}
+	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
+	if err := f.run("sync"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if !strings.HasPrefix(callWith(f, "npx "), "npx -y pnpm@12.10.1 install --ignore-scripts") {
+		t.Errorf("calls %v", f.calls)
+	}
+	f = newFake(checkout(t))
+	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"10.33.2\n", nil}
+	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
+	if err := f.run("sync"); err == nil || !strings.Contains(err.Error(), "12") {
+		t.Errorf("old pnpm and no npx: %v", err)
 	}
 }
