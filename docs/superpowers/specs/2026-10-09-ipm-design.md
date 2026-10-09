@@ -27,7 +27,7 @@ The reference-only plugin design hit limits in Claude Code 2.1.295 (spike, recor
 - **Sources and catalog are per user** (like pnpm's registry config and metadata cache); **packs are per scope** (a project's `ipm.toml`, or the user's global one).
 - **Pickable item by item:** skills, agents, commands, whole plugins (local, inline, external), Copilot plugins (as their skills). **Not individually pickable:** hooks, MCP servers, inline commands — they come only with their whole plugin. Surgical removal of hooks and MCP servers is a later design question.
 - **Naming in Claude:** picked items are `<pack>:<item>`; a whole plugin keeps its own namespace.
-- **Import method:** like pnpm's `auto` on macOS — clone, then hard link, then copy (copy across volumes).
+- **Import method:** hard link, then copy (across volumes). APFS cloning was left out to avoid a new dependency; editing a file in `.ipm/plugins/` therefore also edits pnpm's copy, and `ipm install` rebuilds it.
 
 ## Layout
 
@@ -46,8 +46,9 @@ $IPM_HOME/
 
 <project>/
   ipm.toml                  packs (committed)
-  .ipm/package.json         generated: one pinned, path-scoped dependency per picked item (committed)
+  .ipm/package.json         generated: one dependency per source repo, pinned to a commit (committed)
   .ipm/pnpm-lock.yaml       generated pins (committed)
+  .ipm/ipm.lock             every picked item resolved: id, type, name, repo, path, sha (committed)
   .ipm/node_modules/        pnpm output (gitignored)
   .ipm/plugins/<pack>/      built plugin: cloned items + plugin.json (gitignored)
   .ipm/.claude-plugin/marketplace.json   generated (committed)
@@ -72,7 +73,9 @@ Item IDs are the catalog's: `<type>:<repo>:<path>`, `#<name>` for items defined 
 `.ipm/plugins/<pack>/`:
 
 - `.claude-plugin/plugin.json` — `name` = pack, `description`, `author`, `version`, `dependencies` (one per whole-plugin pick), and `metadata.ipm.items`: `[{id, repo, path, sha, file}]` per cloned item (JSON has no comments; unknown keys fail `--strict`; `metadata` is documented as free-form and ignored by Claude Code).
-- `skills/<name>/`, `agents/<name>.md`, `commands/<name>.md` — cloned from `.ipm/node_modules/<alias>/…`. Name clashes within a pack get `-<repo owner>` appended.
+- `skills/<name>/`, `agents/<name>.md`, `commands/<name>.md` — hard-linked (copied across volumes) from `.ipm/node_modules/<alias>/…`. Name clashes within a pack get `-<repo owner>` appended.
+
+Pins are per source repo, not per picked item: part 2's fetcher hook fetches whole commits as plain tarballs and drops pnpm's `path:` subfolders, and whole repos come from the shared store anyway. `.ipm/ipm.lock` records every resolved item so `ipm install` works without the user's catalog. `ipm install` keeps existing pins; `ipm install --update` moves them to the commits in the user's current catalog. Spike (2026-10-09, Claude Code 2.1.295): a hand-built `.ipm/` with hard-linked items and a stripe dependency validated `--strict`, installed with the dependency, and loaded each item under the pack's name.
 
 `.ipm/.claude-plugin/marketplace.json` lists each pack (`source: ./plugins/<pack>`) and each whole-plugin pick as a pinned external entry (`git-subdir` or the upstream entry's own pinned source), tagged `ipm`. Marketplace name: `<project dir>-ipm` (user scope: `ipm-global`).
 
@@ -84,7 +87,7 @@ Item IDs are the catalog's: `<type>:<repo>:<path>`, `#<name>` for items defined 
 | `ipm sync [--upgrade]` | `pnpm install` (`pnpm update` with `--upgrade`) in `$IPM_HOME/sources`, then `ipm index` |
 | `ipm index`, `stats`, `serve`, `load`, `search`, `show`, `tree`, `graph`, `scan`, `doctor` | as in `aihs`, reading the user-level catalog; `doctor` adds pnpm, sources and scope rows |
 | `ipm pack new/add/remove/list/show [-g]` | edit packs in `ipm.toml` (project) or `global/ipm.toml` (`-g`) |
-| `ipm install [-g]` | resolve picks via the catalog → write `.ipm/package.json` → `pnpm install --ignore-scripts` → build `.ipm/plugins/*` → write `marketplace.json` → `claude plugin validate --strict` |
+| `ipm install [-g] [--update] [--no-validate]` | resolve picks (lock, then catalog) → write `.ipm/ipm.lock` and `.ipm/package.json` → pnpm install → place files in `.ipm/plugins/*` → write `plugin.json`s and `marketplace.json` → `claude plugin validate --strict` |
 
 Installing in Claude: `claude plugin marketplace add ./.ipm`, then `/plugin install <pack>@<marketplace>`.
 
