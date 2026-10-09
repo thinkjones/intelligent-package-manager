@@ -2,19 +2,23 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/thinkjones/fs-skills/cli/internal/catalog"
 	"github.com/thinkjones/fs-skills/cli/internal/marketplace"
 	"github.com/thinkjones/fs-skills/cli/internal/upstream"
 )
@@ -680,5 +684,134 @@ func TestDoctorReportsTypesense(t *testing.T) {
 	f.run("doctor")
 	if !strings.Contains(f.out.String(), "✓ docker") || !strings.Contains(f.out.String(), "42 document(s)") {
 		t.Errorf("doctor:\n%s", f.out.String())
+	}
+}
+
+// withCatalog writes a catalog with n skills (and empty files for the other
+// types) under root, and a search key.
+func withCatalog(t *testing.T, root string, n int) {
+	t.Helper()
+	var skills strings.Builder
+	for i := range n {
+		fmt.Fprintf(&skills, "{\"id\":\"skill:o/r:s%04d\",\"type\":\"skill\",\"name\":\"s%d\",\"repo\":\"o/r\"}\n", i, i)
+	}
+	for _, typ := range catalog.Types {
+		body := ""
+		if typ == catalog.TypeSkill {
+			body = skills.String()
+		}
+		write(t, filepath.Join(root, "catalog", catalog.Files[typ]), body)
+	}
+	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
+}
+
+// tsRecorder is a fake Typesense that records requests and answers imports
+// with one result line per document; fail names IDs to reject.
+type tsRecorder struct {
+	mu       sync.Mutex
+	requests []string
+	batches  []int
+	status   int
+	fail     map[string]bool
+}
+
+func (r *tsRecorder) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.requests = append(r.requests, req.Method+" "+req.URL.Path)
+	if r.status != 0 {
+		w.WriteHeader(r.status)
+		return
+	}
+	if strings.HasSuffix(req.URL.Path, "/import") {
+		body, _ := io.ReadAll(req.Body)
+		lines := strings.Split(strings.TrimSpace(string(body)), "\n")
+		r.batches = append(r.batches, len(lines))
+		for _, l := range lines {
+			var d map[string]any
+			json.Unmarshal([]byte(l), &d)
+			if r.fail[d["id"].(string)] {
+				fmt.Fprintln(w, `{"code":400,"error":"bad","success":false}`)
+			} else {
+				fmt.Fprintln(w, `{"success":true}`)
+			}
+		}
+		return
+	}
+	fmt.Fprint(w, `{}`)
+}
+
+func loadFake(t *testing.T, n int) (*fake, *tsRecorder) {
+	t.Helper()
+	root := checkout(t)
+	withCatalog(t, root, n)
+	rec := &tsRecorder{}
+	srv := httptest.NewServer(rec)
+	t.Cleanup(srv.Close)
+	f := newFake(root)
+	typesenseAt(f, srv)
+	return f, rec
+}
+
+func TestLoadRebuildsCollection(t *testing.T) {
+	f, rec := loadFake(t, 1200)
+	if err := f.run("load"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if len(rec.requests) < 3 || rec.requests[0] != "DELETE /collections/artifacts" || rec.requests[1] != "POST /collections" {
+		t.Errorf("requests %v", rec.requests)
+	}
+	if !reflect.DeepEqual(rec.batches, []int{500, 500, 200}) {
+		t.Errorf("batches %v", rec.batches)
+	}
+	if !regexpMatch(`(?m)^skill\s+1200$`, f.out.String()) || !strings.Contains(f.out.String(), "1200 imported") {
+		t.Errorf("output:\n%s", f.out.String())
+	}
+}
+
+func TestLoadReportsFailures(t *testing.T) {
+	f, rec := loadFake(t, 3)
+	rec.fail = map[string]bool{"skill:o/r:s0001": true}
+	var exit *ExitError
+	if err := f.run("load"); !errors.As(err, &exit) || exit.Code != 1 {
+		t.Errorf("want exit 1, got %v", err)
+	}
+	if !strings.Contains(f.out.String(), "skill:o/r:s0001") || !strings.Contains(f.out.String(), "bad") {
+		t.Errorf("output:\n%s", f.out.String())
+	}
+}
+
+func TestLoadNeedsServer(t *testing.T) {
+	root := checkout(t)
+	withCatalog(t, root, 1)
+	os.Remove(filepath.Join(root, ".aihs", "typesense", "api-key"))
+	if err := newFake(root).run("load"); err == nil || !strings.Contains(err.Error(), "aihs serve") {
+		t.Errorf("no key: %v", err)
+	}
+	f, _ := loadFake(t, 1)
+	srv := httptest.NewServer(http.NotFoundHandler())
+	typesenseAt(f, srv)
+	srv.Close()
+	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "aihs serve") {
+		t.Errorf("server down: %v", err)
+	}
+}
+
+func TestLoadWrongKey(t *testing.T) {
+	f, rec := loadFake(t, 1)
+	rec.status = 401
+	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "port 8108") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestLoadWithoutCatalog(t *testing.T) {
+	f, rec := loadFake(t, 1)
+	os.RemoveAll(filepath.Join(f.env["AIHS_ROOT"], "catalog"))
+	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "aihs index") {
+		t.Errorf("got %v", err)
+	}
+	if len(rec.requests) != 0 {
+		t.Errorf("no request should be sent: %v", rec.requests)
 	}
 }
