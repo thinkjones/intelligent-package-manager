@@ -1,15 +1,16 @@
 # Repos of interest: upstream repos worth watching for Claude Code plugins,
 # Copilot plugins, marketplaces, and skills, hooks and agents folders. This
-# root manifest publishes nothing — packs are the folders beside it.
+# root manifest publishes nothing.
 #
-#   aihs sync   pins every repo here in aihs.lock and caches it
-#   aihs scan   reports the plugin, skills, hooks and agents folders each holds
+#   ipm sync    pins every repo here in aihs.lock and caches it
+#   ipm index   catalogs every artifact they hold into catalog/
+#   ipm scan    reports the plugin, skills, hooks and agents folders each holds
 #
 # [[repo]]
 #   repo     GitHub owner/repo, or a full git URL
 #   version  tag, branch or commit, npm style; omit for the latest default branch
 #
-# Seeded from `aihs repos`: every upstream the packs referenced, most used first.
+# Seeded from the upstreams the former packs referenced, most used first.
 
 [[repo]]
 repo = "github/awesome-copilot"

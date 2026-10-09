@@ -160,7 +160,7 @@ func printHelp(w io.Writer) {
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Config")
-	fmt.Fprintln(w, "  IPM_ROOT       this checkout's root, set by bin/ipm (on PATH after direnv allow)")
+	fmt.Fprintln(w, "  IPM_ROOT        this checkout's root, set by bin/ipm (on PATH after direnv allow)")
 }
 
 func printCommandHelp(w io.Writer, cmd command) {

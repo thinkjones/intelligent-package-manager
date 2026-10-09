@@ -14,7 +14,7 @@ ipm promote <repo|plugin-id>   add repos, or an external plugin's source repo, t
 ipm serve [--stop]             run the local Typesense search server in Docker (data in .aihs/typesense/)
 ipm load                       rebuild the search index from catalog/
 ipm search <query> [flags]     hybrid search with a SCORE column: --type, --repo, --tag (repeatable), --keyword,
-                                --limit, --page N, --all, --explain (KW/SEM columns), --json
+                               --limit, --page N, --all, --explain (KW/SEM columns), --json
 ipm show <id> [--json]         an artifact's fields, GitHub stats and neighbours
 ipm tree <id> [--up]           relationships as a tree (--depth N, --all)
 ipm graph <id> [--format dot]  the neighbourhood as Mermaid (default) or Graphviz
