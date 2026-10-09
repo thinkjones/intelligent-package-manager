@@ -1,6 +1,11 @@
+---
+title: How it works
+nav_order: 7
+---
+
 # Architecture
 
-How `ipm` turns a list of repos into a searchable catalog of agent artifacts, builds packs of picked items into Claude Code plugins, and why it is built this way. For day-to-day use see the [user guide](user-guide.md); for the sources files see the [sources reference](sources-reference.md). The full design, including the TUI (part 4, not built yet), is [the ipm design](superpowers/specs/2026-10-09-ipm-design.md).
+How `ipm` turns a list of repos into a searchable catalog of agent artifacts, builds packs of picked items into Claude Code plugins, and why it is built this way. For day-to-day use see the [guides](guides/index.md); for the sources files see the [sources reference](reference/sources.md). The full design, including the TUI (part 4, not built yet), is [the ipm design](https://github.com/thinkjones/intelligent-package-manager/blob/main/docs/superpowers/specs/2026-10-09-ipm-design.md).
 
 ## Purpose and boundaries
 
@@ -50,7 +55,7 @@ Paths are resolved in `internal/paths`, following pnpm's conventions. Both roots
 
 `XDG_DATA_HOME` and `XDG_CACHE_HOME` are honoured on every OS. The home holds what a user would lose — `sources/` (`package.json`, `pnpm-lock.yaml`, `node_modules/`, the generated `.pnpmfile.cjs`) and `store/`, a pnpm store dedicated to `ipm` (pnpm's docs say a store is for mutually trusted users and processes). The cache holds what `ipm` can rebuild: `catalog/` and `typesense/`.
 
-Nothing is kept in this checkout, so every command works from any directory. Packs live with the project that uses them (next section); user-scope packs live in `$IPM_HOME/global/`.
+Nothing is kept in the directory `ipm` runs from, so every command works anywhere. Packs live with the project that uses them (next section); user-scope packs live in `$IPM_HOME/global/`.
 
 ## Sources
 
@@ -82,7 +87,7 @@ Non-GitHub sources (`git+https`, `git+ssh`, `git+file`) do not match the fetcher
 - **Build** (`build.go`) adds a `repo:` record per source and per external source repo, and the reverse links: each component's `plugins`, each plugin's `marketplaces`.
 - **Stats** (`internal/github`) are kept apart in `github.jsonl` because stars change daily; `ipm stats` refreshes them on demand through `gh`, and `ipm index` leaves the file alone.
 
-An external plugin's catalog ID (`plugin:<marketplace repo>#<name>`) can be given to `ipm source add`, which adds the repo the plugin lives in. Record fields are in [the catalog spec](superpowers/specs/2026-10-08-artifact-catalog-design.md#data-model).
+An external plugin's catalog ID (`plugin:<marketplace repo>#<name>`) can be given to `ipm source add`, which adds the repo the plugin lives in. Record fields are in [the catalog spec](https://github.com/thinkjones/intelligent-package-manager/blob/main/docs/superpowers/specs/2026-10-08-artifact-catalog-design.md#data-model).
 
 ## Search
 
@@ -136,14 +141,14 @@ Items are catalog IDs and carry no commit. `ipm pack add` checks each against th
 ### `ipm install`
 
 1. **Resolve** (`internal/assemble`): every item from `.ipm/ipm.lock` first, then the catalog; an item in neither is an error that names it. Existing pins are kept; `--update` re-resolves every item from the current catalog.
-2. **Lock**: write `.ipm/ipm.lock` (TOML, one `[[item]]` per picked item — id, type, name, repo, path, commit, and a whole plugin's marketplace source — sorted by id).
-3. **Fetch**: write `.ipm/package.json` (one dependency per source repo, `github:Owner/Repo#<sha>` or `git+<url>#<sha>`, through `sources.WriteProject`), `.ipm/.pnpmfile.cjs` and `.ipm/.gitignore` (`node_modules/`, `plugins/`), then run pnpm exactly as `ipm sync` does, with `--dir <root>/.ipm`. Pins are per repo, not per item: the fetcher hook fetches whole commits, and the store shares them anyway.
-4. **Place**: clear `.ipm/plugins/<pack>/` and put each picked skill folder, agent and command there (`skills/<name>/`, `agents/<name>.md`, `commands/<name>.md`) by hard link from `.ipm/node_modules`, copying when linking fails (across volumes). A name clash within a pack gets `-<repo owner>` appended, then `-2`, `-3`.
+2. **Plan** (`assemble.Build`): each pack's files and whole-plugin dependencies. Refuses unpickable types, items with no usable name, and marketplace entry names that clash with each other or with a pack; warns about external plugins whose upstream entry names no commit.
+3. **Fetch**: write `.ipm/package.json` (one dependency per source repo, `github:Owner/Repo#<sha>` or `git+<url>#<sha>`, through `sources.WriteProject`), `.ipm/.pnpmfile.cjs` and `.ipm/.gitignore` (`node_modules/`, `plugins/`, `plugins.tmp/`), then run pnpm exactly as `ipm sync` does, with `--dir <root>/.ipm`. Pins are per repo, not per item: the fetcher hook fetches whole commits, and the store shares them anyway.
+4. **Place**: build into `.ipm/plugins.tmp/<pack>/`, putting each picked skill folder, agent and command there (`skills/<name>/`, `agents/<name>.md`, `commands/<name>.md`) by hard link from `.ipm/node_modules`, copying (with the file's mode) when linking fails across volumes. Symlinks are resolved first and every source must stay inside its repo. A name clash within a pack gets `-<repo owner>` appended, then `-2`, `-3`. When every pack is placed, `plugins.tmp/` replaces `plugins/`.
 5. **plugin.json**: `name` = pack, `description`, `version` `0.0.0-ipm`, `author` (git `user.name` or `ipm`), `dependencies` (the pack's whole-plugin entries), and `metadata.ipm.items` — `{id, type, name, repo, path, sha, file}` per placed file, the provenance.
-6. **Marketplace**: `.ipm/.claude-plugin/marketplace.json`, named `<project dir>-ipm` (user scope `ipm-global`), listing each pack as `./plugins/<pack>` and each whole plugin as `<pack>-<name>`, pinned to its commit (a local plugin as a `git-subdir` source, an inline or external one as its upstream entry), all tagged `ipm`. Built by `internal/marketplace`.
+6. **Marketplace and lock**: `.ipm/.claude-plugin/marketplace.json`, named `<project dir>-ipm` (user scope `ipm-global`), listing each pack as `./plugins/<pack>` and each whole plugin as `<pack>-<name>`, pinned to its commit (a local plugin as a `git-subdir` source, an inline or external one as its upstream entry), all tagged `ipm`. Built by `internal/marketplace`. Then `.ipm/ipm.lock` (TOML, one `[[item]]` per picked item — id, type, name, repo, path, commit, and a whole plugin's marketplace source — sorted by id) is written last, so a failed build leaves the previous plugins and lock in place.
 7. **Validate**: `claude plugin validate --strict .ipm`, skipped with a note when `claude` is not on PATH or with `--no-validate`; a failure exits 1. Finally it prints the `claude plugin marketplace add` and `/plugin install` lines.
 
-Two runs give byte-identical output, and items removed from a pack leave no files. Because the lock and pins are committed, a teammate can run `ipm install` from `ipm.toml` and `.ipm/ipm.lock` without a catalog. In Claude Code, picked items load under the pack's name (`<pack>:<item>`; commands show as skills); whole plugins keep their own names and are installed as dependencies.
+Two runs give byte-identical output, and items removed from a pack leave no files. `ipm.toml` and `.ipm/ipm.lock` are committed by other people, so they are untrusted input: pack names must be valid names, lock paths must be local to their repo, commits must be full SHAs, and a malformed lock entry is an error naming the item. Because the lock and pins are committed, a teammate can run `ipm install` from `ipm.toml` and `.ipm/ipm.lock` without a catalog. In Claude Code, picked items load under the pack's name (`<pack>:<item>`; commands show as skills); whole plugins keep their own names and are installed as dependencies.
 
 ## `ipm doctor`
 
@@ -171,7 +176,7 @@ cli/
     └── marketplace/           marketplace.json entries (ipm's own or upstream entry maps) and atomic Write
 ```
 
-Commands reach the outside world only through `cli.System` (stdout, stderr, environment, `LookPath`, an `Output` runner for pnpm, docker, gh and claude, an HTTP client and a clock). `bin/ipm` at the checkout root is a shell shim: it rebuilds `cli/bin/ipm` when a Go source changes and execs it; `.envrc` puts `bin/` on PATH.
+Commands reach the outside world only through `cli.System` (stdout, stderr, environment, `LookPath`, an `Output` runner for pnpm, docker, gh and claude, an HTTP client and a clock). `go install …/cli/cmd/ipm` builds the same binary. In a clone, `bin/ipm` at the root is a shell shim: it rebuilds `cli/bin/ipm` when a Go source changes and execs it; `.envrc` puts `bin/` on PATH.
 
 ## Decisions
 
@@ -206,4 +211,4 @@ Commands reach the outside world only through `cli.System` (stdout, stderr, envi
 - **A command** — add `internal/cli/<name>.go` with a `<name>Flags()` returning its `flag.FlagSet` and run function, and a row in the `commands` table in `cli.go`. Get data folders from `ipmPaths(sys)`.
 - **Another artifact type** — add a marker to `internal/catalog/walk.go`, a parser, a type in `catalog.Types` with its file, and fixtures.
 - **A pickable type** — teach `ipm pack add` to accept it (`internal/cli/packcmd.go`) and `internal/assemble` where to place it.
-- **The TUI** — part 4 of [the ipm design](superpowers/specs/2026-10-09-ipm-design.md): a TUI over search and packs.
+- **The TUI** — part 4 of [the ipm design](https://github.com/thinkjones/intelligent-package-manager/blob/main/docs/superpowers/specs/2026-10-09-ipm-design.md): a TUI over search and packs.

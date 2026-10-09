@@ -2,7 +2,7 @@
 
 `ipm` ("intelligent package manager") finds agent artifacts across many repos. You list the repos you care about; `ipm` has pnpm fetch and pin them, catalogs every skill, agent, command, hook, MCP server and plugin they hold, and gives you hybrid keyword and semantic search over the lot. Then you pick items into **packs** and `ipm install` builds each pack into a Claude Code plugin, pinned to the commits you picked from.
 
-This repository is `ipm`'s source code. `ipm` was previously called `aihs`.
+**Documentation: [thinkjones.github.io/intelligent-package-manager](https://thinkjones.github.io/intelligent-package-manager/)**
 
 ## Why it is different
 
@@ -15,15 +15,17 @@ This repository is `ipm`'s source code. `ipm` was previously called `aihs`.
 
 ## Quick start
 
-Requirements: Go, [direnv](https://direnv.net), pnpm 12+ or Node (ipm then runs pnpm 12 through `npx`), and Docker for search. `gh` for GitHub stats.
+Requirements: Go 1.26+, pnpm 12+ or Node (ipm then runs pnpm 12 through `npx`), and Docker for search. `gh` for GitHub stats, `jq` to list IDs from search.
 
 ```bash
-direnv allow                          # in this checkout: puts bin/ipm on PATH
+go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest
+
 ipm source add obra/superpowers anthropics/skills
 ipm sync                              # pnpm fetches and pins them, then ipm indexes
 ipm stats                             # GitHub stars, topics, descriptions (needs gh)
 ipm serve && ipm load                 # start Typesense in Docker and index the catalog
 ipm search tdd
+ipm search tdd --type skill --json | jq -r .document.id   # the IDs you pick with
 ipm doctor
 
 # in a project: build a plugin from picked items
@@ -32,6 +34,8 @@ ipm pack add my-pack 'skill:obra/superpowers:skills/test-driven-development'
 ipm install                           # builds .ipm/plugins/my-pack/ and .ipm/.claude-plugin/marketplace.json
 claude plugin marketplace add ./.ipm  # then /plugin install my-pack@<project dir>-ipm in Claude Code
 ```
+
+See [Getting started](https://thinkjones.github.io/intelligent-package-manager/getting-started.html) for the full walkthrough.
 
 ## Commands
 
@@ -65,13 +69,33 @@ On Windows the home is `%LOCALAPPDATA%\ipm`.
 - **Hooks and MCP servers come only with their whole plugin.** They (and inline commands) can't be picked on their own.
 - **No TUI yet.** Part 4 of [the design](docs/superpowers/specs/2026-10-09-ipm-design.md), a TUI over search and packs, is next.
 - **Non-GitHub sources may lose files.** GitHub repos are fetched as plain tarballs; other git sources go through pnpm's git fetcher, which applies npm's packing rules (`files`, `.npmignore`).
-- **Local build only.** `ipm` runs from this checkout through `bin/ipm`; there is no packaged release.
+- **No packaged release yet.** Install with `go install`, or build from a clone.
+- **Search results don't show IDs.** Use `--json` (or `ipm pack show` for items already picked).
+- **macOS and Linux.** Windows paths are defined but untested.
 
 ## Documentation
 
-- [User guide](docs/user-guide.md) — set up, add sources, sync, search, build your own plugin, troubleshoot.
-- [Sources reference](docs/sources-reference.md) — the sources `package.json`, aliases, refs and `ipm source`.
-- [Architecture](docs/architecture.md) — how `ipm` is built and why.
-- [`cli/README.md`](cli/README.md) — working on `ipm` itself.
+The [documentation site](https://thinkjones.github.io/intelligent-package-manager/) is built from [`docs/`](docs/):
+
+- [Getting started](docs/getting-started.md) and [Concepts](docs/concepts.md).
+- Guides: [sources](docs/guides/sources.md), [search](docs/guides/search.md), [build your own plugin](docs/guides/build-a-plugin.md), [share packs with a team](docs/guides/teams.md).
+- Reference: [commands](docs/reference/commands.md), [sources](docs/reference/sources.md), [files and paths](docs/reference/files.md).
+- [Troubleshooting](docs/troubleshooting.md) and [how it works](docs/architecture.md).
+- [`cli/README.md`](cli/README.md): working on `ipm` itself.
+
+## Contributing
+
+```bash
+git clone https://github.com/thinkjones/intelligent-package-manager.git
+cd intelligent-package-manager
+direnv allow          # puts bin/ on PATH; bin/ipm rebuilds the CLI when its source changes
+mise run cli:test     # gofmt, go vet, go test: the gate for every change
+```
+
+`ipm` was previously called `aihs`. Design history is in [`docs/superpowers/`](docs/superpowers/).
+
+## License
+
+[MIT](LICENSE)
 
 <p align="center"><sub>Maintained by Dr Gene Conroy-Jones.</sub></p>

@@ -1,3 +1,9 @@
+---
+title: Sources
+parent: Reference
+nav_order: 2
+---
+
 # Sources reference
 
 Your **sources** are the repos of interest `ipm` fetches, pins and catalogs. They live in one pnpm project in your ipm home, which `ipm source` edits and `ipm sync` installs. This page covers the files, the `ipm source` commands and the naming rules.
@@ -18,7 +24,7 @@ Your **sources** are the repos of interest `ipm` fetches, pins and catalogs. The
 
 The home holds what you would lose (your list of sources and its pins); the cache holds only what `ipm` can rebuild.
 
-A project's `.ipm/` (`package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs`, `node_modules/`) is a second pnpm project of the same shape, written by `ipm install` from your packs and pinned to the commits in `.ipm/ipm.lock`; see [Build your own plugin](user-guide.md#build-your-own-plugin).
+A project's `.ipm/` (`package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs`, `node_modules/`) is a second pnpm project of the same shape, written by `ipm install` from your packs and pinned to the commits in `.ipm/ipm.lock`; see [Build your own plugin](../guides/build-a-plugin.md).
 
 ## `package.json`
 

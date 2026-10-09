@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Router for agents working in ai-harness-skills: the source code of `ipm` ("intelligent package manager"), a local Go CLI that fetches repos of agent artifacts with pnpm, catalogs every skill, agent, command, hook, MCP server and plugin in them, searches the catalog, and builds packs of picked items into Claude Code plugins. Read the linked file for detail; this page is only where things are.
+Router for agents working in [thinkjones/intelligent-package-manager](https://github.com/thinkjones/intelligent-package-manager): the source code of `ipm` ("intelligent package manager"), a local Go CLI that fetches repos of agent artifacts with pnpm, catalogs every skill, agent, command, hook, MCP server and plugin in them, searches the catalog, and builds packs of picked items into Claude Code plugins. Read the linked file for detail; this page is only where things are.
 
 `ipm` was called `aihs`. The design and its parts are in [the ipm design](docs/superpowers/specs/2026-10-09-ipm-design.md); parts 1 (rename), 2 (sources on pnpm) and 3 (packs built into plugins with `ipm install`) are built; part 4 (a TUI) is not.
 
@@ -10,8 +10,10 @@ Router for agents working in ai-harness-skills: the source code of `ipm` ("intel
 | --- | --- |
 | [`cli/`](cli/README.md) | `ipm`, the Go CLI. Every command is in `cli/internal/cli`. |
 | `bin/ipm` | Shim that builds `cli/bin/ipm` when a Go source changes and runs it; `direnv allow` puts `bin/` on PATH. |
-| [`docs/`](docs/) | [User guide](docs/user-guide.md), [sources reference](docs/sources-reference.md), [architecture](docs/architecture.md). |
-| `docs/superpowers/` | Design specs and implementation plans. Historical: never rewrite them to match the code. |
+| [`docs/`](docs/) | The user documentation, published to GitHub Pages at <https://thinkjones.github.io/intelligent-package-manager/> (Jekyll, Just the Docs theme, `docs/_config.yml`): [getting started](docs/getting-started.md), [concepts](docs/concepts.md), `guides/`, `reference/` ([commands](docs/reference/commands.md), [sources](docs/reference/sources.md), [files](docs/reference/files.md)), [troubleshooting](docs/troubleshooting.md), [how it works](docs/architecture.md). |
+| `docs/plans/` | Early notes. Historical, and excluded from the site. |
+| `docs/superpowers/` | Design specs and implementation plans. Historical: never rewrite them to match the code. Excluded from the site. |
+| `LICENSE` | MIT. |
 
 `ipm`'s data is outside this repo, per user:
 
@@ -42,5 +44,6 @@ Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.lo
 - **`ipm` is self-contained.** It works from any directory, keeps its data only in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), never installs into Claude Code, and shares no configuration with fsh or Gas City.
 - **All CLI commands are Go**, in `cli/internal/cli`. There are no script commands.
 - **Prose in Markdown is not hard-wrapped**: one line per paragraph or list item.
+- **User docs change with the code.** A change to a command, flag, message or file format updates `docs/reference/commands.md`, the guide that uses it and `docs/troubleshooting.md` in the same commit. Each site page has Just the Docs front matter (`title`, `nav_order`, `parent` under `guides/` and `reference/`); link between pages with relative `.md` links, which work on GitHub and on the site. Don't link to `docs/superpowers/` with a relative link from a site page (it isn't published); use its GitHub URL.
 
 [`CLAUDE.md`](CLAUDE.md) has the commands and the sharp edges.

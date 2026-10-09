@@ -1,0 +1,43 @@
+title: ipm
+description: Find agent skills, agents, commands and plugins across many repos, and build your own Claude Code plugins from them.
+url: https://thinkjones.github.io
+baseurl: /intelligent-package-manager
+
+remote_theme: just-the-docs/just-the-docs@v0.10.1
+plugins:
+  - jekyll-remote-theme
+  - jekyll-relative-links
+  - jekyll-seo-tag
+
+relative_links:
+  enabled: true
+  collections: false
+
+search_enabled: true
+heading_anchors: true
+color_scheme: light
+mermaid:
+  version: "11.4.1"
+
+aux_links:
+  GitHub: https://github.com/thinkjones/intelligent-package-manager
+aux_links_new_tab: true
+
+gh_edit_link: true
+gh_edit_link_text: Edit this page on GitHub
+gh_edit_repository: https://github.com/thinkjones/intelligent-package-manager
+gh_edit_branch: main
+gh_edit_source: docs
+gh_edit_view_mode: edit
+
+back_to_top: true
+back_to_top_text: Back to top
+
+footer_content: "ipm is MIT licensed. Maintained by Dr Gene Conroy-Jones."
+
+# Design history and old notes stay in the repo but not on the site.
+exclude:
+  - superpowers/
+  - plans/
+  - Gemfile
+  - Gemfile.lock
