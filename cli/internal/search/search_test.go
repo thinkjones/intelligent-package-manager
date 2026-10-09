@@ -1,0 +1,174 @@
+package search
+
+import (
+	"bytes"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"unicode/utf8"
+
+	"github.com/thinkjones/fs-skills/cli/internal/catalog"
+	"github.com/thinkjones/fs-skills/cli/internal/typesense"
+)
+
+// fixture writes a small catalog and returns its dir.
+func fixture(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	files := map[string]string{
+		"repos.jsonl": `{"id":"repo:o/r","type":"repo","name":"o/r","repo":"o/r","followed":true}` + "\n" +
+			`{"id":"repo:x/c","type":"repo","name":"x/c","repo":"x/c","followed":false}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:o/r#c","type":"plugin","name":"c","repo":"o/r","source_repo":"x/c","description":"ext"}` + "\n" +
+			`{"id":"plugin:o/r:p","type":"plugin","name":"tools","repo":"o/r","path":"p","commit":"c1"}` + "\n",
+		"skills.jsonl": `{"id":"skill:o/r:p/skills/s","type":"skill","name":"s","description":"Test first","tags":["testing"],"repo":"o/r","path":"p/skills/s","commit":"c1","plugins":["plugin:o/r:p"]}` + "\n",
+		"github.jsonl": `{"repo":"o/r","stars":10,"description":"D","topics":["t"]}` + "\n" + `{"repo":"x/c","stars":99,"description":"","topics":[]}` + "\n",
+	}
+	for _, typ := range catalog.Types {
+		if _, ok := files[catalog.Files[typ]]; !ok {
+			files[catalog.Files[typ]] = ""
+		}
+	}
+	for name, body := range files {
+		os.WriteFile(filepath.Join(dir, name), []byte(body), 0o644)
+	}
+	return dir
+}
+
+func TestSchema(t *testing.T) {
+	s := Schema()
+	if s["name"] != Collection || s["default_sorting_field"] != "stars" {
+		t.Errorf("schema %v", s)
+	}
+	fields := map[string]map[string]any{}
+	for _, f := range s["fields"].([]map[string]any) {
+		fields[f["name"].(string)] = f
+	}
+	emb := fields["embedding"]
+	embed := emb["embed"].(map[string]any)
+	if emb["type"] != "float[]" || !reflect.DeepEqual(embed["from"], []string{"name", "description", "tags"}) ||
+		embed["model_config"].(map[string]any)["model_name"] != Model {
+		t.Errorf("embedding %v", emb)
+	}
+	for _, f := range []string{"type", "tags", "repo"} {
+		if fields[f]["facet"] != true {
+			t.Errorf("%s not a facet", f)
+		}
+	}
+	if fields["stars"]["type"] != "int32" || fields["plugins"]["index"] != false {
+		t.Errorf("stars/plugins %v %v", fields["stars"], fields["plugins"])
+	}
+}
+
+func TestDocuments(t *testing.T) {
+	docs, err := Documents(fixture(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]map[string]any{}
+	var ids []string
+	for _, d := range docs {
+		by[d["id"].(string)] = d
+		ids = append(ids, d["id"].(string))
+		if _, ok := d["embedding"]; ok {
+			t.Error("documents must not carry embeddings")
+		}
+	}
+	if !sortedStrings(ids) {
+		t.Errorf("not sorted: %v", ids)
+	}
+	s := by["skill:o/r:p/skills/s"]
+	if s["stars"] != 10 || !reflect.DeepEqual(s["plugin_names"], []string{"tools"}) || !reflect.DeepEqual(s["plugins"], []string{"plugin:o/r:p"}) {
+		t.Errorf("skill doc %v", s)
+	}
+	if e := by["plugin:o/r#c"]; e["stars"] != 99 || e["source_repo"] != "x/c" {
+		t.Errorf("external plugin doc %v", e)
+	}
+	if r := by["repo:o/r"]; r["description"] != "D" || !reflect.DeepEqual(r["tags"], []string{"t"}) || r["stars"] != 10 {
+		t.Errorf("repo doc %v", r)
+	}
+	if _, err := Documents(t.TempDir()); err == nil || !strings.Contains(err.Error(), "aihs index") {
+		t.Errorf("missing catalog: %v", err)
+	}
+}
+
+func TestParamsHybridAndKeyword(t *testing.T) {
+	p := Query{Text: "c# testing"}.Params()
+	for k, want := range map[string]string{
+		"q": "c# testing", "query_by": "name,description,tags,plugin_names,embedding", "query_by_weights": "4,2,2,1,0",
+		"exclude_fields": "embedding", "sort_by": "_text_match:desc,stars:desc", "facet_by": "type", "num_typos": "2", "per_page": "20",
+	} {
+		if p.Get(k) != want {
+			t.Errorf("%s = %q, want %q", k, p.Get(k), want)
+		}
+	}
+	k := Query{Text: "x", Keyword: true}.Params()
+	if k.Get("query_by") != "name,description,tags,plugin_names" || k.Get("query_by_weights") != "4,2,2,1" {
+		t.Errorf("keyword %v", k)
+	}
+	if p.Has("filter_by") {
+		t.Error("no filters → no filter_by")
+	}
+}
+
+func TestParamsFiltersAreQuoted(t *testing.T) {
+	p := Query{Text: "*", Types: []string{"skill", "agent"}, Repos: []string{"o/r.x-y"}, Tags: []string{"a,b && c"}}.Params()
+	want := "type:=[`skill`,`agent`] && repo:=[`o/r.x-y`] && tags:=[`a,b && c`]"
+	if p.Get("filter_by") != want {
+		t.Errorf("got  %s\nwant %s", p.Get("filter_by"), want)
+	}
+}
+
+func TestParamsLimitCapped(t *testing.T) {
+	if (Query{Limit: 999}).Params().Get("per_page") != "250" || (Query{Limit: 5}).Params().Get("per_page") != "5" {
+		t.Error("limit not capped or not passed")
+	}
+}
+
+func TestStars(t *testing.T) {
+	for n, want := range map[int]string{0: "0", 999: "999", 1000: "1k", 31234: "31.2k", 296686: "297k", 1234567: "1.2M"} {
+		if got := Stars(n); got != want {
+			t.Errorf("Stars(%d) = %q, want %q", n, got, want)
+		}
+	}
+}
+
+func TestTable(t *testing.T) {
+	res := typesense.Result{Found: 41, SearchTimeMS: 7,
+		Facets: map[string][]typesense.FacetCount{"type": {{Value: "skill", Count: 30}, {Value: "agent", Count: 11}}},
+		Hits: []typesense.Hit{
+			{Document: map[string]any{"type": "skill", "name": "tdd", "repo": "o/r", "stars": float64(31234), "plugin_names": []any{"tools"},
+				"description": strings.Repeat("very long description ", 20)}},
+			{Document: map[string]any{"type": "agent", "name": "reviewer", "repo": "x/y", "stars": float64(0), "plugin_names": []any{}, "description": "Reviews"}},
+		}}
+	var b bytes.Buffer
+	Table(&b, res, 120)
+	out := b.String()
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if !strings.HasPrefix(lines[0], "TYPE") || !strings.Contains(lines[0], "DESCRIPTION") || !strings.Contains(lines[1], "31.2k") || !strings.Contains(lines[2], "—") {
+		t.Errorf("table:\n%s", out)
+	}
+	for _, l := range lines {
+		if utf8.RuneCountInString(l) > 120 {
+			t.Errorf("line longer than 120: %q", l)
+		}
+	}
+	if lines[len(lines)-1] != "41 match(es) · skill 30 · agent 11 · 7 ms" {
+		t.Errorf("summary %q", lines[len(lines)-1])
+	}
+	b.Reset()
+	Table(&b, typesense.Result{}, 120)
+	if strings.TrimSpace(b.String()) != "no matches" {
+		t.Errorf("zero hits: %q", b.String())
+	}
+}
+
+func sortedStrings(s []string) bool {
+	for i := 1; i < len(s); i++ {
+		if s[i] < s[i-1] {
+			return false
+		}
+	}
+	return true
+}
