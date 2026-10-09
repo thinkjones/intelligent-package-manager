@@ -97,6 +97,10 @@ func doctor(sys System) error {
 		row(ok, "marketplace", path)
 	}
 
+	dockerRow, tsRow := searchHealth(sys, cfg.Root)
+	row(dockerRow[0], "docker", dockerRow[1])
+	row(tsRow[0], "typesense", tsRow[1])
+
 	if p, err := sys.LookPath("claude"); err != nil {
 		row(warn, "claude", "not on PATH — create-plugin cannot validate")
 	} else {

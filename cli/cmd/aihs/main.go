@@ -13,6 +13,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"time"
@@ -38,6 +39,7 @@ func run() int {
 			out, err := cmd.CombinedOutput()
 			return string(out), err
 		},
+		HTTP:    &http.Client{},
 		Now:     time.Now,
 		Version: version,
 	})

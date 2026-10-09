@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -23,6 +24,8 @@ type System struct {
 	LookPath func(string) (string, error)
 	// Output runs name with args in dir and returns its combined output.
 	Output func(dir, name string, args ...string) (string, error)
+	// HTTP is the client for the local Typesense server; nil uses defaults.
+	HTTP *http.Client
 	// Now is the current time; tests fix it.
 	Now     func() time.Time
 	Version string
@@ -60,6 +63,7 @@ func init() {
 		{"create-plugin", "write .claude-plugin/marketplace.json from the packs' manifest.toml", "", createPluginFlags},
 		{"doctor", "check config and every pack manifest — exits 1 on problems", "", doctorFlags},
 		{"index", "write catalog/*.jsonl from the repos of interest at their locked commits", "", indexFlags},
+		{"serve", "start the local Typesense search server in Docker (--stop to stop it)", "", serveFlags},
 		{"stats", "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl", "", statsFlags},
 		{"promote", "add repos (or an external plugin's source repo) to the root manifest.toml", "<repo|plugin-id>...", promoteFlags},
 		{"scan", "cache repos and report their plugin, skills, hooks and agents folders", "[repo...]", scanFlags},

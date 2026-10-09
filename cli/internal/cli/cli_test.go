@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -26,6 +29,7 @@ type fake struct {
 	results map[string]result
 	mu      sync.Mutex
 	calls   []string
+	http    *http.Client
 }
 
 type result struct {
@@ -72,6 +76,7 @@ func (f *fake) system() System {
 			r := f.results[key]
 			return r.out, r.err
 		},
+		HTTP:    f.http,
 		Now:     func() time.Time { return time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC) },
 		Version: "test",
 	}
@@ -279,7 +284,7 @@ func TestDoctor(t *testing.T) {
 	if err := f.run("doctor"); err != nil {
 		t.Fatalf("healthy checkout: %v\n%s", err, f.out.String())
 	}
-	for _, want := range []string{"✓ eng", "! idle", "✓ aihs.lock", "2 upstream(s) pinned", "! marketplace", "! claude", "0 problem(s), 3 warning(s)"} {
+	for _, want := range []string{"✓ eng", "! idle", "✓ aihs.lock", "2 upstream(s) pinned", "! marketplace", "! claude", "! docker", "! typesense", "0 problem(s), 5 warning(s)"} {
 		if !strings.Contains(f.out.String(), want) {
 			t.Errorf("doctor missing %q:\n%s", want, f.out.String())
 		}
@@ -535,5 +540,145 @@ func TestPromoteRefusesWhatIsNotARepo(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "manifest.toml")); !os.IsNotExist(err) {
 		t.Error("manifest.toml should not be written")
+	}
+}
+
+// typesenseAt points the fake's HTTP at srv, whatever host a request names.
+func typesenseAt(f *fake, srv *httptest.Server) {
+	target, _ := url.Parse(srv.URL)
+	f.http = &http.Client{Transport: rewrite{target, srv.Client().Transport}}
+}
+
+type rewrite struct {
+	target *url.URL
+	next   http.RoundTripper
+}
+
+func (r rewrite) RoundTrip(req *http.Request) (*http.Response, error) {
+	req = req.Clone(req.Context())
+	req.URL.Scheme, req.URL.Host = r.target.Scheme, r.target.Host
+	return r.next.RoundTrip(req)
+}
+
+// healthy is a Typesense stand-in that is up and holds n documents.
+func healthy(t *testing.T, n int) *httptest.Server {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"ok":true}`)
+			return
+		}
+		fmt.Fprintf(w, `{"num_documents":%d}`, n)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func dockerFake(t *testing.T, inspect result) (*fake, string) {
+	t.Helper()
+	root := checkout(t)
+	f := newFake(root)
+	f.onPath["docker"] = true
+	f.results["docker info"] = result{"ok", nil}
+	f.results["docker insp"] = inspect
+	typesenseAt(f, healthy(t, 0))
+	return f, root
+}
+
+func callWith(f *fake, prefix string) string {
+	for _, c := range f.calls {
+		if strings.HasPrefix(c, prefix) {
+			return c
+		}
+	}
+	return ""
+}
+
+func TestServeCreatesContainer(t *testing.T) {
+	f, root := dockerFake(t, result{"Error: No such object", errors.New("exit 1")})
+	if err := f.run("serve"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	keyFile := filepath.Join(root, ".aihs", "typesense", "api-key")
+	key, err := os.ReadFile(keyFile)
+	info, _ := os.Stat(keyFile)
+	if err != nil || !regexpMatch(`^[0-9a-f]{32}$`, string(key)) || info.Mode().Perm() != 0o600 {
+		t.Fatalf("key %q %v %v", key, err, info.Mode())
+	}
+	want := "docker run -d --name aihs-typesense -p 127.0.0.1:8108:8108 -v " + filepath.Join(root, ".aihs", "typesense", "data") +
+		":/data typesense/typesense:30.2 --data-dir /data --api-key " + string(key)
+	if got := callWith(f, "docker run"); got != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+	f2, _ := dockerFake(t, result{"Error", errors.New("exit 1")})
+	f2.env = f.env
+	f2.run("serve")
+	if again, _ := os.ReadFile(keyFile); string(again) != string(key) {
+		t.Error("the key must be reused")
+	}
+}
+
+func TestServeLeavesRunningContainer(t *testing.T) {
+	f, _ := dockerFake(t, result{"true\n", nil})
+	if err := f.run("serve"); err != nil {
+		t.Fatal(err)
+	}
+	if callWith(f, "docker run") != "" || callWith(f, "docker start") != "" {
+		t.Errorf("calls %v", f.calls)
+	}
+}
+
+func TestServeStartsStoppedContainer(t *testing.T) {
+	f, _ := dockerFake(t, result{"false\n", nil})
+	if err := f.run("serve"); err != nil {
+		t.Fatal(err)
+	}
+	if callWith(f, "docker start aihs-typesense") == "" {
+		t.Errorf("calls %v", f.calls)
+	}
+}
+
+func TestServeStop(t *testing.T) {
+	f, _ := dockerFake(t, result{"true", nil})
+	if err := f.run("serve", "--stop"); err != nil {
+		t.Fatal(err)
+	}
+	if callWith(f, "docker stop aihs-typesense") == "" {
+		t.Errorf("calls %v", f.calls)
+	}
+}
+
+func TestServeWithoutDocker(t *testing.T) {
+	f := newFake(checkout(t))
+	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "Docker") {
+		t.Errorf("no docker: %v", err)
+	}
+	f.onPath["docker"] = true
+	f.results["docker info"] = result{"Cannot connect", errors.New("exit 1")}
+	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "not running") {
+		t.Errorf("docker down: %v", err)
+	}
+}
+
+func TestServeHealthTimeout(t *testing.T) {
+	defer func(e, f time.Duration) { healthEvery, healthFor = e, f }(healthEvery, healthFor)
+	healthEvery, healthFor = 10*time.Millisecond, 50*time.Millisecond
+	f, _ := dockerFake(t, result{"true", nil})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
+	defer srv.Close()
+	typesenseAt(f, srv)
+	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "docker logs aihs-typesense") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestDoctorReportsTypesense(t *testing.T) {
+	f, root := dockerFake(t, result{"true", nil})
+	os.MkdirAll(filepath.Join(root, ".aihs", "typesense"), 0o755)
+	os.WriteFile(filepath.Join(root, ".aihs", "typesense", "api-key"), []byte("k"), 0o600)
+	typesenseAt(f, healthy(t, 42))
+	f.run("doctor")
+	if !strings.Contains(f.out.String(), "✓ docker") || !strings.Contains(f.out.String(), "42 document(s)") {
+		t.Errorf("doctor:\n%s", f.out.String())
 	}
 }
