@@ -609,12 +609,12 @@ func TestSearchFlagsAnywhere(t *testing.T) {
 func withGraphCatalog(t *testing.T, root string) {
 	t.Helper()
 	files := map[string]string{
-		"repos.jsonl": `{"id":"repo:o/r","type":"repo","name":"o/r","repo":"o/r","commit":"c1","followed":true}` + "\n" +
+		"repos.jsonl": `{"id":"repo:o/r","type":"repo","name":"o/r","repo":"o/r","commit":"c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1","followed":true}` + "\n" +
 			`{"id":"repo:x/c","type":"repo","name":"x/c","repo":"x/c","followed":false}` + "\n",
 		"marketplaces.jsonl": `{"id":"marketplace:o/r:.","type":"marketplace","name":"m","repo":"o/r","plugins":["plugin:o/r:p","plugin:o/r#e"]}` + "\n",
-		"plugins.jsonl": `{"id":"plugin:o/r#e","type":"plugin","name":"e","repo":"o/r","source_repo":"x/c"}` + "\n" +
-			`{"id":"plugin:o/r:p","type":"plugin","name":"p","repo":"o/r","commit":"c1","path":"p","skills":["skill:o/r:p/skills/s1"],"hooks":["hook:o/r:p/hooks/hooks.json"]}` + "\n",
-		"skills.jsonl": `{"id":"skill:o/r:p/skills/s1","type":"skill","name":"s1","description":"Test first","tags":["testing"],"repo":"o/r","commit":"c1","path":"p/skills/s1","plugins":["plugin:o/r:p"]}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:o/r#e","type":"plugin","name":"e","repo":"o/r","source_repo":"x/c","entry":{"name":"e","source":{"source":"github","repo":"x/c"}}}` + "\n" +
+			`{"id":"plugin:o/r:p","type":"plugin","name":"p","repo":"o/r","commit":"c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1","path":"p","skills":["skill:o/r:p/skills/s1"],"hooks":["hook:o/r:p/hooks/hooks.json"]}` + "\n",
+		"skills.jsonl": `{"id":"skill:o/r:p/skills/s1","type":"skill","name":"s1","description":"Test first","tags":["testing"],"repo":"o/r","commit":"c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1","path":"p/skills/s1","plugins":["plugin:o/r:p"]}` + "\n",
 		"hooks.jsonl":  `{"id":"hook:o/r:p/hooks/hooks.json","type":"hook","name":"p","repo":"o/r","plugins":["plugin:o/r:p"]}` + "\n",
 		"github.jsonl": `{"repo":"o/r","stars":10,"forks":2,"license":"MIT","pushed_at":"2026-10-01T00:00:00Z","topics":["t"]}` + "\n",
 	}
@@ -1227,7 +1227,7 @@ func installFake(t *testing.T) (*fake, string) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	f.results["git conf"] = result{"Ada\n", nil}
-	write(t, filepath.Join(cacheOf(root), "catalog", "agents.jsonl"), `{"id":"agent:o/r:p/agents/rev.md","type":"agent","name":"reviewer","repo":"o/r","commit":"c1","path":"p/agents/rev.md","plugins":["plugin:o/r:p"]}`+"\n")
+	write(t, filepath.Join(cacheOf(root), "catalog", "agents.jsonl"), `{"id":"agent:o/r:p/agents/rev.md","type":"agent","name":"reviewer","repo":"o/r","commit":"c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1","path":"p/agents/rev.md","plugins":["plugin:o/r:p"]}`+"\n")
 	write(t, filepath.Join(root, ".ipm", "node_modules", "o--r", "p", "skills", "s1", "SKILL.md"), "---\nname: s1\n---\n")
 	write(t, filepath.Join(root, ".ipm", "node_modules", "o--r", "p", "agents", "rev.md"), "---\nname: reviewer\n---\n")
 	if err := f.run("pack", "new", "kit", "--description", "My kit"); err != nil {
@@ -1263,15 +1263,18 @@ func TestInstallBuildsPlugin(t *testing.T) {
 		t.Errorf("marketplace.json:\n%s", mp)
 	}
 	gi, _ := os.ReadFile(filepath.Join(ipm, ".gitignore"))
-	if string(gi) != "node_modules/\nplugins/\n" {
+	if string(gi) != "node_modules/\nplugins/\nplugins.tmp/\n" {
 		t.Errorf(".gitignore %q", gi)
 	}
 	if got := callWith(f, "pnpm install"); !strings.Contains(got, "--dir "+ipm) {
 		t.Errorf("pnpm call %q", got)
 	}
 	pkg, _ := os.ReadFile(filepath.Join(ipm, "package.json"))
-	if !strings.Contains(string(pkg), `"o--r": "github:o/r#c1"`) {
+	if !strings.Contains(string(pkg), `"o--r": "github:o/r#c1c1`) {
 		t.Errorf("package.json:\n%s", pkg)
+	}
+	if !strings.Contains(f.out.String(), "plugin:o/r#e is not pinned upstream") {
+		t.Errorf("want the unpinned warning:\n%s", f.out.String())
 	}
 	if !strings.Contains(f.out.String(), "claude plugin marketplace add "+ipm) || !strings.Contains(f.out.String(), "/plugin install kit@work-ipm") {
 		t.Errorf("hints:\n%s", f.out.String())
@@ -1284,15 +1287,15 @@ func TestInstallKeepsPinsUnlessUpdate(t *testing.T) {
 	ipm := filepath.Join(root, ".ipm")
 	lock, _ := project.LoadLock(ipm)
 	s1 := lock["skill:o/r:p/skills/s1"]
-	s1.SHA = "old"
+	s1.SHA = strings.Repeat("d", 40)
 	lock[s1.ID] = s1
 	project.SaveLock(ipm, lock)
 	f.run("install")
-	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != "old" {
+	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != strings.Repeat("d", 40) {
 		t.Errorf("install must keep the pin: %+v", l[s1.ID])
 	}
 	f.run("install", "--update")
-	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != "c1" {
+	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1" {
 		t.Errorf("--update must re-pin: %+v", l[s1.ID])
 	}
 }
@@ -1379,5 +1382,26 @@ func TestInstallGlobal(t *testing.T) {
 	mp, _ := os.ReadFile(filepath.Join(f.env["IPM_HOME"], "global", ".ipm", ".claude-plugin", "marketplace.json"))
 	if !strings.Contains(string(mp), `"ipm-global"`) {
 		t.Errorf("marketplace:\n%s", mp)
+	}
+}
+
+func TestInstallFailureKeepsPreviousBuild(t *testing.T) {
+	f, root := installFake(t)
+	if err := f.run("install"); err != nil {
+		t.Fatal(err)
+	}
+	lockBefore, _ := os.ReadFile(filepath.Join(root, ".ipm", "ipm.lock"))
+	os.RemoveAll(filepath.Join(root, ".ipm", "node_modules", "o--r")) // placement will fail
+	packs, _ := project.LoadPacks(root)
+	packs[0].Description = "changed"
+	project.SavePacks(root, packs)
+	if err := f.run("install"); err == nil {
+		t.Fatal("want a failure")
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "agents", "reviewer.md")); err != nil {
+		t.Error("the previous plugins must survive a failed install")
+	}
+	if after, _ := os.ReadFile(filepath.Join(root, ".ipm", "ipm.lock")); string(after) != string(lockBefore) {
+		t.Error("the lock must only change when the build succeeds")
 	}
 }

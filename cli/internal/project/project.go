@@ -13,6 +13,8 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/thinkjones/fs-skills/cli/internal/pack"
 )
 
 const (
@@ -90,6 +92,11 @@ func LoadPacks(root string) ([]Pack, error) {
 	}
 	var out []Pack
 	for name, p := range f.Packs {
+		// The name becomes a folder under .ipm/plugins, so a teammate's
+		// ipm.toml must not be able to name one elsewhere.
+		if !pack.ValidName(name) || pack.Reserved(name) {
+			return nil, fmt.Errorf("%s: pack name %q must start with a letter or digit, use only letters, digits, '.', '_' and '-', and not be one Claude Code reserves", path, name)
+		}
 		out = append(out, Pack{Name: name, Description: p.Description, Items: p.Items})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })

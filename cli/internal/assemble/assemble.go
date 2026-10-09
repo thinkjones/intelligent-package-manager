@@ -52,10 +52,12 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 			return nil
 		}
 		if l, ok := lock[id]; ok {
+			if err := check(l); err != nil {
+				return fmt.Errorf("%s in ipm.lock: %v — fix it, or run `ipm install --update` to re-resolve from the catalog", id, err)
+			}
 			out[id] = l
 			if l.Type == catalog.TypeCopilotPlugin {
-				var skills []string
-				json.Unmarshal([]byte(l.Source), &skills)
+				skills, _ := copilotSkills(l)
 				for _, s := range skills {
 					if err := resolve(packName, s); err != nil {
 						return err
@@ -82,15 +84,19 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 			skills := strs(r["skills"])
 			b, _ := json.Marshal(skills)
 			it.Source = string(b)
-			out[id] = it
+		}
+		if err := check(it); err != nil {
+			return fmt.Errorf("%s in the catalog: %v", id, err)
+		}
+		out[id] = it
+		if it.Type == catalog.TypeCopilotPlugin {
+			skills, _ := copilotSkills(it)
 			for _, s := range skills {
 				if err := resolve(packName, s); err != nil {
 					return err
 				}
 			}
-			return nil
 		}
-		out[id] = it
 		return nil
 	}
 	for _, p := range packs {
@@ -101,6 +107,65 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 		}
 	}
 	return out, nil
+}
+
+var commitRE = regexp.MustCompile(`^[0-9a-f]{40}$`)
+
+// check refuses an item that would read outside its repo or can't be
+// pinned: ipm.lock is committed, so a teammate's copy is untrusted input.
+func check(it project.LockItem) error {
+	if it.Repo == "" {
+		return fmt.Errorf("no repo")
+	}
+	if it.Path != "" && it.Path != "." && (strings.Contains(it.Path, `\`) || !filepath.IsLocal(filepath.FromSlash(it.Path))) {
+		return fmt.Errorf("path %q is outside its repo", it.Path)
+	}
+	// An external plugin is pinned by its upstream entry, not a commit here.
+	external := it.Type == catalog.TypePlugin && it.Path == "" && strings.Contains(it.ID, "#")
+	if (it.SHA != "" || !external) && !commitRE.MatchString(it.SHA) {
+		return fmt.Errorf("sha %q is not a full commit", it.SHA)
+	}
+	switch {
+	case it.Type == catalog.TypeCopilotPlugin:
+		if _, err := copilotSkills(it); err != nil {
+			return err
+		}
+	case it.Type == catalog.TypePlugin && strings.Contains(it.ID, "#"):
+		if _, err := upstreamEntry(it); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// copilotSkills is a copilot plugin's skill IDs, from its Source.
+func copilotSkills(it project.LockItem) ([]string, error) {
+	var skills []string
+	if err := json.Unmarshal([]byte(it.Source), &skills); err != nil {
+		return nil, fmt.Errorf("source is not a list of skill IDs: %v", err)
+	}
+	return skills, nil
+}
+
+// upstreamEntry is an inline or external plugin's marketplace entry, from
+// its Source.
+func upstreamEntry(it project.LockItem) (map[string]any, error) {
+	var entry map[string]any
+	if err := json.Unmarshal([]byte(it.Source), &entry); err != nil || entry == nil {
+		return nil, fmt.Errorf("source is not a marketplace entry (JSON object): %s", it.Source)
+	}
+	return entry, nil
+}
+
+// pinned reports whether an upstream entry's source names a commit.
+func pinned(entry map[string]any) bool {
+	src, ok := entry["source"].(map[string]any)
+	if !ok {
+		return false
+	}
+	sha, _ := src["sha"].(string)
+	ref, _ := src["ref"].(string)
+	return commitRE.MatchString(sha) || commitRE.MatchString(ref)
 }
 
 // Placed is one file or folder copied into a plugin: From is repo-relative in
@@ -136,8 +201,9 @@ func (p PackPlan) DepNames() []string {
 // Plan is every pack's plugin plus the repos to fetch: alias → pnpm spec
 // pinned to a commit.
 type Plan struct {
-	Repos map[string]string
-	Packs []PackPlan
+	Repos    map[string]string
+	Packs    []PackPlan
+	Warnings []string
 }
 
 var unsafe = regexp.MustCompile(`[^a-z0-9._-]+`)
@@ -163,10 +229,20 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 		plan.Repos[a] = spec
 		return nil
 	}
+	// Every pack and dependency is one marketplace entry; names must differ.
+	entries := map[string]string{}
+	for _, p := range packs {
+		entries[p.Name] = "pack " + p.Name
+	}
 	for _, p := range packs {
 		pp := PackPlan{Name: p.Name, Description: p.Description}
 		used := map[string]bool{}
+		placed := map[string]bool{}
 		place := func(it project.LockItem) error {
+			if placed[it.ID] {
+				return nil
+			}
+			placed[it.ID] = true
 			if err := pin(it); err != nil {
 				return err
 			}
@@ -177,6 +253,9 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 			base := slug(it.Name)
 			if base == "" {
 				base = slug(strings.TrimSuffix(path.Base(it.Path), ".md"))
+			}
+			if base == "" {
+				return fmt.Errorf("%s has no name usable as a file name", it.ID)
 			}
 			name := base
 			if used[dir+"/"+name] {
@@ -191,22 +270,45 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 			return nil
 		}
 		for _, id := range p.Items {
-			it := items[id]
+			it, ok := items[id]
+			if !ok {
+				return Plan{}, fmt.Errorf("%s is not resolved", id)
+			}
 			switch it.Type {
 			case catalog.TypeSkill, catalog.TypeAgent, catalog.TypeCommand:
 				if err := place(it); err != nil {
 					return Plan{}, err
 				}
 			case catalog.TypeCopilotPlugin:
-				var skills []string
-				json.Unmarshal([]byte(it.Source), &skills)
+				skills, err := copilotSkills(it)
+				if err != nil {
+					return Plan{}, fmt.Errorf("%s: %v", id, err)
+				}
 				for _, s := range skills {
-					if err := place(items[s]); err != nil {
+					sk, ok := items[s]
+					if !ok || sk.Type != catalog.TypeSkill {
+						return Plan{}, fmt.Errorf("%s lists %s, which is not a resolved skill", id, s)
+					}
+					if err := place(sk); err != nil {
 						return Plan{}, err
 					}
 				}
 			case catalog.TypePlugin:
-				pp.Deps = append(pp.Deps, wholePlugin(p.Name, it))
+				dep, err := wholePlugin(p.Name, it)
+				if err != nil {
+					return Plan{}, fmt.Errorf("%s: %v", id, err)
+				}
+				pp.Deps = append(pp.Deps, dep)
+				name := pp.DepNames()[len(pp.DepNames())-1]
+				if prev, clash := entries[name]; clash {
+					return Plan{}, fmt.Errorf("%s would be published as %q, already used by %s — rename a pack", id, name, prev)
+				}
+				entries[name] = id
+				if m, ok := dep.(map[string]any); ok && it.Path == "" && !pinned(m) {
+					plan.Warnings = append(plan.Warnings, fmt.Sprintf("%s is not pinned upstream: its entry installs whatever its source points at when installed", id))
+				}
+			default:
+				return Plan{}, fmt.Errorf("%s is a %s; only skills, agents, commands and whole plugins can be picked — hooks and MCP servers come with their plugin", id, it.Type)
 			}
 		}
 		plan.Packs = append(plan.Packs, pp)
@@ -217,7 +319,7 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 // wholePlugin is a whole-plugin pick as a marketplace entry named
 // <pack>-<slug>: a local plugin pinned by git-subdir; an inline or external
 // one as its upstream entry, with an inline one's relative source pinned.
-func wholePlugin(packName string, it project.LockItem) any {
+func wholePlugin(packName string, it project.LockItem) (any, error) {
 	name := packName + "-" + slug(it.Name)
 	tags := []string{marketplace.OwnerTag, packName}
 	if it.Source == "" {
@@ -225,15 +327,17 @@ func wholePlugin(packName string, it project.LockItem) any {
 		if p == "." {
 			p = ""
 		}
-		return marketplace.Entry{Name: name, Source: marketplace.SourceFor(it.Repo, p, "", it.SHA), Tags: tags}
+		return marketplace.Entry{Name: name, Source: marketplace.SourceFor(it.Repo, p, "", it.SHA), Tags: tags}, nil
 	}
-	var entry map[string]any
-	json.Unmarshal([]byte(it.Source), &entry)
+	entry, err := upstreamEntry(it)
+	if err != nil {
+		return nil, err
+	}
 	entry["name"], entry["tags"] = name, tags
 	if it.Path != "" {
 		entry["source"] = marketplace.SourceFor(it.Repo, it.Path, "", it.SHA)
 	}
-	return entry
+	return entry, nil
 }
 
 // Place clears pluginDir and puts each planned file there, linking with link
@@ -247,7 +351,19 @@ func Place(p PackPlan, nodeModules, pluginDir string, link func(oldname, newname
 		if err != nil {
 			return fmt.Errorf("%s is not installed in %s: %v", f.Item.Repo, nodeModules, err)
 		}
-		src := filepath.Join(root, filepath.FromSlash(f.From))
+		from := filepath.FromSlash(f.From)
+		if !filepath.IsLocal(from) {
+			return fmt.Errorf("%s: %s is outside its repo", f.Item.ID, f.From)
+		}
+		// Resolve symlinks so neither the item nor a link inside it can
+		// reach outside the repo.
+		src, err := filepath.EvalSymlinks(filepath.Join(root, from))
+		if err != nil {
+			return fmt.Errorf("%s: %v", f.Item.ID, err)
+		}
+		if rel, err := filepath.Rel(root, src); err != nil || !filepath.IsLocal(rel) {
+			return fmt.Errorf("%s: %s leads outside its repo", f.Item.ID, f.From)
+		}
 		dst := filepath.Join(pluginDir, filepath.FromSlash(f.To))
 		if !f.Dir {
 			if err := put(src, dst, link); err != nil {
@@ -281,8 +397,16 @@ func put(src, dst string, link func(string, string) error) error {
 		return err
 	}
 	defer in.Close()
-	out, err := os.Create(dst)
+	info, err := in.Stat()
 	if err != nil {
+		return err
+	}
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, info.Mode().Perm())
+	if err != nil {
+		return err
+	}
+	if err := out.Chmod(info.Mode().Perm()); err != nil {
+		out.Close()
 		return err
 	}
 	if _, err := io.Copy(out, in); err != nil {

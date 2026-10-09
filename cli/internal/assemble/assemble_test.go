@@ -187,3 +187,91 @@ func TestPlaceRemovesStaleFiles(t *testing.T) {
 		t.Error("files of removed items must go")
 	}
 }
+
+func lockItems(items ...project.LockItem) map[string]project.LockItem {
+	m := map[string]project.LockItem{}
+	for _, it := range items {
+		m[it.ID] = it
+	}
+	return m
+}
+
+func TestResolveRefusesUnsafeLockItems(t *testing.T) {
+	for name, it := range map[string]project.LockItem{
+		"path escapes":  {ID: "agent:o/r:x", Type: "agent", Name: "x", Repo: "o/r", Path: "../../etc/x.md", SHA: shaA},
+		"absolute path": {ID: "agent:o/r:x", Type: "agent", Name: "x", Repo: "o/r", Path: "/etc/x.md", SHA: shaA},
+		"bad sha":       {ID: "agent:o/r:x", Type: "agent", Name: "x", Repo: "o/r", Path: "agents/x.md", SHA: "main"},
+		"bad source":    {ID: "plugin:o/r#x", Type: "plugin", Name: "x", Repo: "o/r", Source: "null"},
+	} {
+		_, err := Resolve([]project.Pack{{Name: "kit", Items: []string{it.ID}}}, lockItems(it), t.TempDir())
+		if err == nil || !strings.Contains(err.Error(), it.ID) {
+			t.Errorf("%s: got %v", name, err)
+		}
+	}
+}
+
+func TestBuildRefusesUnpickableAndEmptyNames(t *testing.T) {
+	for name, it := range map[string]project.LockItem{
+		"hook":       {ID: "hook:o/r:h.json", Type: "hook", Name: "h", Repo: "o/r", Path: "h.json", SHA: shaA},
+		"empty name": {ID: "agent:o/r:x", Type: "agent", Name: "!!!", Repo: "o/r", Path: "agents/!!!.md", SHA: shaA},
+	} {
+		if _, err := Build([]project.Pack{{Name: "kit", Items: []string{it.ID}}}, lockItems(it)); err == nil || !strings.Contains(err.Error(), it.ID) {
+			t.Errorf("%s: got %v", name, err)
+		}
+	}
+}
+
+func TestBuildRefusesEntryNameCollisions(t *testing.T) {
+	a := project.LockItem{ID: "plugin:o/r:a/p", Type: "plugin", Name: "p", Repo: "o/r", Path: "a/p", SHA: shaA}
+	b := project.LockItem{ID: "plugin:o/r:b/p", Type: "plugin", Name: "p", Repo: "o/r", Path: "b/p", SHA: shaA}
+	_, err := Build([]project.Pack{{Name: "a", Items: []string{a.ID, b.ID}}}, lockItems(a, b))
+	if err == nil || !strings.Contains(err.Error(), "a-p") {
+		t.Errorf("same pack: %v", err)
+	}
+	_, err = Build([]project.Pack{{Name: "a", Items: []string{a.ID}}, {Name: "a-p"}}, lockItems(a))
+	if err == nil || !strings.Contains(err.Error(), "a-p") {
+		t.Errorf("pack named like an entry: %v", err)
+	}
+}
+
+func TestBuildWarnsOnUnpinnedExternalPlugin(t *testing.T) {
+	ext := project.LockItem{ID: "plugin:o/r#x", Type: "plugin", Name: "x", Repo: "o/r", Source: `{"name":"x","source":{"source":"github","repo":"x/x"}}`}
+	plan, err := Build([]project.Pack{{Name: "kit", Items: []string{ext.ID}}}, lockItems(ext))
+	if err != nil || len(plan.Warnings) != 1 || !strings.Contains(plan.Warnings[0], ext.ID) {
+		t.Errorf("warnings %v %v", plan.Warnings, err)
+	}
+}
+
+func TestBuildDedupesWithinPack(t *testing.T) {
+	packs, items := resolved(t, "skill:o/r:skills/go", "copilot-plugin:o/r:plugins/go")
+	plan, _ := Build(packs, items)
+	if n := len(plan.Packs[0].Files); n != 1 {
+		t.Errorf("a skill picked twice is placed %d times", n)
+	}
+}
+
+func TestPlaceRefusesEscapes(t *testing.T) {
+	nm := nodeModules(t)
+	outside := filepath.Join(t.TempDir(), "secret.md")
+	os.WriteFile(outside, []byte("SECRET"), 0o644)
+	os.Symlink(outside, filepath.Join(nm, "o--r", "agents", "link.md"))
+	for name, from := range map[string]string{"dotdot": "../../" + filepath.Base(filepath.Dir(outside)) + "/secret.md", "symlinked file": "agents/link.md"} {
+		pp := PackPlan{Name: "kit", Files: []Placed{{Alias: "o--r", From: from, To: "agents/x.md", Item: project.LockItem{ID: "agent:o/r:" + from}}}}
+		if err := Place(pp, nm, filepath.Join(t.TempDir(), "kit"), os.Link); err == nil {
+			t.Errorf("%s: escaped the repo", name)
+		}
+	}
+}
+
+func TestPlaceCopyKeepsMode(t *testing.T) {
+	nm := nodeModules(t)
+	script := filepath.Join(nm, "o--r", "skills", "code-review", "run.sh")
+	os.WriteFile(script, []byte("#!/bin/sh"), 0o755)
+	packs, items := resolved(t, "skill:o/r:skills/code-review")
+	plan, _ := Build(packs, items)
+	dir := filepath.Join(t.TempDir(), "kit")
+	Place(plan.Packs[0], nm, dir, func(string, string) error { return errors.New("EXDEV") })
+	if info, err := os.Stat(filepath.Join(dir, "skills", "code-review", "run.sh")); err != nil || info.Mode().Perm() != 0o755 {
+		t.Errorf("mode %v %v", info, err)
+	}
+}

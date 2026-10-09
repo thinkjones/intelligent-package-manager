@@ -93,3 +93,13 @@ func TestLockRoundTrip(t *testing.T) {
 		t.Errorf("missing lock: %v %v", l, err)
 	}
 }
+
+func TestLoadPacksRefusesUnsafeNames(t *testing.T) {
+	for _, name := range []string{`"../../victim"`, `"claude-x"`, `"a b"`} {
+		root := t.TempDir()
+		os.WriteFile(filepath.Join(root, File), []byte("[packs."+name+"]\nitems = []\n"), 0o644)
+		if _, err := LoadPacks(root); err == nil {
+			t.Errorf("%s accepted", name)
+		}
+	}
+}

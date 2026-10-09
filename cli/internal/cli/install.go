@@ -76,10 +76,10 @@ func runInstall(sys System, global, update, noValidate bool) error {
 	if err != nil {
 		return err
 	}
-
-	if err := project.SaveLock(dir, items); err != nil {
-		return err
+	for _, w := range plan.Warnings {
+		fmt.Fprintf(sys.Stdout, "%s %s\n", warn, w)
 	}
+
 	root, err := sources.WriteProject(dir, plan.Repos)
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func runInstall(sys System, global, update, noValidate bool) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("node_modules/\nplugins/\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("node_modules/\nplugins/\nplugins.tmp/\n"), 0o644); err != nil {
 		return err
 	}
 	if len(plan.Repos) > 0 {
@@ -110,14 +110,17 @@ func runInstall(sys System, global, update, noValidate bool) error {
 	if out, err := sys.Output(scope.Root, "git", "config", "user.name"); err == nil && strings.TrimSpace(out) != "" {
 		owner = strings.TrimSpace(out)
 	}
-	plugins := filepath.Join(dir, "plugins")
-	if err := os.RemoveAll(plugins); err != nil {
+	// Build into plugins.tmp and swap it in, so a failure keeps the last
+	// good build; the lock is written only once the build is in place.
+	plugins, staging := filepath.Join(dir, "plugins"), filepath.Join(dir, "plugins.tmp")
+	if err := os.RemoveAll(staging); err != nil {
 		return err
 	}
+	defer os.RemoveAll(staging)
 	var entries []any
 	var names []string
 	for _, pp := range plan.Packs {
-		pluginDir := filepath.Join(plugins, pp.Name)
+		pluginDir := filepath.Join(staging, pp.Name)
 		if err := assemble.Place(pp, filepath.Join(dir, "node_modules"), pluginDir, os.Link); err != nil {
 			return err
 		}
@@ -137,12 +140,24 @@ func runInstall(sys System, global, update, noValidate bool) error {
 		names = append(names, pp.Name)
 		fmt.Fprintf(sys.Stdout, "%s %s: %d item(s), %d plugin dependency(ies)\n", ok, pp.Name, len(pp.Files), len(pp.Deps))
 	}
+	if err := os.MkdirAll(staging, 0o755); err != nil {
+		return err
+	}
+	if err := os.RemoveAll(plugins); err != nil {
+		return err
+	}
+	if err := os.Rename(staging, plugins); err != nil {
+		return err
+	}
 	name := "ipm-global"
 	if !scope.Global {
 		name = strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(scope.Root)), "-"), "-.") + "-ipm"
 	}
 	m := marketplace.Build(entries, names, marketplace.Options{Name: name, Owner: owner, Description: "ipm packs: " + strings.Join(names, ", ")})
 	if err := marketplace.Write(filepath.Join(dir, ".claude-plugin", "marketplace.json"), m); err != nil {
+		return err
+	}
+	if err := project.SaveLock(dir, items); err != nil {
 		return err
 	}
 
