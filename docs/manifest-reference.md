@@ -1,6 +1,6 @@
 # Manifest reference
 
-Every table and key `aihs` reads, the lock it writes, and the rules it enforces. Unknown keys and tables are an error, so a typo never passes silently.
+Every table and key `ipm` reads, the lock it writes, and the rules it enforces. Unknown keys and tables are an error, so a typo never passes silently.
 
 ## Where manifests live
 
@@ -8,7 +8,7 @@ A pack is any directory at the checkout root that contains `manifest.toml` — a
 
 ## Repos of interest: the root `manifest.toml`
 
-The `manifest.toml` at the checkout root is not a pack. It lists upstream repos worth watching, and publishes nothing. `aihs sync` pins and caches each one alongside the packs' upstreams; `aihs scan` reports the Claude Code plugins (`.claude-plugin/plugin.json`), Copilot plugins (a bare `plugin.json`), marketplaces (`.claude-plugin/marketplace.json`) and the `skills`, `hooks` and `agents` folders each holds. `aihs scan owner/repo` scans a repo that is not listed: it is cached at its remote's current commit until the next `aihs sync` prunes it. `aihs promote <owner/repo>` appends a `[[repo]]` entry, keeping the file's comments; given an external plugin's catalog ID (`plugin:<marketplace repo>#<name>`) it promotes the repo that plugin lives in. `aihs index` then catalogs every repo listed here into `catalog/*.jsonl`; the record fields are in the [catalog spec](superpowers/specs/2026-10-08-artifact-catalog-design.md#data-model).
+The `manifest.toml` at the checkout root is not a pack. It lists upstream repos worth watching, and publishes nothing. `ipm sync` pins and caches each one alongside the packs' upstreams; `ipm scan` reports the Claude Code plugins (`.claude-plugin/plugin.json`), Copilot plugins (a bare `plugin.json`), marketplaces (`.claude-plugin/marketplace.json`) and the `skills`, `hooks` and `agents` folders each holds. `ipm scan owner/repo` scans a repo that is not listed: it is cached at its remote's current commit until the next `ipm sync` prunes it. `ipm promote <owner/repo>` appends a `[[repo]]` entry, keeping the file's comments; given an external plugin's catalog ID (`plugin:<marketplace repo>#<name>`) it promotes the repo that plugin lives in. `ipm index` then catalogs every repo listed here into `catalog/*.jsonl`; the record fields are in the [catalog spec](superpowers/specs/2026-10-08-artifact-catalog-design.md#data-model).
 
 | Key | Type | Required | Meaning |
 | --- | --- | --- | --- |
@@ -21,7 +21,7 @@ Optional. Describes the pack's stack plugin.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
-| `description` | string | Shown in `/plugin`; `aihs` appends a summary such as `(9 plugins; includes user-core)`. |
+| `description` | string | Shown in `/plugin`; `ipm` appends a summary such as `(9 plugins; includes user-core)`. |
 | `version` | string | The stack plugin's version label. |
 | `includes` | array of pack names | Packs this stack builds on. Installing this pack installs them. |
 
@@ -66,11 +66,11 @@ Record what cannot be published as a trailing comment, so nothing is silently lo
 #   github/awesome-copilot/instructions/rust.instructions.md  — Copilot instructions file — no Claude Code plugin component loads it as is
 ```
 
-`aihs` ignores comments; this is a convention for people.
+`ipm` ignores comments; this is a convention for people.
 
 ## `aihs.lock`
 
-Written by `aihs sync`; commit it, do not edit it. Like npm's `package-lock.json`, it records each upstream's requested version and the commit it resolved to:
+Written by `ipm sync`; commit it, do not edit it. Like npm's `package-lock.json`, it records each upstream's requested version and the commit it resolved to:
 
 ```toml
 [[repo]]
@@ -89,11 +89,11 @@ One entry per distinct `repo` and `version` (`version` is absent for the default
 
 | Path | Written by | Commit? |
 | --- | --- | --- |
-| `aihs.lock` | `aihs sync` | yes |
-| `.aihs/cache/<owner>/<repo>/<commit>/` | `aihs sync` — a shallow checkout per locked commit | no (gitignored) |
-| `.claude-plugin/marketplace.json` | `aihs create-plugin` | yes |
+| `aihs.lock` | `ipm sync` | yes |
+| `.aihs/cache/<owner>/<repo>/<commit>/` | `ipm sync` — a shallow checkout per locked commit | no (gitignored) |
+| `.claude-plugin/marketplace.json` | `ipm create-plugin` | yes |
 
-`aihs` writes nothing into a pack.
+`ipm` writes nothing into a pack.
 
 ## Naming rules
 
@@ -104,4 +104,4 @@ Every plugin and pack name must:
 - be unique across the marketplace, except that several packs may list the same plugin when every listing has the same `repo`, `path`, `version`, `skills`, `agents` and `dependencies` (descriptions may differ);
 - not equal a pack name.
 
-`aihs doctor` reports every violation; `aihs create-plugin` refuses to publish until they are fixed.
+`ipm doctor` reports every violation; `ipm create-plugin` refuses to publish until they are fixed.

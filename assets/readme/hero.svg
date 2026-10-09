@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="460" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
   <title id="title">ai-harness-skills</title>
-  <desc id="desc">Skills and plugins from many GitHub repos, pinned to commits in aihs.lock and referenced in place, published by aihs as one Claude Code marketplace of 98 plugins and installed as whole stacks.</desc>
+  <desc id="desc">Skills and plugins from many GitHub repos, pinned to commits in aihs.lock and referenced in place, published by ipm as one Claude Code marketplace of 98 plugins and installed as whole stacks.</desc>
 
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
@@ -38,9 +38,9 @@
 
     <line x1="914" y1="204" x2="914" y2="230" stroke="#46c2a8" stroke-width="2" marker-end="url(#arrow)"/>
 
-    <!-- aihs -->
+    <!-- ipm -->
     <rect x="684" y="236" width="460" height="50" rx="12" fill="#13261f" stroke="#46c2a8" stroke-width="2"/>
-    <text x="704" y="268" fill="#46c2a8" font-weight="700">aihs</text>
+    <text x="704" y="268" fill="#46c2a8" font-weight="700">ipm</text>
     <text x="764" y="268" fill="#e9eef2">sync · create-plugin</text>
 
     <line x1="914" y1="288" x2="914" y2="314" stroke="#46c2a8" stroke-width="2" marker-end="url(#arrow)"/>

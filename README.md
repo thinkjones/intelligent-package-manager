@@ -1,14 +1,14 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="ai-harness-skills: skills from any repo, pinned to commits and referenced in place, published by aihs as one Claude Code marketplace of 98 plugins and installed as whole stacks">
+  <img src="./assets/readme/hero.svg" width="100%" alt="ai-harness-skills: skills from any repo, pinned to commits and referenced in place, published by ipm as one Claude Code marketplace of 98 plugins and installed as whole stacks">
 </p>
 
 <p align="center">
-  <img src="./assets/readme/proof.svg" width="100%" alt="Terminal: aihs sync pins 19 upstreams; aihs create-plugin writes a 98-plugin marketplace, all referenced upstream at locked commits, that passes claude plugin validate; installing code-core pulls in 23 dependencies">
+  <img src="./assets/readme/proof.svg" width="100%" alt="Terminal: ipm sync pins 19 upstreams; ipm create-plugin writes a 98-plugin marketplace, all referenced upstream at locked commits, that passes claude plugin validate; installing code-core pulls in 23 dependencies">
 </p>
 
 ## What it is
 
-A curated Claude Code plugin marketplace whose content lives in other people's repos. Each **pack** is a folder holding one `manifest.toml` that names upstream skills and plugins — Anthropic's skills, `obra/superpowers`, Cloudflare's skills, GitHub's awesome-copilot and more. The `aihs` CLI pins every upstream to a commit and writes `.claude-plugin/marketplace.json`, where every entry points back at its source. Install a pack and you get its whole stack.
+A curated Claude Code plugin marketplace whose content lives in other people's repos. Each **pack** is a folder holding one `manifest.toml` that names upstream skills and plugins — Anthropic's skills, `obra/superpowers`, Cloudflare's skills, GitHub's awesome-copilot and more. The `ipm` CLI pins every upstream to a commit and writes `.claude-plugin/marketplace.json`, where every entry points back at its source. Install a pack and you get its whole stack.
 
 ## Why it is different
 
@@ -20,12 +20,12 @@ A curated Claude Code plugin marketplace whose content lives in other people's r
 ## How it works
 
 <p align="center">
-  <img src="./assets/readme/workflow.svg" width="100%" alt="Four stages: declare upstreams in manifest.toml; aihs sync caches them and pins commits in aihs.lock; aihs create-plugin pins every entry and validates; Claude Code installs a pack as one stack">
+  <img src="./assets/readme/workflow.svg" width="100%" alt="Four stages: declare upstreams in manifest.toml; ipm sync caches them and pins commits in aihs.lock; ipm create-plugin pins every entry and validates; Claude Code installs a pack as one stack">
 </p>
 
 1. **Declare** — a pack's `manifest.toml` lists `[[plugin]]` upstreams and `[[copilot-plugin]]` items, each with an optional `version`.
-2. **Sync** — `aihs sync` resolves each version to a commit, records it in `aihs.lock` (committed), and shallow-fetches it into `.aihs/cache/<owner>/<repo>/<commit>/` (gitignored).
-3. **Publish** — `aihs create-plugin` pins every entry to its locked commit, writes the marketplace and runs `claude plugin validate`. It writes nothing else.
+2. **Sync** — `ipm sync` resolves each version to a commit, records it in `aihs.lock` (committed), and shallow-fetches it into `.aihs/cache/<owner>/<repo>/<commit>/` (gitignored).
+3. **Publish** — `ipm create-plugin` pins every entry to its locked commit, writes the marketplace and runs `claude plugin validate`. It writes nothing else.
 4. **Install** — Claude Code adds the marketplace and installs a pack, pulling in its dependencies.
 
 ## Quick start
@@ -33,15 +33,15 @@ A curated Claude Code plugin marketplace whose content lives in other people's r
 Requirements: Go, git, [direnv](https://direnv.net), and Claude Code.
 
 ```bash
-direnv allow                     # puts bin/aihs on PATH — the only setup
-aihs sync                        # cache every upstream, pin it in aihs.lock
-aihs create-plugin               # pin, write and validate the marketplace
+direnv allow                     # puts bin/ipm on PATH — the only setup
+ipm sync                        # cache every upstream, pin it in aihs.lock
+ipm create-plugin               # pin, write and validate the marketplace
 
 claude plugin marketplace add "$PWD"
 claude plugin install code-core@ai-harness-skills-marketplace
 ```
 
-`aihs` is local to this checkout: it installs nothing globally, reads no global config, and is not on your PATH anywhere else.
+`ipm` is local to this checkout: it installs nothing globally, reads no global config, and is not on your PATH anywhere else.
 
 ## Packs
 
@@ -92,10 +92,10 @@ claude plugin install code-core@ai-harness-skills-marketplace
 
 | Command | Does |
 | --- | --- |
-| `aihs sync [--upgrade]` | Resolve every upstream's version to a commit, pin it in `aihs.lock` and cache it; `--upgrade` re-resolves every version |
-| `aihs create-plugin [--pack NAME]… [--dry-run]` | Write `.claude-plugin/marketplace.json` with every entry pinned, then validate it |
-| `aihs doctor` | Check config, every manifest, the lock and the marketplace |
-| `aihs help [command]` | Usage, or one command's flags |
+| `ipm sync [--upgrade]` | Resolve every upstream's version to a commit, pin it in `aihs.lock` and cache it; `--upgrade` re-resolves every version |
+| `ipm create-plugin [--pack NAME]… [--dry-run]` | Write `.claude-plugin/marketplace.json` with every entry pinned, then validate it |
+| `ipm doctor` | Check config, every manifest, the lock and the marketplace |
+| `ipm help [command]` | Usage, or one command's flags |
 
 ## Limits
 
@@ -108,7 +108,7 @@ claude plugin install code-core@ai-harness-skills-marketplace
 
 - [User guide](docs/user-guide.md) — install, add and update packs, pin versions, troubleshoot.
 - [Manifest reference](docs/manifest-reference.md) — every table and key in `manifest.toml`, and `aihs.lock`.
-- [Architecture](docs/architecture.md) — how `aihs` is built and why.
-- [`cli/README.md`](cli/README.md) — working on `aihs` itself.
+- [Architecture](docs/architecture.md) — how `ipm` is built and why.
+- [`cli/README.md`](cli/README.md) — working on `ipm` itself.
 
 <p align="center"><sub>Maintained by Dr Gene Conroy-Jones.</sub></p>

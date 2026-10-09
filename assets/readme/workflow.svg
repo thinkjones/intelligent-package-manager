@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
   <title id="title">How ai-harness-skills works</title>
-  <desc id="desc">Four stages: declare upstreams in a pack's manifest.toml; aihs sync caches them and pins commits in aihs.lock; aihs create-plugin pins every entry to its locked commit and validates; Claude Code installs a pack as one stack.</desc>
+  <desc id="desc">Four stages: declare upstreams in a pack's manifest.toml; ipm sync caches them and pins commits in aihs.lock; ipm create-plugin pins every entry to its locked commit and validates; Claude Code installs a pack as one stack.</desc>
 
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="8" markerHeight="8" orient="auto">
@@ -34,8 +34,8 @@
 
     <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#46c2a8">
       <text x="62" y="160">manifest.toml</text>
-      <text x="348" y="160">aihs sync</text>
-      <text x="634" y="160">aihs create-plugin</text>
+      <text x="348" y="160">ipm sync</text>
+      <text x="634" y="160">ipm create-plugin</text>
       <text x="920" y="160">/plugin install</text>
     </g>
 
