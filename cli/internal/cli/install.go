@@ -20,7 +20,7 @@ func installFlags() (*flag.FlagSet, func(System) error) {
 	fs := flag.NewFlagSet("install", flag.ContinueOnError)
 	fs.BoolVar(&global, "g", false, "build your user scope's packs ($IPM_HOME/global)")
 	fs.BoolVar(&update, "update", false, "re-pin every item to the commit in your current catalog")
-	fs.BoolVar(&noValidate, "no-validate", false, "skip `claude plugin validate --strict`")
+	fs.BoolVar(&noValidate, "no-validate", false, "skip claude plugin validate --strict")
 	return fs, func(sys System) error { return runInstall(sys, global, update, noValidate) }
 }
 

@@ -135,6 +135,10 @@ func TestHelpAndVersion(t *testing.T) {
 		t.Fatalf("search --help: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
+	if err := f.run("help", "install"); err != nil || strings.Contains(f.out.String(), "-no-validate claude") {
+		t.Fatalf("a backquoted usage turns into a flag argument name:\n%s", f.out.String())
+	}
+	f.out.Reset()
 	if err := f.run("--version"); err != nil || f.out.String() != "ipm test\n" {
 		t.Fatalf("version: %v %q", err, f.out.String())
 	}
