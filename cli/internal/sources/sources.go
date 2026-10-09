@@ -237,8 +237,10 @@ func Checkouts(dir string) ([]Checkout, error) {
 		if commit == "" {
 			return nil, fmt.Errorf("%s has no pinned commit in pnpm-lock.yaml — run `ipm sync`", s.Repo)
 		}
-		d := filepath.Join(dir, "node_modules", s.Alias)
-		if _, err := os.Stat(d); err != nil {
+		// pnpm links node_modules/<alias> to its virtual store; walkers don't
+		// descend through a symlinked root, so hand out the real folder.
+		d, err := filepath.EvalSymlinks(filepath.Join(dir, "node_modules", s.Alias))
+		if err != nil {
 			return nil, fmt.Errorf("%s is not installed — run `ipm sync`", s.Repo)
 		}
 		out = append(out, Checkout{Source: s, Dir: d, Commit: commit})

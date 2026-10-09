@@ -3,13 +3,10 @@ package cli
 import (
 	"flag"
 	"fmt"
-	"path/filepath"
 	"text/tabwriter"
 
 	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/config"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
-	"github.com/thinkjones/fs-skills/cli/internal/upstream"
+	"github.com/thinkjones/fs-skills/cli/internal/sources"
 )
 
 func indexFlags() (*flag.FlagSet, func(System) error) {
@@ -17,38 +14,30 @@ func indexFlags() (*flag.FlagSet, func(System) error) {
 	return fs, runIndex
 }
 
-// runIndex writes catalog/*.jsonl from the repos of interest at their locked
-// commits. It reads only aihs.lock and the cache, and writes nothing unless
-// every repo is pinned and cached.
+// runIndex writes the catalog from every synced source at its pinned commit.
+// It reads only what pnpm installed, and writes nothing unless every source
+// is installed and pinned.
 func runIndex(sys System) error {
-	cfg, err := config.Load(sys.Getenv)
+	p, err := ipmPaths(sys)
 	if err != nil {
 		return err
 	}
-	ups, err := pack.LoadInterest(cfg.Root)
+	srcs, err := sources.Checkouts(p.Sources())
 	if err != nil {
 		return err
 	}
-	if len(ups) == 0 {
-		return fmt.Errorf("no repos of interest: list them as [[repo]] in %s, then run `ipm sync`", filepath.Join(cfg.Root, pack.ManifestFile))
+	if len(srcs) == 0 {
+		return fmt.Errorf("no sources to index — add some with `ipm source add owner/repo`, then `ipm sync`")
 	}
-	lock, err := upstream.ReadLock(cfg.Root)
-	if err != nil {
-		return err
-	}
-	cos := make([]catalog.Checkout, 0, len(ups))
-	for _, u := range ups {
-		dir, err := upstream.Checkout(cfg.Root, u, lock)
-		if err != nil {
-			return err
-		}
-		cos = append(cos, catalog.Checkout{Repo: u.Repo, Commit: lock[u.Key()], Dir: dir})
+	cos := make([]catalog.Checkout, 0, len(srcs))
+	for _, s := range srcs {
+		cos = append(cos, catalog.Checkout{Repo: s.Repo, Commit: s.Commit, Dir: s.Dir})
 	}
 	recs, warnings, err := catalog.Build(cos)
 	if err != nil {
 		return err
 	}
-	if err := catalog.Write(filepath.Join(cfg.Root, "catalog"), recs); err != nil {
+	if err := catalog.Write(p.Catalog(), recs); err != nil {
 		return err
 	}
 

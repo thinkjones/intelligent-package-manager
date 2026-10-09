@@ -51,9 +51,15 @@ func ipm(t *testing.T, root string, args ...string) (stdout, stderr string, code
 	return o.String(), e.String(), code
 }
 
-// TestSyncThenCreatePlugin runs the real binary and real git against a local
-// repo served over file://, standing in for GitHub.
-func TestSyncThenCreatePlugin(t *testing.T) {
+// TestSourceSyncIndexWithPnpm runs the real binary and real pnpm against a
+// local git repo served over file://, standing in for GitHub. Skipped when
+// pnpm isn't installed.
+func TestSourceSyncIndexWithPnpm(t *testing.T) {
+	pnpm, err := exec.LookPath("pnpm")
+	if err != nil {
+		t.Skip("pnpm not installed")
+	}
+	node, _ := exec.LookPath("node")
 	upstream := t.TempDir()
 	git := func(args ...string) string {
 		t.Helper()
@@ -65,30 +71,36 @@ func TestSyncThenCreatePlugin(t *testing.T) {
 		return strings.TrimSpace(string(out))
 	}
 	git("init", "-q", "-b", "main")
-	git("commit", "-q", "--allow-empty", "-m", "one")
+	if err := os.MkdirAll(filepath.Join(upstream, "skills", "one"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	os.WriteFile(filepath.Join(upstream, "skills", "one", "SKILL.md"), []byte("---\nname: one\ndescription: d\n---\n"), 0o644)
+	git("add", ".")
+	git("commit", "-q", "-m", "one")
 	sha := git("rev-parse", "HEAD")
 
-	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "notes"), 0o755); err != nil {
-		t.Fatal(err)
+	home, cache := t.TempDir(), t.TempDir()
+	path := filepath.Dir(pnpm) + ":" + filepath.Dir(node) + ":/usr/bin:/bin"
+	run := func(args ...string) (string, int) {
+		t.Helper()
+		cmd := exec.Command(bin, args...)
+		cmd.Env = []string{"PATH=" + path, "HOME=" + t.TempDir(), "IPM_HOME=" + home, "IPM_CACHE_DIR=" + cache}
+		out, err := cmd.CombinedOutput()
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			return string(out), exitErr.ExitCode()
+		}
+		return string(out), 0
 	}
-	manifest := fmt.Sprintf("[[plugin]]\nname = \"notes-plugin\"\nrepo = \"file://%s\"\n", upstream)
-	if err := os.WriteFile(filepath.Join(root, "notes", "manifest.toml"), []byte(manifest), 0o644); err != nil {
-		t.Fatal(err)
+	if out, code := run("source", "add", "file://"+upstream); code != 0 {
+		t.Fatalf("source add: exit %d\n%s", code, out)
 	}
-
-	if _, errOut, code := ipm(t, root, "create-plugin", "--no-validate"); code != 1 || !strings.Contains(errOut, "run `ipm sync`") {
-		t.Fatalf("before sync: exit %d, %s", code, errOut)
+	if out, code := run("sync"); code != 0 {
+		t.Fatalf("sync: exit %d\n%s", code, out)
 	}
-	if out, errOut, code := ipm(t, root, "sync"); code != 0 || !strings.Contains(out, "fetched") {
-		t.Fatalf("sync: exit %d\n%s%s", code, out, errOut)
-	}
-	if _, errOut, code := ipm(t, root, "create-plugin", "--no-validate", "--owner", "me"); code != 0 {
-		t.Fatalf("create-plugin: exit %d: %s", code, errOut)
-	}
-	data, err := os.ReadFile(filepath.Join(root, ".claude-plugin", "marketplace.json"))
-	if err != nil || !strings.Contains(string(data), `"sha": "`+sha+`"`) {
-		t.Fatalf("marketplace.json should pin %s: %v\n%s", sha, err, data)
+	data, err := os.ReadFile(filepath.Join(cache, "catalog", "skills.jsonl"))
+	if err != nil || !strings.Contains(string(data), "skills/one") || !strings.Contains(string(data), sha) {
+		t.Fatalf("skills.jsonl should hold skills/one at %s: %v\n%s", sha, err, data)
 	}
 }
 
@@ -104,9 +116,9 @@ func TestExitCodes(t *testing.T) {
 		{"ok", "", []string{"version"}, 0, ""},
 		{"usage error", root, []string{"--upgrade"}, 2, "Try `ipm help`"},
 		{"unknown command", root, []string{"nope"}, 2, "unknown command"},
-		{"bad flag", root, []string{"create-plugin", "--bogus"}, 2, "flag provided but not defined"},
-		{"missing config", "", []string{"create-plugin"}, 1, "IPM_ROOT is not set"},
-		{"nothing to publish", root, []string{"create-plugin"}, 1, "nothing to publish"},
+		{"bad flag", root, []string{"sync", "--bogus"}, 2, "flag provided but not defined"},
+		{"no pnpm", root, []string{"sync"}, 1, "pnpm"},
+		{"no sources", root, []string{"index"}, 1, "ipm source add"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

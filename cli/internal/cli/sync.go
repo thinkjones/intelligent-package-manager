@@ -3,70 +3,43 @@ package cli
 import (
 	"flag"
 	"fmt"
-
-	"github.com/thinkjones/fs-skills/cli/internal/config"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
-	"github.com/thinkjones/fs-skills/cli/internal/upstream"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
 func syncFlags() (*flag.FlagSet, func(System) error) {
 	var upgrade bool
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
-	fs.BoolVar(&upgrade, "upgrade", false, "move every pin to the latest commit of its branch or tag")
+	fs.BoolVar(&upgrade, "upgrade", false, "move every source to the latest commit of its branch or tag")
 	return fs, func(sys System) error { return runSync(sys, upgrade) }
 }
 
-// runSync caches every upstream the packs and the repos of interest read
-// from and pins it in aihs.lock.
+// runSync has pnpm fetch and pin every source (never running their
+// scripts), then reindexes. A failed pnpm run leaves the catalog as it was.
 func runSync(sys System, upgrade bool) error {
-	cfg, err := config.Load(sys.Getenv)
+	p, err := ipmPaths(sys)
 	if err != nil {
 		return err
 	}
-	packs, err := pack.LoadAll(cfg.Root, nil)
+	if _, err := sys.LookPath("pnpm"); err != nil {
+		return fmt.Errorf("ipm fetches sources with pnpm — install it (https://pnpm.io/installation), then rerun")
+	}
+	if _, err := os.Stat(filepath.Join(p.Sources(), "package.json")); err != nil {
+		return fmt.Errorf("no sources yet — add some with `ipm source add owner/repo`")
+	}
+	args := []string{"install"}
+	if upgrade {
+		args = []string{"update", "--latest"}
+	}
+	args = append(args, "--ignore-scripts", "--store-dir", p.Store(), "--dir", p.Sources())
+	fmt.Fprintf(sys.Stdout, "pnpm %s\n", strings.Join(args, " "))
+	out, err := sys.Output(p.Sources(), "pnpm", args...)
 	if err != nil {
-		return err
-	}
-	lock, err := upstream.ReadLock(cfg.Root)
-	if err != nil {
-		return err
-	}
-	interest, err := pack.LoadInterest(cfg.Root)
-	if err != nil {
-		return err
-	}
-	ups := pack.Merge(pack.Upstreams(packs), interest)
-	git := func(dir string, args ...string) (string, error) { return sys.Output(dir, "git", args...) }
-	results, next := upstream.Sync(git, cfg.Root, ups, lock, upgrade)
-	if err := upstream.WriteLock(cfg.Root, next, ups); err != nil {
-		return err
-	}
-
-	width := 0
-	for _, u := range ups {
-		width = max(width, len(u.Key()))
-	}
-	failed, fetched, moved := 0, 0, 0
-	for _, r := range results {
-		switch {
-		case r.Err != nil:
-			failed++
-			fmt.Fprintf(sys.Stdout, "%s %-*s  %v\n", bad, width, r.Upstream.Key(), r.Err)
-		case r.Was != "":
-			moved++
-			fmt.Fprintf(sys.Stdout, "%s %-*s  %s → %s\n", ok, width, r.Upstream.Key(), r.Was[:7], r.Commit[:7])
-		default:
-			note := "cached"
-			if r.Fetched {
-				fetched++
-				note = "fetched"
-			}
-			fmt.Fprintf(sys.Stdout, "%s %-*s  %s  %s\n", ok, width, r.Upstream.Key(), r.Commit[:7], note)
-		}
-	}
-	fmt.Fprintf(sys.Stdout, "\n%d upstream(s): %d fetched, %d moved, %d failed — %s\n", len(ups), fetched, moved, failed, upstream.LockFile)
-	if failed > 0 {
+		fmt.Fprintln(sys.Stdout, strings.TrimSpace(out))
+		fmt.Fprintf(sys.Stdout, "%s pnpm failed — the catalog is unchanged\n", bad)
 		return &ExitError{Code: 1}
 	}
-	return nil
+	fmt.Fprintf(sys.Stdout, "%s sources synced\n\n", ok)
+	return runIndex(sys)
 }

@@ -111,7 +111,7 @@ func runShow(sys System, id string, asJSON bool) error {
 	neighbours(sys.Stdout, g, "up:", g.Children(id, true))
 	neighbours(sys.Stdout, g, "down:", g.Children(id, false))
 	if s("type") == catalog.TypePlugin && s("source_repo") != "" {
-		fmt.Fprintf(sys.Stdout, "\npromote: ipm promote %s\n", id)
+		fmt.Fprintf(sys.Stdout, "\nadd its source: ipm source add %s\n", id)
 	}
 	return nil
 }

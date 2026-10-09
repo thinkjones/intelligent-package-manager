@@ -59,10 +59,10 @@ var commands []command
 
 func init() {
 	commands = []command{
-		{"sync", "cache every upstream the packs and repos of interest read from and pin it in aihs.lock", "", syncFlags},
-		{"create-plugin", "write .claude-plugin/marketplace.json from the packs' manifest.toml", "", createPluginFlags},
+		{"source", "add, remove, list or import your repos of interest", "<add|remove|list|import> …", sourceFlags},
+		{"sync", "fetch and pin every source with pnpm, then reindex", "", syncFlags},
 		{"doctor", "check config and every pack manifest — exits 1 on problems", "", doctorFlags},
-		{"index", "write catalog/*.jsonl from the repos of interest at their locked commits", "", indexFlags},
+		{"index", "rebuild the catalog from your synced sources", "", indexFlags},
 		{"serve", "start the local Typesense search server in Docker (--stop to stop it)", "", serveFlags},
 		{"load", "rebuild the search index from catalog/", "", loadFlags},
 		{"search", "hybrid search over the catalog (needs ipm serve and ipm load)", "<query>", searchFlags},
@@ -70,7 +70,6 @@ func init() {
 		{"tree", "an artifact's relationships as a tree (reads catalog/)", "<id>", treeFlags},
 		{"graph", "an artifact's neighbourhood as Mermaid or Graphviz (reads catalog/)", "<id>", graphFlags},
 		{"stats", "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl", "", statsFlags},
-		{"promote", "add repos (or an external plugin's source repo) to the root manifest.toml", "<repo|plugin-id>...", promoteFlags},
 		{"scan", "cache repos and report their plugin, skills, hooks and agents folders", "[repo...]", scanFlags},
 		{"version", "print ipm's version", "", versionFlags},
 		{"help", "this text, or `help <command>` for one command's flags", "", nil},

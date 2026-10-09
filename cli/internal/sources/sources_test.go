@@ -113,7 +113,7 @@ func TestCheckouts(t *testing.T) {
 	got := map[string]string{}
 	for _, c := range cos {
 		got[c.Repo] = c.Commit
-		if c.Dir != filepath.Join(dir, "node_modules", c.Alias) {
+		if want, _ := filepath.EvalSymlinks(filepath.Join(dir, "node_modules", c.Alias)); c.Dir != want {
 			t.Errorf("dir %s", c.Dir)
 		}
 	}
@@ -135,6 +135,27 @@ func TestCheckoutsNeedSync(t *testing.T) {
 		breakIt(dir)
 		if _, err := Checkouts(dir); err == nil || !strings.Contains(err.Error(), "ipm sync") {
 			t.Errorf("%s: got %v", name, err)
+		}
+	}
+}
+
+func TestCheckoutsResolvePnpmSymlinks(t *testing.T) {
+	dir := synced(t)
+	alias := filepath.Join(dir, "node_modules", "obra--superpowers")
+	real := filepath.Join(dir, "node_modules", ".pnpm", "obra--superpowers@x", "node_modules", "obra--superpowers")
+	os.RemoveAll(alias)
+	os.MkdirAll(real, 0o755)
+	if err := os.Symlink(real, alias); err != nil {
+		t.Fatal(err)
+	}
+	cos, err := Checkouts(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, _ := filepath.EvalSymlinks(real)
+	for _, c := range cos {
+		if c.Alias == "obra--superpowers" && c.Dir != want {
+			t.Errorf("Dir = %s, want the real folder %s", c.Dir, want)
 		}
 	}
 }
