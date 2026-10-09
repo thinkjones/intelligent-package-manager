@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/thinkjones/fs-skills/cli/internal/sources"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 )
 
 func syncFlags() (*flag.FlagSet, func(System) error) {

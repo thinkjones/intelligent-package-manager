@@ -15,11 +15,11 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/marketplace"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
-	"github.com/thinkjones/fs-skills/cli/internal/project"
-	"github.com/thinkjones/fs-skills/cli/internal/sources"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/marketplace"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 )
 
 var ownerRepo = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)

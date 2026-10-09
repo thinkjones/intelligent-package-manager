@@ -3,7 +3,7 @@ package catalog
 import (
 	"slices"
 
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 )
 
 // componentKeys are the plugin fields that list owned components.

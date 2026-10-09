@@ -6,8 +6,8 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/thinkjones/fs-skills/cli/internal/scan"
-	"github.com/thinkjones/fs-skills/cli/internal/sources"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/scan"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 )
 
 func scanFlags() (*flag.FlagSet, func(System) error) {

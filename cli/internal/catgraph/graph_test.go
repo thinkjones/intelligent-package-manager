@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 )
 
 func fixture(t *testing.T) string {

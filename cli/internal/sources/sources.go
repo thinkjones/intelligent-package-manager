@@ -18,7 +18,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 )
 
 // Source is one repo of interest.

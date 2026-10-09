@@ -5,8 +5,8 @@ import (
 	"io"
 	"strings"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/search"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
 )
 
 // maxChildren is how many children a node shows before "… N more".

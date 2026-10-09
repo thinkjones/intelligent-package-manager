@@ -8,9 +8,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/github"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/github"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 )
 
 var ownerRepoRE = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)

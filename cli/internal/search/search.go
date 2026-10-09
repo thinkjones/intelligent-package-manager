@@ -15,10 +15,10 @@ import (
 	"text/tabwriter"
 	"unicode/utf8"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/github"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
-	"github.com/thinkjones/fs-skills/cli/internal/typesense"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/github"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/typesense"
 )
 
 const (

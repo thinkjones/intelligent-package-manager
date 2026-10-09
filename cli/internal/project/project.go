@@ -14,7 +14,7 @@ import (
 
 	"github.com/BurntSushi/toml"
 
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 )
 
 const (

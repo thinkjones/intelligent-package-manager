@@ -1,4 +1,4 @@
-module github.com/thinkjones/fs-skills/cli
+module github.com/thinkjones/intelligent-package-manager/cli
 
 go 1.26
 

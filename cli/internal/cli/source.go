@@ -10,10 +10,10 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
-	"github.com/thinkjones/fs-skills/cli/internal/paths"
-	"github.com/thinkjones/fs-skills/cli/internal/sources"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/paths"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 )
 
 // ipmPaths is where this user's ipm keeps things.

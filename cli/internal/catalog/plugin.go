@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/thinkjones/fs-skills/cli/internal/copilot"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/copilot"
 )
 
 // Components is what a plugin.json, or a marketplace entry acting as one,

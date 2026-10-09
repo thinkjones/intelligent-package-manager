@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/project"
-	"github.com/thinkjones/fs-skills/cli/internal/sources"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 )
 
 // fake is a System with no real environment, git or claude. Output answers

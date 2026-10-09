@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/thinkjones/fs-skills/cli/internal/search"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
 )
 
 func searchFlags() (*flag.FlagSet, func(System) error) {

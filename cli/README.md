@@ -1,6 +1,6 @@
 # ipm
 
-The Go CLI. Every command is Go code in this module; it keeps its data in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), never installs into Claude Code, and is separate from fsh and Gas City. For using it see the [user guide](../docs/user-guide.md); for the design see the [architecture](../docs/architecture.md).
+The Go CLI. Every command is Go code in this module; it keeps its data in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), never installs into Claude Code, and is separate from fsh and Gas City. For using it see [the documentation](https://thinkjones.github.io/intelligent-package-manager/) (source in [`docs/`](../docs/)); for the design see [how it works](../docs/architecture.md).
 
 ## Usage
 
@@ -40,6 +40,8 @@ Exit codes: `0` success; `1` failure (bad source, pnpm missing or failed, unsync
 direnv allow     # once: .envrc puts the repo's bin/ on PATH
 ipm doctor
 ```
+
+Users install the same binary with `go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest`.
 
 `bin/ipm` is a shell shim: it builds `cli/bin/ipm` on first use and whenever a Go source in `cli/` changes, then execs the binary. The binary reads `IPM_HOME` and `IPM_CACHE_DIR` (and `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `HOME`, `LOCALAPPDATA`) to find its data, so it works from any directory.
 

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/catgraph"
-	"github.com/thinkjones/fs-skills/cli/internal/github"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
-	"github.com/thinkjones/fs-skills/cli/internal/search"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catgraph"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/github"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
 )
 
 // oneID is the single artifact ID a relationship command takes; flags may

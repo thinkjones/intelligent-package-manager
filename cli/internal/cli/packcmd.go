@@ -7,11 +7,11 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/thinkjones/fs-skills/cli/internal/catalog"
-	"github.com/thinkjones/fs-skills/cli/internal/catgraph"
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
-	"github.com/thinkjones/fs-skills/cli/internal/project"
-	"github.com/thinkjones/fs-skills/cli/internal/search"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catgraph"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
 )
 
 func packFlags() (*flag.FlagSet, func(System) error) {

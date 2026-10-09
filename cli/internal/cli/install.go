@@ -9,10 +9,10 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/thinkjones/fs-skills/cli/internal/assemble"
-	"github.com/thinkjones/fs-skills/cli/internal/marketplace"
-	"github.com/thinkjones/fs-skills/cli/internal/project"
-	"github.com/thinkjones/fs-skills/cli/internal/sources"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/assemble"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/marketplace"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 )
 
 func installFlags() (*flag.FlagSet, func(System) error) {

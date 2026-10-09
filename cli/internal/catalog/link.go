@@ -24,7 +24,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/thinkjones/fs-skills/cli/internal/pack"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 )
 
 // RepoResult is one repo's records, the warnings raised indexing it, and the

@@ -21,7 +21,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/thinkjones/fs-skills/cli/internal/cli"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/cli"
 )
 
 const version = "0.2.0"

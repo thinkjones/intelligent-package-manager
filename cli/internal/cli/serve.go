@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/thinkjones/fs-skills/cli/internal/paths"
-	"github.com/thinkjones/fs-skills/cli/internal/search"
-	"github.com/thinkjones/fs-skills/cli/internal/typesense"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/paths"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/typesense"
 )
 
 const (
