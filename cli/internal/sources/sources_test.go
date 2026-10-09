@@ -199,3 +199,19 @@ func TestAddSkippingExisting(t *testing.T) {
 		t.Errorf("added %+v skipped %v err %v", added, skipped, err)
 	}
 }
+
+func TestWriteProject(t *testing.T) {
+	dir := t.TempDir()
+	root, err := WriteProject(dir, map[string]string{"o--r": "github:o/r#" + strings.Repeat("a", 40)})
+	if err != nil || !strings.HasPrefix(root, rootPrefix) {
+		t.Fatalf("%q %v", root, err)
+	}
+	again, _ := WriteProject(dir, map[string]string{"x--y": "github:x/y#" + strings.Repeat("b", 40)})
+	if again != root {
+		t.Errorf("root name must be kept: %q → %q", root, again)
+	}
+	got, _ := Load(dir)
+	if len(got) != 1 || got[0].Alias != "x--y" {
+		t.Errorf("deps must be replaced: %+v", got)
+	}
+}

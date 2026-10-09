@@ -201,3 +201,52 @@ func TestSyncUpgradeMovesBranchesNotTags(t *testing.T) {
 		t.Errorf("package.json changed:\nbefore %s\nafter  %s", specs, after)
 	}
 }
+
+// TestPackInstallWithPnpm: real ipm + real pnpm from a local git source to a
+// built plugin.
+func TestPackInstallWithPnpm(t *testing.T) {
+	pnpm, err := exec.LookPath("pnpm")
+	if err != nil {
+		t.Skip("pnpm not installed")
+	}
+	node, _ := exec.LookPath("node")
+	upstream := t.TempDir()
+	for rel, body := range map[string]string{
+		"skills/one/SKILL.md":  "---\nname: one\ndescription: d\n---\n",
+		"agents/helper.md":     "---\nname: helper\ndescription: h\n---\n",
+		"skills/one/refs/x.md": "x",
+	} {
+		os.MkdirAll(filepath.Join(upstream, filepath.Dir(rel)), 0o755)
+		os.WriteFile(filepath.Join(upstream, rel), []byte(body), 0o644)
+	}
+	for _, args := range [][]string{{"init", "-q", "-b", "main"}, {"add", "."}, {"commit", "-q", "-m", "one"}} {
+		base := []string{"-c", "user.name=t", "-c", "user.email=t@t", "-C", upstream}
+		if out, err := exec.Command("git", append(base, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	home, cache, project := t.TempDir(), t.TempDir(), t.TempDir()
+	path := filepath.Dir(pnpm) + ":" + filepath.Dir(node) + ":/usr/bin:/bin"
+	run := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command(bin, args...)
+		cmd.Dir = project
+		cmd.Env = []string{"PATH=" + path, "HOME=" + t.TempDir(), "IPM_HOME=" + home, "IPM_CACHE_DIR=" + cache}
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("ipm %v: %v\n%s", args, err, out)
+		}
+		return string(out)
+	}
+	repo := "file://" + upstream
+	run("source", "add", repo)
+	run("sync")
+	run("pack", "new", "kit")
+	run("pack", "add", "kit", "skill:"+repo+":skills/one", "agent:"+repo+":agents/helper.md")
+	run("install", "--no-validate")
+	for _, rel := range []string{"skills/one/SKILL.md", "skills/one/refs/x.md", "agents/helper.md", ".claude-plugin/plugin.json"} {
+		if _, err := os.Stat(filepath.Join(project, ".ipm", "plugins", "kit", rel)); err != nil {
+			t.Errorf("missing %s: %v", rel, err)
+		}
+	}
+}

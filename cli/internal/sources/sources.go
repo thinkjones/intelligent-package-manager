@@ -309,3 +309,18 @@ func Checkouts(dir string) ([]Checkout, error) {
 	}
 	return out, nil
 }
+
+// WriteProject writes dir/package.json for a project's .ipm folder: deps as
+// given (alias → pinned spec), replacing any before, under the existing root
+// name or a new unguessable one. It returns the root name.
+func WriteProject(dir string, deps map[string]string) (string, error) {
+	pj, err := read(dir)
+	if err != nil {
+		return "", err
+	}
+	pj.Dependencies = map[string]string{}
+	for a, spec := range deps {
+		pj.Dependencies[a] = spec
+	}
+	return pj.Name, write(dir, pj)
+}

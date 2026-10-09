@@ -72,6 +72,7 @@ func init() {
 		{"tree", "an artifact's relationships as a tree (reads the catalog, no search server)", "<id>", treeFlags},
 		{"graph", "an artifact's neighbourhood as Mermaid or Graphviz (reads the catalog, no search server)", "<id>", graphFlags},
 		{"pack", "create and edit packs of catalog items in ipm.toml (-g for your user scope)", "<new|add|remove|list|show> …", packFlags},
+		{"install", "build each pack in ipm.toml into a Claude Code plugin under .ipm/ (-g for your user scope)", "", installFlags},
 		{"stats", "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl", "", statsFlags},
 		{"scan", "report the plugin, skills, hooks and agents folders in your synced sources", "[repo...]", scanFlags},
 		{"version", "print ipm's version", "", versionFlags},

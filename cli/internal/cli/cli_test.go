@@ -1213,3 +1213,167 @@ func TestPackWalksUpToProject(t *testing.T) {
 		t.Error("must use the project's ipm.toml, not create one in a subfolder")
 	}
 }
+
+// installFake is a project with a pack holding a skill, an agent and an
+// external plugin, pnpm 12 on PATH (doing nothing) and the picked repo
+// already in .ipm/node_modules.
+func installFake(t *testing.T) (*fake, string) {
+	t.Helper()
+	f, root := packFake(t)
+	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["git conf"] = result{"Ada\n", nil}
+	write(t, filepath.Join(cacheOf(root), "catalog", "agents.jsonl"), `{"id":"agent:o/r:p/agents/rev.md","type":"agent","name":"reviewer","repo":"o/r","commit":"c1","path":"p/agents/rev.md","plugins":["plugin:o/r:p"]}`+"\n")
+	write(t, filepath.Join(root, ".ipm", "node_modules", "o--r", "p", "skills", "s1", "SKILL.md"), "---\nname: s1\n---\n")
+	write(t, filepath.Join(root, ".ipm", "node_modules", "o--r", "p", "agents", "rev.md"), "---\nname: reviewer\n---\n")
+	if err := f.run("pack", "new", "kit", "--description", "My kit"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("pack", "add", "kit", "skill:o/r:p/skills/s1", "agent:o/r:p/agents/rev.md", "plugin:o/r#e"); err != nil {
+		t.Fatal(err)
+	}
+	return f, root
+}
+
+func TestInstallBuildsPlugin(t *testing.T) {
+	f, root := installFake(t)
+	if err := f.run("install"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	ipm := filepath.Join(root, ".ipm")
+	for _, rel := range []string{"plugins/kit/skills/s1/SKILL.md", "plugins/kit/agents/reviewer.md", "ipm.lock", ".pnpmfile.cjs", "package.json"} {
+		if _, err := os.Stat(filepath.Join(ipm, rel)); err != nil {
+			t.Errorf("missing %s", rel)
+		}
+	}
+	var pj map[string]any
+	data, _ := os.ReadFile(filepath.Join(ipm, "plugins", "kit", ".claude-plugin", "plugin.json"))
+	json.Unmarshal(data, &pj)
+	items := pj["metadata"].(map[string]any)["ipm"].(map[string]any)["items"].([]any)
+	if pj["name"] != "kit" || pj["description"] != "My kit" || pj["author"].(map[string]any)["name"] != "Ada" ||
+		!reflect.DeepEqual(pj["dependencies"], []any{"kit-e"}) || len(items) != 2 {
+		t.Errorf("plugin.json:\n%s", data)
+	}
+	mp, _ := os.ReadFile(filepath.Join(ipm, ".claude-plugin", "marketplace.json"))
+	if !strings.Contains(string(mp), `"./plugins/kit"`) || !strings.Contains(string(mp), `"kit-e"`) || !strings.Contains(string(mp), `"work-ipm"`) {
+		t.Errorf("marketplace.json:\n%s", mp)
+	}
+	gi, _ := os.ReadFile(filepath.Join(ipm, ".gitignore"))
+	if string(gi) != "node_modules/\nplugins/\n" {
+		t.Errorf(".gitignore %q", gi)
+	}
+	if got := callWith(f, "pnpm install"); !strings.Contains(got, "--dir "+ipm) {
+		t.Errorf("pnpm call %q", got)
+	}
+	pkg, _ := os.ReadFile(filepath.Join(ipm, "package.json"))
+	if !strings.Contains(string(pkg), `"o--r": "github:o/r#c1"`) {
+		t.Errorf("package.json:\n%s", pkg)
+	}
+	if !strings.Contains(f.out.String(), "claude plugin marketplace add "+ipm) || !strings.Contains(f.out.String(), "/plugin install kit@work-ipm") {
+		t.Errorf("hints:\n%s", f.out.String())
+	}
+}
+
+func TestInstallKeepsPinsUnlessUpdate(t *testing.T) {
+	f, root := installFake(t)
+	f.run("install")
+	ipm := filepath.Join(root, ".ipm")
+	lock, _ := project.LoadLock(ipm)
+	s1 := lock["skill:o/r:p/skills/s1"]
+	s1.SHA = "old"
+	lock[s1.ID] = s1
+	project.SaveLock(ipm, lock)
+	f.run("install")
+	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != "old" {
+		t.Errorf("install must keep the pin: %+v", l[s1.ID])
+	}
+	f.run("install", "--update")
+	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != "c1" {
+		t.Errorf("--update must re-pin: %+v", l[s1.ID])
+	}
+}
+
+func TestInstallFromLockWithoutCatalog(t *testing.T) {
+	f, root := installFake(t)
+	f.run("install")
+	os.RemoveAll(filepath.Join(cacheOf(root), "catalog"))
+	os.RemoveAll(filepath.Join(root, ".ipm", "plugins"))
+	if err := f.run("install"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "agents", "reviewer.md")); err != nil {
+		t.Error("the lock alone must be enough to rebuild")
+	}
+}
+
+func TestInstallUnknownItem(t *testing.T) {
+	f, root := installFake(t)
+	packs, _ := project.LoadPacks(root)
+	packs[0].Items = append(packs[0].Items, "skill:gone")
+	project.SavePacks(root, packs)
+	if err := f.run("install"); err == nil || !strings.Contains(err.Error(), "skill:gone") {
+		t.Errorf("got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ipm", "ipm.lock")); !os.IsNotExist(err) {
+		t.Error("nothing should be written")
+	}
+}
+
+func TestInstallIsDeterministic(t *testing.T) {
+	f, root := installFake(t)
+	f.run("install")
+	snap := func() map[string]string {
+		m := map[string]string{}
+		filepath.WalkDir(filepath.Join(root, ".ipm"), func(p string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() && !strings.Contains(p, "node_modules") {
+				b, _ := os.ReadFile(p)
+				m[p] = string(b)
+			}
+			return nil
+		})
+		return m
+	}
+	first := snap()
+	packs, _ := project.LoadPacks(root)
+	project.SavePacks(root, packs)
+	f.run("install")
+	if !reflect.DeepEqual(first, snap()) {
+		t.Error("a second install changed .ipm")
+	}
+	packs[0].Items = []string{"agent:o/r:p/agents/rev.md"}
+	project.SavePacks(root, packs)
+	f.run("install")
+	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "skills")); !os.IsNotExist(err) {
+		t.Error("a removed item's files must go")
+	}
+}
+
+func TestInstallValidates(t *testing.T) {
+	f, root := installFake(t)
+	f.onPath["claude"] = true
+	if err := f.run("install"); err != nil {
+		t.Fatal(err)
+	}
+	if callWith(f, "claude plugin validate --strict "+filepath.Join(root, ".ipm")) == "" {
+		t.Errorf("calls %v", f.calls)
+	}
+	f.results["claude plug"] = result{"✘ Validation failed", errors.New("exit 1")}
+	var exit *ExitError
+	if err := f.run("install"); !errors.As(err, &exit) || !strings.Contains(f.out.String(), "Validation failed") {
+		t.Errorf("got %v\n%s", err, f.out.String())
+	}
+}
+
+func TestInstallGlobal(t *testing.T) {
+	f, _ := installFake(t)
+	f.run("pack", "-g", "new", "mine")
+	f.run("pack", "-g", "add", "mine", "agent:o/r:p/agents/rev.md")
+	write(t, filepath.Join(f.env["IPM_HOME"], "global", ".ipm", "node_modules", "o--r", "p", "agents", "rev.md"), "x")
+	if err := f.run("install", "-g"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	mp, _ := os.ReadFile(filepath.Join(f.env["IPM_HOME"], "global", ".ipm", ".claude-plugin", "marketplace.json"))
+	if !strings.Contains(string(mp), `"ipm-global"`) {
+		t.Errorf("marketplace:\n%s", mp)
+	}
+}
