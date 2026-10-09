@@ -1,6 +1,6 @@
-# The one piece of code here is ipm (cli/), a local-only Go CLI for this
-# repo's packs. `direnv allow` puts its bin/ipm shim on PATH; nothing is
-# installed globally. See cli/README.md.
+# This repo is the source of ipm (cli/), a Go CLI. `direnv allow` puts its
+# bin/ipm shim on PATH; ipm keeps its data in your user folders. See
+# cli/README.md.
 
 [tasks."cli:build"]
 description = "Build ipm into cli/bin/ (bin/ipm also does this on demand)"

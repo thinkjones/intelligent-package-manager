@@ -1,153 +1,110 @@
 # User guide
 
-How to install the marketplace, curate packs, and keep them current. For the exact manifest format see the [manifest reference](manifest-reference.md); for how it works inside see the [architecture](architecture.md).
+How to set up `ipm`, choose the repos it watches, keep them current, and search what they hold. For the sources files and rules see the [sources reference](sources-reference.md); for how it works inside see the [architecture](architecture.md).
 
 ## Concepts in one minute
 
-- A **pack** is a folder at the repo root holding exactly one file, `manifest.toml`. It names upstream plugins and skills; it never holds content of its own.
-- Every pack is also a **stack**: a plugin named after the folder that depends on everything the pack lists. Installing it installs the lot.
-- **`ipm`** builds the marketplace. `ipm sync` pins every upstream's version to a commit in `aihs.lock`; `ipm create-plugin` writes `.claude-plugin/marketplace.json`.
-- Nothing upstream is copied: Claude Code fetches every plugin from its repo, at the locked commit, when it is installed.
+- A **source** is a repo of interest: a GitHub `owner/repo` or any git URL, optionally at a tag, branch or commit. Your sources are one pnpm project in your ipm home, one git dependency each.
+- **`ipm sync`** has pnpm fetch and pin every source to a commit, then **`ipm index`** builds the **catalog**: one record per repo, marketplace, plugin, Copilot plugin, skill, agent, command, hook and MCP server, with its commit and links to what owns it.
+- **`ipm serve`** and **`ipm load`** put the catalog into a local Typesense search server; **`ipm search`** queries it, and **`ipm show`**, **`tree`** and **`graph`** explore an artifact's relationships.
+- Nothing upstream is modified or executed, and `ipm` installs nothing into Claude Code. Building your own plugins from picked items is coming in part 3 of [the design](superpowers/specs/2026-10-09-ipm-design.md).
 
 ## Set up
 
-You need Go, git, [direnv](https://direnv.net) and Claude Code.
+You need Go and [direnv](https://direnv.net) to build `ipm`, pnpm 12 or later or Node (then `ipm` runs `npx -y pnpm@12.10.1`), Docker for search, and the GitHub CLI `gh` for stats.
 
 ```bash
 cd ai-harness-skills
-direnv allow          # once: .envrc puts bin/ on PATH
-ipm sync             # fetch every upstream into .aihs/cache/ at its locked commit
-ipm doctor           # checks config, every manifest, the lock and the marketplace
+direnv allow          # once: .envrc puts bin/ on PATH; bin/ipm builds the CLI on demand
+ipm doctor            # home, cache, pnpm, sources, catalog, docker, typesense, claude
 ```
 
-`bin/ipm` builds the CLI on first use and whenever its Go source changes. `ipm` only exists inside this checkout; it installs and configures nothing globally.
+`ipm` keeps its data in your user folders, not in the checkout, so commands work from any directory:
 
-## Install the marketplace in Claude Code
+- **Home** (`IPM_HOME`): your sources and ipm's pnpm store. macOS `~/Library/ipm`; Linux `$XDG_DATA_HOME/ipm` or `~/.local/share/ipm`; Windows `%LOCALAPPDATA%\ipm`.
+- **Cache** (`IPM_CACHE_DIR`): the catalog and search data, all rebuildable. macOS `~/Library/Caches/ipm`; Linux `$XDG_CACHE_HOME/ipm` or `~/.cache/ipm`.
+
+Set either variable to an absolute path to move it.
+
+## Add sources
 
 ```bash
-claude plugin marketplace add /path/to/ai-harness-skills
-claude plugin install code-core@ai-harness-skills-marketplace    # a whole stack
-claude plugin install pdf@ai-harness-skills-marketplace          # or a single plugin
+ipm source add obra/superpowers                 # a GitHub repo, default branch
+ipm source add anthropics/skills@main           # at a branch, tag or commit
+ipm source add https://gitlab.com/me/skills.git#v1
+ipm source add 'plugin:anthropics/claude-plugins-official#stripe'   # the repo an external plugin lives in
+ipm source list                                 # alias, repo, ref, pinned commit
+ipm source remove anthropics/skills
 ```
 
-Inside a session, `/plugin` browses the marketplace. After `ipm create-plugin`, start a new session or run `/reload-plugins` to pick up changes. To remove everything: `claude plugin marketplace remove ai-harness-skills-marketplace`.
+`add`, `remove` and `import` only edit `$IPM_HOME/sources/package.json`; run `ipm sync` afterwards. An external plugin ID only works once that plugin is in your catalog (find it with `ipm search --type plugin`).
 
-## The everyday loop
+### Coming from aihs
+
+If you used `ipm` when it was `aihs`, import the old list of repos of interest once:
 
 ```bash
-$EDITOR <pack>/manifest.toml   # declare what you want
-ipm sync                      # resolve new versions, pin them, cache them
-ipm create-plugin --dry-run   # see what would be published
-ipm create-plugin             # write and validate the marketplace
-ipm doctor
+ipm source import path/to/old/checkout/manifest.toml
+ipm sync
 ```
 
-Commit `manifest.toml`, `aihs.lock` and `.claude-plugin/marketplace.json` together.
+It adds each `[[repo]]` entry (a `version` becomes the ref) and copies the old `catalog/github.jsonl` beside it into your cache, so GitHub stats need not be refetched. The old `.aihs/` folder in a checkout is no longer used and can be deleted.
 
-## Add content to a pack
-
-### An upstream Claude Code plugin
-
-Use the name from the plugin's own `.claude-plugin/plugin.json`, so its skills keep their prefix. It is published as it is — skills, agents, commands, hooks and MCP servers alike:
-
-```toml
-[[plugin]]
-name = "pr-review-toolkit"
-repo = "anthropics/claude-plugins-official"
-path = "plugins/pr-review-toolkit"   # omit to use the whole repo
-description = "Comprehensive PR review"
-```
-
-### Skill folders from any repo
-
-Point `path` at the folder holding the skills and list the ones you want; `"./"` means every skill folder in `path`:
-
-```toml
-[[plugin]]
-name = "arc"
-repo = "vinnie357/claude-skills"
-path = "plugins/core/skills"
-skills = ["./twelve-factor", "./mise", "./code-review"]
-```
-
-When a repo is itself a plugin that bundles more than you want, pointing `path` at a skills folder publishes only your selection.
-
-### A GitHub Copilot plugin
-
-```toml
-[[copilot-plugin]]            # an awesome-copilot plugin (agent-plugins.org plugin.json)
-repo = "github/awesome-copilot"
-path = "plugins/arize-ax"
-```
-
-Its skills are published from upstream as one plugin named for the Copilot plugin (`arize-ax`); set `name` to override. Its agents, hooks and MCP servers are not published, and `create-plugin` says so. A Copilot plugin with no skills is an error, because it would publish nothing. Copilot agents and instructions on their own cannot be published either; record them in the manifest's "Not published" comment instead.
-
-### Build a stack on another stack
-
-```toml
-[pack]
-description = "My stack"
-includes = ["user-core"]
-```
-
-Installing this pack then installs `user-core` too. Includes must name packs being published and must not form a cycle.
-
-## Pin a version
-
-Every `[[plugin]]` and `[[copilot-plugin]]` takes an optional `version`, as in npm:
-
-```toml
-[[plugin]]
-name = "superpowers"
-repo = "obra/superpowers"
-version = "v5.0.0"     # a tag, a branch, or a 40-character commit
-```
-
-Without `version`, the entry follows the upstream's default branch. Either way `ipm sync` records the resolved commit in `aihs.lock`, and the marketplace publishes exactly that commit.
-
-## Keep upstreams current
+## Sync and index
 
 ```bash
-ipm sync --upgrade      # re-resolve every version; branches move, tags and commits stay put
-ipm create-plugin       # republish at the new commits
+ipm sync              # pnpm install, then ipm index
+ipm sync --upgrade    # pnpm update --latest: every source to the latest commit of its branch or tag
+ipm index             # rebuild the catalog without fetching
+ipm stats             # refresh GitHub stars, topics and descriptions (needs gh auth login)
 ```
 
-`ipm sync` prints each move as `old → new` and removes cached commits nothing is locked to.
+`ipm sync` prints the pnpm command it runs, always with `--ignore-scripts`. If pnpm fails, its output is shown, `ipm` exits 1, and the catalog is left as it was. `ipm index` writes `catalog/*.jsonl` in the cache; `ipm stats` writes `catalog/github.jsonl` beside it.
 
-## Create a new pack
+To see what a source holds without searching, `ipm scan` reports each synced source's commit and its plugins, Copilot plugins, marketplaces, and `skills`, `hooks` and `agents` folders; `--paths` lists every folder, and `ipm scan owner/repo` limits it to named sources.
+
+## Search
 
 ```bash
-mkdir my-stack
-cat > my-stack/manifest.toml <<'EOF'
-[pack]
-description = "My stack"
-
-[[plugin]]
-name = "superpowers"
-repo = "obra/superpowers"
-EOF
-ipm sync && ipm create-plugin
-claude plugin install my-stack@ai-harness-skills-marketplace
+ipm serve                         # start Typesense in Docker (ipm-typesense, 127.0.0.1:8108)
+ipm load                          # rebuild the index from the catalog; rerun after every sync or stats
+ipm search c# testing             # hybrid keyword + semantic search, with a SCORE column
+ipm search tdd --type skill --repo obra/superpowers --limit 10
+ipm search review --explain       # KW and SEM columns: why each hit matched
+ipm search hooks --keyword --json # keyword ranking only, one JSON line per hit
+ipm serve --stop                  # stop the server; its data is kept
 ```
 
-The folder name is the stack's plugin name, so it must be a valid plugin name and must not start with `claude-` or `anthropic-`. The folder must hold nothing but `manifest.toml`.
+Filters: `--type` (repo, marketplace, plugin, copilot-plugin, skill, agent, command, hook, mcp), `--repo` and `--tag`, each repeatable. Paging: `--limit` (max 250), `--page N`, or `--all`. The SCORE is relative within one query; see [Search](architecture.md#search) for how it is computed.
+
+## Explore an artifact
+
+```bash
+ipm show 'skill:obra/superpowers:skills/test-driven-development'   # fields, GitHub stats, neighbours (--json for the record)
+ipm tree 'repo:obra/superpowers'                                   # what it contains (--depth N, --all)
+ipm tree 'skill:obra/superpowers:skills/test-driven-development' --up   # what contains it
+ipm graph 'repo:obra/superpowers' --format dot                     # Mermaid by default, or Graphviz
+```
+
+IDs are `<type>:<repo>:<path>`, with `#<name>` for items defined inside a file and `plugin:<repo>#<name>` for external plugins. `ipm search` shows them. These commands read only the catalog; they need no search server.
 
 ## Troubleshooting
 
 | Message | Cause and fix |
 | --- | --- |
-| `IPM_ROOT is not set` | You are running the binary directly or outside the checkout. Run `direnv allow` in the checkout and use `ipm`. |
-| `a pack holds only manifest.toml — <x> does not belong here` | Remove the file or folder; reference the content upstream instead. |
-| `aihs.lock does not pin <repo> — run ipm sync` | A manifest names an upstream the lock has not seen. Run `ipm sync`. |
-| `the cache does not hold <repo> at its locked commit … — run ipm sync` | The cache was removed or never filled, for example on a fresh clone. Run `ipm sync`. |
-| `<repo> has no version "<version>"` | The tag or branch does not exist upstream. |
-| `plugin "<name>" is defined differently in <pack> and <pack>` | Two packs list the same name with different `repo`, `path`, `skills`, `version` or dependencies. Make them identical or rename one. |
-| `name "<name>" is reserved by Claude Code for Anthropic's own plugins` | Pick another name; the plugin's skills keep their upstream prefix regardless. |
-| `<pack> includes "<x>", which is not a pack being published` | The include is misspelled, the pack publishes nothing, or `--pack` left it out. |
-| `publishes nothing: its plugin.json lists no skills` | The Copilot plugin has only agents (or hooks). Remove it and record it as not published. |
-| `this is a Claude Code plugin — list it as a [[plugin]]` | A `[[copilot-plugin]]` points at a Claude Code plugin. |
-| `… not found upstream` | The item moved or was removed upstream at the locked commit. Fix `path`, or remove the entry and record it as not published. |
-| `.claude-plugin/marketplace.json exists and was not written by ipm` | Someone hand-wrote the file. Pass `--force` to replace it. |
-| `claude plugin validate failed` | Read the listed errors; most are naming rules. `ipm doctor` catches the common ones first. |
-
-Packs that publish nothing (no `[[plugin]]`, no `[[copilot-plugin]]`, no includes) are left out of the marketplace and reported as warnings by `ipm doctor`.
+| `ipm fetches sources with pnpm 12 or later …` | No pnpm and no `npx`. Install pnpm 12+ or Node. |
+| `ipm needs pnpm 12 or later (found …)` | pnpm on PATH is too old and `npx` is missing. Upgrade pnpm, or install Node. |
+| `pnpm failed — the catalog is unchanged` | pnpm's output above says why (often network, or a ref that does not exist). Fix it and rerun `ipm sync`. |
+| `no sources yet — add some with ipm source add owner/repo` | Add a source first. |
+| `sources are not synced yet`, `… has no pinned commit in pnpm-lock.yaml`, `… is not installed` | Run `ipm sync`. |
+| `… is already a source` | It is listed already; `ipm source list` shows it. |
+| `… and … would both install as "<alias>" — remove one first` | Two repos differ only in case or punctuation; keep one. |
+| `… is not owner/repo or a git URL` | Use `owner/repo[@ref]` or a URL starting `https://`, `ssh://`, `file://` or `git@`. |
+| `no plugin plugin:… in the catalog — run ipm index` | The plugin ID is not in your catalog; check it with `ipm search`. |
+| `IPM_HOME must be an absolute path` | Use an absolute path (likewise `IPM_CACHE_DIR`). |
+| `the search server is not running — run ipm serve` / `no search server set up` | Start it with `ipm serve`. |
+| `Docker is not running` / `ipm serve runs Typesense in Docker` | Start or install Docker (or OrbStack). |
+| `the search index is empty — run ipm load` | Load the catalog into the server. |
+| `the search server rejected the API key` | Another Typesense holds port 8108; check `docker ps`. |
+| `gh is not logged in` | Run `gh auth login`, then `ipm stats`. |
+| A source from a non-GitHub host is missing files | pnpm applies npm's packing rules (`files`, `.npmignore`) to non-GitHub git sources. A known limitation; use the GitHub mirror if there is one. |

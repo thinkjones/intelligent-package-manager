@@ -1053,3 +1053,17 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 		t.Errorf("old pnpm and no npx: %v", err)
 	}
 }
+
+func TestServeRemovesLegacyContainer(t *testing.T) {
+	f, _ := dockerFake(t, result{"Error: No such object", errors.New("exit 1")})
+	f.results["docker ps"] = result{"aihs-typesense\n", nil}
+	if err := f.run("serve"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if callWith(f, "docker rm -f aihs-typesense") == "" || callWith(f, "docker run -d --name ipm-typesense") == "" {
+		t.Errorf("calls %v", f.calls)
+	}
+	if !strings.Contains(f.out.String(), "ipm load") {
+		t.Errorf("output:\n%s", f.out.String())
+	}
+}

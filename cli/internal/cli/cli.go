@@ -70,7 +70,7 @@ func init() {
 		{"tree", "an artifact's relationships as a tree (reads catalog/)", "<id>", treeFlags},
 		{"graph", "an artifact's neighbourhood as Mermaid or Graphviz (reads catalog/)", "<id>", graphFlags},
 		{"stats", "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl", "", statsFlags},
-		{"scan", "cache repos and report their plugin, skills, hooks and agents folders", "[repo...]", scanFlags},
+		{"scan", "report the plugin, skills, hooks and agents folders in your synced sources", "[repo...]", scanFlags},
 		{"version", "print ipm's version", "", versionFlags},
 		{"help", "this text, or `help <command>` for one command's flags", "", nil},
 	}

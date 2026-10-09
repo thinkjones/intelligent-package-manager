@@ -1,31 +1,31 @@
 # ipm
 
-The Go CLI that builds this repo's Claude Code marketplace. It is local-only: every command is Go code in this module, it installs and configures nothing outside the checkout, and it is separate from fsh and Gas City. For using it see the [user guide](../docs/user-guide.md); for the design see the [architecture](../docs/architecture.md).
+The Go CLI. Every command is Go code in this module; it keeps its data in `IPM_HOME` and `IPM_CACHE_DIR`, never installs into Claude Code, and is separate from fsh and Gas City. For using it see the [user guide](../docs/user-guide.md); for the design see the [architecture](../docs/architecture.md).
 
 ## Usage
 
 ```text
-ipm sync [--upgrade]           resolve every upstream's version, pin it in aihs.lock, cache it
-ipm create-plugin [flags]      write .claude-plugin/marketplace.json pinned to the lock, then validate it
-ipm doctor                     check config, every manifest, the lock and the marketplace
-ipm index                      write catalog/*.jsonl from the repos of interest at their locked commits
-ipm stats                      fetch GitHub stats for every catalog repo into catalog/github.jsonl (needs gh)
-ipm promote <repo|plugin-id>   add repos, or an external plugin's source repo, to the root manifest.toml
-ipm serve [--stop]             run the local Typesense search server in Docker (data in .aihs/typesense/)
-ipm load                       rebuild the search index from catalog/
+ipm source add <repo>…         add sources: owner/repo[@ref], a git URL[#ref], or an external plugin ID
+ipm source remove <repo>…      remove sources
+ipm source list                alias, repo, ref and pinned commit of every source
+ipm source import <manifest>   one-time: add the [[repo]] entries of an aihs-era manifest.toml
+ipm sync [--upgrade]           pnpm install (or update --latest) the sources, then ipm index
+ipm index                      rebuild <cache>/catalog/*.jsonl from the synced sources
+ipm stats                      fetch GitHub stats for every catalog repo into github.jsonl (needs gh)
+ipm serve [--stop]             run Typesense in Docker as ipm-typesense on 127.0.0.1:8108
+ipm load                       rebuild the search index from the catalog
 ipm search <query> [flags]     hybrid search with a SCORE column: --type, --repo, --tag (repeatable), --keyword,
                                --limit, --page N, --all, --explain (KW/SEM columns), --json
 ipm show <id> [--json]         an artifact's fields, GitHub stats and neighbours
 ipm tree <id> [--up]           relationships as a tree (--depth N, --all)
-ipm graph <id> [--format dot]  the neighbourhood as Mermaid (default) or Graphviz
-ipm scan [--paths] [repo...]   cache repos (default: the root manifest.toml) and report their plugin, skills, hooks and agents folders
+ipm graph <id> [--format dot]  the neighbourhood as Mermaid (default) or Graphviz (--depth N, --all, --up)
+ipm scan [--paths] [repo...]   report the plugin, skills, hooks and agents folders in synced sources
+ipm doctor                     check home, cache, pnpm, sources, catalog, docker, typesense, claude
 ipm version
 ipm help [command]             usage, or one command's flags
 ```
 
-`create-plugin` flags: `--pack NAME` (repeatable; default every pack), `--dry-run`, `--force` (overwrite a marketplace ipm didn't write), `--no-validate`, `--name`, `--description`, `--owner`, `--repo-url`.
-
-Exit codes: `0` success; `1` failure (bad config or manifest, unpinned or failed upstream, refused overwrite, failed validation, doctor problems); `2` malformed command line.
+Exit codes: `0` success; `1` failure (bad source, pnpm missing or failed, unsynced sources, doctor problems); `2` malformed command line.
 
 ## Setup
 
@@ -34,25 +34,33 @@ direnv allow     # once: .envrc puts the repo's bin/ on PATH
 ipm doctor
 ```
 
-`bin/ipm` is a shell shim: it builds `cli/bin/ipm` on first use and whenever a Go source in `cli/` changes, sets `IPM_ROOT` to the checkout root, and execs the binary. `IPM_ROOT` is the only configuration ipm reads, and only the shim sets it, so outside the checkout `ipm` is not on PATH.
+`bin/ipm` is a shell shim: it builds `cli/bin/ipm` on first use and whenever a Go source in `cli/` changes, then execs the binary. The binary reads `IPM_HOME` and `IPM_CACHE_DIR` (and `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `HOME`, `LOCALAPPDATA`) to find its data, so it works from any directory.
+
+`ipm sync` needs pnpm 12 or later: pnpm from PATH when it is new enough, otherwise `npx -y pnpm@12.10.1`. Search needs Docker; `ipm stats` needs `gh`.
 
 ## Layout
 
 ```text
-cmd/ipm/main.go           wires the process into cli.Run: argv, real git and claude, exit codes
-internal/cli/              the commands table, help, and one file per command
-internal/config/           IPM_ROOT, validated
-internal/pack/             manifest.toml parsing and validation; Problems; Reserved names
-internal/upstream/         versions, aihs.lock, the commit-keyed cache, Sync, Checkout
-internal/copilot/          Copilot plugin.json → upstream skill references (nothing copied)
-internal/marketplace/      packs → marketplace.json entries pinned to the lock; atomic Write; IsOurs
+cmd/ipm/main.go           wires the process into cli.Run: argv, real commands, HTTP client, exit codes
+internal/cli/              the commands table, help, and one file per command; pnpm.go finds pnpm and writes .pnpmfile.cjs
+internal/paths/            IPM_HOME and the cache dir: platform defaults, overrides, the folders under them
+internal/sources/          sources/package.json (aliases, specifiers), pnpm-lock.yaml commits, Checkouts
+internal/catalog/          walk, parse and link a source into catalog records; read and write *.jsonl
+internal/github/           GitHub stats through gh
+internal/typesense/        a plain net/http Typesense client
+internal/search/           documents, schema, search parameters, the results table
+internal/catgraph/         the catalog as a graph for show, tree and graph
+internal/scan/             the folder report behind ipm scan
+internal/pack/             naming rules, and reading an aihs-era manifest.toml for source import
+internal/copilot/          which skills a Copilot plugin.json lists (kept for part 3)
+internal/marketplace/      marketplace.json entries and atomic Write (kept for part 3)
 ```
 
-Commands reach the outside world only through `cli.System` — stdout, stderr, environment, `LookPath`, and an `Output` runner used for git and claude — so tests drive them in-process with a fake.
+Commands reach the outside world only through `cli.System` — stdout, stderr, environment, `LookPath`, an `Output` runner used for pnpm, docker, gh and claude, an HTTP client for Typesense, and a clock — so tests drive them in-process with a fake.
 
 ## Adding a command
 
-Add `internal/cli/<name>.go` with a `<name>Flags()` function returning the command's `flag.FlagSet` and its run function, and a row in the `commands` table in `cli.go`. Write its tests in `internal/cli` against the fake `System`.
+Add `internal/cli/<name>.go` with a `<name>Flags()` function returning the command's `flag.FlagSet` and its run function, and a row in the `commands` table in `cli.go`. Write its tests in `internal/cli` against the fake `System`. Resolve data folders with `ipmPaths(sys)`.
 
 ## Testing
 
@@ -61,7 +69,7 @@ mise run cli:test      # gofmt check, go vet, go test ./... — the gate for cha
 mise run cli:build     # cli/bin/ipm (bin/ipm also does this on demand)
 ```
 
-- `internal/pack`, `internal/marketplace` and `internal/copilot` test the manifest format, the manifest-only rule, conflict rules, JSON shape and Copilot expansion against fixtures.
-- `internal/upstream` runs real `git` against local repositories served over `file://`.
-- `internal/cli` drives every command in-process with a fake `System`; no real git or claude.
-- `cmd/ipm` builds the real binary and runs `sync` then `create-plugin` against a `file://` upstream, plus exit codes.
+- `internal/paths` and `internal/sources` test path resolution on every OS, aliases, the `package.json` round trip, collisions and reading commits from a fixture `pnpm-lock.yaml`.
+- `internal/catalog`, `internal/catgraph`, `internal/search` and `internal/typesense` test the catalog, the graph and search against fixtures and a fake server.
+- `internal/cli` drives every command in-process with a fake `System`, `IPM_HOME` and `IPM_CACHE_DIR` in temp dirs; no real pnpm, docker or claude.
+- `cmd/ipm` builds the real binary and checks exit codes; with pnpm installed it also runs `source add`, `sync` and `index` against a local git repo over `file://`.
