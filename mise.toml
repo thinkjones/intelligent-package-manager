@@ -1,0 +1,17 @@
+# The one piece of code here is aihs (cli/), a local-only Go CLI for this
+# repo's packs. `direnv allow` puts its bin/aihs shim on PATH; nothing is
+# installed globally. See cli/README.md.
+
+[tasks."cli:build"]
+description = "Build aihs into cli/bin/ (bin/aihs also does this on demand)"
+dir = "cli"
+run = "go build -o bin/aihs ./cmd/aihs"
+
+[tasks."cli:test"]
+description = "gofmt check, go vet, go test — what a change to cli/ must pass"
+dir = "cli"
+run = [
+  'test -z "$(gofmt -l .)" || { gofmt -l .; echo "gofmt: the files above need gofmt -w" >&2; exit 1; }',
+  "go vet ./...",
+  "go test ./...",
+]

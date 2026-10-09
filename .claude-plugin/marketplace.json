@@ -1,0 +1,1762 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "ai-harness-skills-marketplace",
+  "description": "Plugins from ai-harness-skills (agentic-harness, ai-agents, ai-tooling, architect-cloud, architect-dataops, architect-devops, architect-mlops, business-core, code-architecture, code-core, code-csharp, code-go, code-java, code-mobile, code-python, code-rust, code-typescript, design-frontend, eng-best-practices, graphic-design, plan-core, plan-docs, productivity, security-core, test-core, user-core)",
+  "owner": {
+    "name": "Gene Conroy-Jones"
+  },
+  "plugins": [
+    {
+      "name": "agentic-harness",
+      "description": "The agentic-harness pack (1 plugin)",
+      "source": "./agentic-harness",
+      "category": "agentic-harness",
+      "tags": [
+        "aihs",
+        "agentic-harness"
+      ],
+      "strict": false,
+      "dependencies": [
+        "skill-creator"
+      ],
+      "commands": [],
+      "agents": []
+    },
+    {
+      "name": "skill-creator",
+      "description": "Create, improve and evaluate skills (Anthropic)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/skill-creator",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "agentic-harness",
+      "tags": [
+        "aihs",
+        "agentic-harness"
+      ]
+    },
+    {
+      "name": "ai-agents",
+      "description": "Agent swarms, multi-agent orchestration, MCP server building, LangGraph/LangChain observability, and agentic SDK tooling. (6 plugins)",
+      "source": "./ai-agents",
+      "category": "ai-agents",
+      "tags": [
+        "aihs",
+        "ai-agents"
+      ],
+      "strict": false,
+      "dependencies": [
+        "agent-sdk-dev",
+        "mcp-server-dev",
+        "mcp-builder",
+        "gem-team",
+        "copilot-sdk",
+        "arize-ax"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "agent-sdk-dev",
+      "description": "Anthropic Agent SDK development tools",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/agent-sdk-dev",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "ai-agents",
+      "tags": [
+        "aihs",
+        "ai-agents"
+      ]
+    },
+    {
+      "name": "mcp-server-dev",
+      "description": "MCP server development tools",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/mcp-server-dev",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "ai-agents",
+      "tags": [
+        "aihs",
+        "ai-agents"
+      ]
+    },
+    {
+      "name": "mcp-builder",
+      "description": "MCP server building (Python FastMCP + TypeScript SDK)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "ai-agents",
+      "tags": [
+        "aihs",
+        "ai-agents"
+      ],
+      "skills": [
+        "./mcp-builder"
+      ]
+    },
+    {
+      "name": "gem-team",
+      "description": "Self-Learning Multi-agent orchestration framework for spec-driven development and automated verification. With smarter tool calling and leaner context.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "ai-agents",
+      "tags": [
+        "aihs",
+        "ai-agents"
+      ],
+      "skills": [
+        "./gem-devops-guidelines"
+      ]
+    },
+    {
+      "name": "copilot-sdk",
+      "description": "Build applications with the GitHub Copilot SDK across multiple programming languages. Includes comprehensive instructions for C#, Go, Node.js/TypeScript, and Python to help you create AI-powered applications.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "ai-agents",
+      "tags": [
+        "aihs",
+        "ai-agents"
+      ],
+      "skills": [
+        "./copilot-sdk"
+      ]
+    },
+    {
+      "name": "arize-ax",
+      "description": "Arize AX platform skills for LLM observability, evaluation, and optimization. Includes trace export, instrumentation, datasets, experiments, evaluators, AI provider integrations, annotations, prompt optimization, and deep linking to the Arize UI.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "ai-agents",
+      "tags": [
+        "aihs",
+        "ai-agents"
+      ],
+      "skills": [
+        "./arize-ai-provider-integration",
+        "./arize-annotation",
+        "./arize-dataset",
+        "./arize-evaluator",
+        "./arize-experiment",
+        "./arize-instrumentation",
+        "./arize-link",
+        "./arize-prompt-optimization",
+        "./arize-trace"
+      ]
+    },
+    {
+      "name": "ai-tooling",
+      "description": "Meta-tooling for APM package authors — retrofit existing skills/plugins/agents repos into APM-compliant packages, scaffold manifests, and audit compliance. (1 plugin)",
+      "source": "./ai-tooling",
+      "category": "ai-tooling",
+      "tags": [
+        "aihs",
+        "ai-tooling"
+      ],
+      "strict": false,
+      "dependencies": [
+        "apm-retrofit"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.4"
+    },
+    {
+      "name": "apm-retrofit",
+      "description": "Retrofit an existing skills, plugin or agent repo into an APM package",
+      "source": {
+        "source": "git-subdir",
+        "url": "thinkjones/awesome-apm-stacks",
+        "path": "ai-tooling/.apm/skills",
+        "sha": "dfe0cc732f6a93e065eb29ea7c74d171a58b478d"
+      },
+      "category": "ai-tooling",
+      "tags": [
+        "aihs",
+        "ai-tooling"
+      ],
+      "skills": [
+        "./apm-retrofit"
+      ]
+    },
+    {
+      "name": "architect-cloud",
+      "description": "Cloud architecture — Azure/AWS IaC, serverless patterns, cost optimization, and API design. (3 plugins)",
+      "source": "./architect-cloud",
+      "category": "architect-cloud",
+      "tags": [
+        "aihs",
+        "architect-cloud"
+      ],
+      "strict": false,
+      "dependencies": [
+        "cloud-design-patterns",
+        "supabase-agent-skills",
+        "azure-cloud-development"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "cloud-design-patterns",
+      "description": "Cloud design patterns (42 patterns: reliability, perf, security)",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "architect-cloud",
+      "tags": [
+        "aihs",
+        "architect-cloud"
+      ],
+      "skills": [
+        "./cloud-design-patterns"
+      ]
+    },
+    {
+      "name": "supabase-agent-skills",
+      "description": "Supabase Postgres best practices",
+      "source": {
+        "source": "github",
+        "repo": "supabase/agent-skills",
+        "sha": "c9be0e931b7930f7d02126d04774d904c381e7d7"
+      },
+      "category": "architect-cloud",
+      "tags": [
+        "aihs",
+        "architect-cloud"
+      ]
+    },
+    {
+      "name": "azure-cloud-development",
+      "description": "Comprehensive Azure cloud development tools including Infrastructure as Code, serverless functions, architecture patterns, and cost optimization for building scalable cloud applications.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "architect-cloud",
+      "tags": [
+        "aihs",
+        "architect-cloud"
+      ],
+      "skills": [
+        "./az-cost-optimize",
+        "./azure-pricing",
+        "./azure-resource-health-diagnose",
+        "./import-infrastructure-as-code"
+      ]
+    },
+    {
+      "name": "architect-dataops",
+      "description": "Data operations and data architecture — database management, PostgreSQL, SQL optimization, data modelling, and ETL patterns. (2 plugins)",
+      "source": "./architect-dataops",
+      "category": "architect-dataops",
+      "tags": [
+        "aihs",
+        "architect-dataops"
+      ],
+      "strict": false,
+      "dependencies": [
+        "supabase-agent-skills",
+        "database-data-management"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "database-data-management",
+      "description": "Database administration, SQL optimization, and data management tools for PostgreSQL, SQL Server, and general database development best practices.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "architect-dataops",
+      "tags": [
+        "aihs",
+        "architect-dataops"
+      ],
+      "skills": [
+        "./postgresql-code-review",
+        "./postgresql-optimization",
+        "./sql-code-review",
+        "./sql-optimization"
+      ]
+    },
+    {
+      "name": "architect-devops",
+      "description": "DevOps and Developer Experience — Docker, CI/CD, incident triage, git guardrails, and infrastructure best practices. (1 plugin)",
+      "source": "./architect-devops",
+      "category": "architect-devops",
+      "tags": [
+        "aihs",
+        "architect-devops"
+      ],
+      "strict": false,
+      "dependencies": [
+        "devops-oncall"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "devops-oncall",
+      "description": "A focused set of prompts, instructions, and a chat mode to help triage incidents and respond quickly with DevOps tools and Azure resources.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "architect-devops",
+      "tags": [
+        "aihs",
+        "architect-devops"
+      ],
+      "skills": [
+        "./azure-resource-health-diagnose",
+        "./multi-stage-dockerfile"
+      ]
+    },
+    {
+      "name": "architect-mlops",
+      "description": "ML operations — model observability, evaluation pipelines, experiment tracking, and LLM instrumentation. (2 plugins)",
+      "source": "./architect-mlops",
+      "category": "architect-mlops",
+      "tags": [
+        "aihs",
+        "architect-mlops"
+      ],
+      "strict": false,
+      "dependencies": [
+        "arize-ax",
+        "gem-team"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "business-core",
+      "description": "Core tooling used for business workflows. (1 plugin)",
+      "source": "./business-core",
+      "category": "business-core",
+      "tags": [
+        "aihs",
+        "business-core"
+      ],
+      "strict": false,
+      "dependencies": [
+        "composio-skills"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "composio-skills",
+      "description": "A curated list of awesome Claude Skills, resources, and tools for customizing Claude AI workflows",
+      "source": {
+        "source": "github",
+        "repo": "ComposioHQ/awesome-claude-skills",
+        "sha": "be2a406907dbc61b73e6827ded415c96139d13a2"
+      },
+      "category": "business-core",
+      "tags": [
+        "aihs",
+        "business-core"
+      ],
+      "skills": [
+        "./"
+      ]
+    },
+    {
+      "name": "code-architecture",
+      "description": "The code-architecture pack (1 plugin)",
+      "source": "./code-architecture",
+      "category": "code-architecture",
+      "tags": [
+        "aihs",
+        "code-architecture"
+      ],
+      "strict": false,
+      "dependencies": [
+        "arc"
+      ],
+      "commands": [],
+      "agents": []
+    },
+    {
+      "name": "arc",
+      "description": "Twelve-factor, mise, documentation, code review and anti-fabrication skills",
+      "source": {
+        "source": "git-subdir",
+        "url": "vinnie357/claude-skills",
+        "path": "plugins/core/skills",
+        "sha": "ec421117de3c7bc16a959542b9144d727b8b0746"
+      },
+      "category": "code-architecture",
+      "tags": [
+        "aihs",
+        "code-architecture"
+      ],
+      "skills": [
+        "./twelve-factor",
+        "./mise",
+        "./documentation",
+        "./code-review",
+        "./anti-fabrication"
+      ]
+    },
+    {
+      "name": "code-core",
+      "description": "Code architecture quality gates — API design agents and architecture review. Extends user-core with code-specific concerns. (14 plugins; includes user-core)",
+      "source": "./code-core",
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ],
+      "strict": false,
+      "dependencies": [
+        "superpowers",
+        "serena",
+        "code-review",
+        "code-simplifier",
+        "commit-commands",
+        "feature-dev",
+        "playground",
+        "pr-review-toolkit",
+        "tdd-guard",
+        "git-guardrails-claude-code",
+        "grill-me",
+        "improve-codebase-architecture",
+        "setup-pre-commit",
+        "tdd",
+        "user-core"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "superpowers",
+      "description": "Software development methodology framework (TDD, debugging, code review, git worktrees)",
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers",
+        "sha": "8ca22dba9a94f28898bbce59f2537ff4d87c747d"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "serena",
+      "description": "Semantic code retrieval and editing MCP toolkit",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "external_plugins/serena",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "code-review",
+      "description": "Automated code review for style and best practices",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/code-review",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "code-simplifier",
+      "description": "Code simplification for clarity and maintainability",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/code-simplifier",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "commit-commands",
+      "description": "Git commit, push, and PR creation workflows",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/commit-commands",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "feature-dev",
+      "description": "Guided feature development with codebase understanding",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/feature-dev",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "playground",
+      "description": "Interactive HTML playground generation",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/playground",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "pr-review-toolkit",
+      "description": "Comprehensive PR review (code-reviewer, silent-failure-hunter, type-design-analyzer)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/pr-review-toolkit",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "tdd-guard",
+      "description": "TDD Guard: blocks file changes that violate TDD principles",
+      "source": {
+        "source": "git-subdir",
+        "url": "nizos/tdd-guard",
+        "path": "plugin",
+        "sha": "7245912d8a368296b0cf161bc183d8ca0d8d03f5"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ]
+    },
+    {
+      "name": "git-guardrails-claude-code",
+      "source": {
+        "source": "git-subdir",
+        "url": "mattpocock/skills",
+        "path": "skills/misc",
+        "sha": "4588b32ecab9ecc9fc8cc6b6c5e7d675b6004b0d"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ],
+      "skills": [
+        "./git-guardrails-claude-code"
+      ]
+    },
+    {
+      "name": "grill-me",
+      "source": {
+        "source": "git-subdir",
+        "url": "mattpocock/skills",
+        "path": "skills/productivity",
+        "sha": "4588b32ecab9ecc9fc8cc6b6c5e7d675b6004b0d"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ],
+      "skills": [
+        "./grill-me"
+      ]
+    },
+    {
+      "name": "improve-codebase-architecture",
+      "source": {
+        "source": "git-subdir",
+        "url": "mattpocock/skills",
+        "path": "skills/engineering",
+        "sha": "4588b32ecab9ecc9fc8cc6b6c5e7d675b6004b0d"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ],
+      "skills": [
+        "./improve-codebase-architecture"
+      ]
+    },
+    {
+      "name": "setup-pre-commit",
+      "source": {
+        "source": "git-subdir",
+        "url": "mattpocock/skills",
+        "path": "skills/misc",
+        "sha": "4588b32ecab9ecc9fc8cc6b6c5e7d675b6004b0d"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ],
+      "skills": [
+        "./setup-pre-commit"
+      ]
+    },
+    {
+      "name": "tdd",
+      "source": {
+        "source": "git-subdir",
+        "url": "mattpocock/skills",
+        "path": "skills/engineering",
+        "sha": "4588b32ecab9ecc9fc8cc6b6c5e7d675b6004b0d"
+      },
+      "category": "code-core",
+      "tags": [
+        "aihs",
+        "code-core"
+      ],
+      "skills": [
+        "./tdd"
+      ]
+    },
+    {
+      "name": "code-csharp",
+      "description": "C#/.NET development — .NET architecture, C# MCP servers, ASP.NET, and enterprise patterns. (1 plugin)",
+      "source": "./code-csharp",
+      "category": "code-csharp",
+      "tags": [
+        "aihs",
+        "code-csharp"
+      ],
+      "strict": false,
+      "dependencies": [
+        "csharp-dotnet-development"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "csharp-dotnet-development",
+      "description": "Essential prompts, instructions, and chat modes for C# and .NET development including testing, documentation, and best practices.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-csharp",
+      "tags": [
+        "aihs",
+        "code-csharp"
+      ],
+      "skills": [
+        "./aspnet-minimal-api-openapi",
+        "./csharp-async",
+        "./csharp-mstest",
+        "./csharp-nunit",
+        "./csharp-tunit",
+        "./csharp-xunit",
+        "./dotnet-best-practices",
+        "./dotnet-upgrade",
+        "./resx-source-generator-migration"
+      ]
+    },
+    {
+      "name": "code-go",
+      "description": "Go development — MCP server building with go-sdk, Go idioms, testing patterns, and debugging support. (1 plugin)",
+      "source": "./code-go",
+      "category": "code-go",
+      "tags": [
+        "aihs",
+        "code-go"
+      ],
+      "strict": false,
+      "dependencies": [
+        "go-mcp-development"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "go-mcp-development",
+      "description": "Complete toolkit for building Model Context Protocol (MCP) servers in Go using the official github.com/modelcontextprotocol/go-sdk. Includes instructions for best practices, a prompt for generating servers, and an expert chat mode for guidance.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-go",
+      "tags": [
+        "aihs",
+        "code-go"
+      ],
+      "skills": [
+        "./go-mcp-server-generator"
+      ]
+    },
+    {
+      "name": "code-java",
+      "description": "Java/JVM development — Spring Boot, Java MCP servers, Maven/Gradle, and enterprise patterns. (2 plugins)",
+      "source": "./code-java",
+      "category": "code-java",
+      "tags": [
+        "aihs",
+        "code-java"
+      ],
+      "strict": false,
+      "dependencies": [
+        "java-development",
+        "java-mcp-development"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "java-development",
+      "description": "Comprehensive collection of prompts and instructions for Java development including Spring Boot, Quarkus, testing, documentation, and best practices.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-java",
+      "tags": [
+        "aihs",
+        "code-java"
+      ],
+      "skills": [
+        "./create-spring-boot-java-project",
+        "./java-docs",
+        "./java-junit",
+        "./java-springboot"
+      ]
+    },
+    {
+      "name": "java-mcp-development",
+      "description": "Complete toolkit for building Model Context Protocol servers in Java using the official MCP Java SDK with reactive streams and Spring Boot integration.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-java",
+      "tags": [
+        "aihs",
+        "code-java"
+      ],
+      "skills": [
+        "./java-mcp-server-generator"
+      ]
+    },
+    {
+      "name": "code-mobile",
+      "description": "Mobile development — Flutter/Dart, Swift, Kotlin, cross-platform patterns, and mobile MCP servers. (2 plugins)",
+      "source": "./code-mobile",
+      "category": "code-mobile",
+      "tags": [
+        "aihs",
+        "code-mobile"
+      ],
+      "strict": false,
+      "dependencies": [
+        "swift-mcp-development",
+        "kotlin-mcp-development"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "swift-mcp-development",
+      "description": "Comprehensive collection for building Model Context Protocol servers in Swift using the official MCP Swift SDK with modern concurrency features.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-mobile",
+      "tags": [
+        "aihs",
+        "code-mobile"
+      ],
+      "skills": [
+        "./swift-mcp-server-generator"
+      ]
+    },
+    {
+      "name": "kotlin-mcp-development",
+      "description": "Complete toolkit for building Model Context Protocol (MCP) servers in Kotlin using the official io.modelcontextprotocol:kotlin-sdk library. Includes instructions for best practices, a prompt for generating servers, and an expert chat mode for guidance.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-mobile",
+      "tags": [
+        "aihs",
+        "code-mobile"
+      ],
+      "skills": [
+        "./kotlin-mcp-server-generator"
+      ]
+    },
+    {
+      "name": "code-python",
+      "description": "Python development — best practices, FastMCP server building, pytest patterns, typing, and Python SDK guidance. (2 plugins)",
+      "source": "./code-python",
+      "category": "code-python",
+      "tags": [
+        "aihs",
+        "code-python"
+      ],
+      "strict": false,
+      "dependencies": [
+        "supabase-agent-skills",
+        "python-mcp-development"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "python-mcp-development",
+      "description": "Complete toolkit for building Model Context Protocol (MCP) servers in Python using the official SDK with FastMCP. Includes instructions for best practices, a prompt for generating servers, and an expert chat mode for guidance.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-python",
+      "tags": [
+        "aihs",
+        "code-python"
+      ],
+      "skills": [
+        "./python-mcp-server-generator"
+      ]
+    },
+    {
+      "name": "code-rust",
+      "description": "Rust development — systems programming, Rust MCP servers, cargo patterns, and memory safety. (1 plugin)",
+      "source": "./code-rust",
+      "category": "code-rust",
+      "tags": [
+        "aihs",
+        "code-rust"
+      ],
+      "strict": false,
+      "dependencies": [
+        "rust-mcp-development"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "rust-mcp-development",
+      "description": "Build high-performance Model Context Protocol servers in Rust using the official rmcp SDK with async/await, procedural macros, and type-safe implementations.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-rust",
+      "tags": [
+        "aihs",
+        "code-rust"
+      ],
+      "skills": [
+        "./rust-mcp-server-generator"
+      ]
+    },
+    {
+      "name": "code-typescript",
+      "description": "TypeScript/Node.js development — MCP server building, React, frontend web dev, NestJS, and debugging support. (2 plugins)",
+      "source": "./code-typescript",
+      "category": "code-typescript",
+      "tags": [
+        "aihs",
+        "code-typescript"
+      ],
+      "strict": false,
+      "dependencies": [
+        "typescript-mcp-development",
+        "frontend-web-dev"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "typescript-mcp-development",
+      "description": "Complete toolkit for building Model Context Protocol (MCP) servers in TypeScript/Node.js using the official SDK. Includes instructions for best practices, a prompt for generating servers, and an expert chat mode for guidance.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-typescript",
+      "tags": [
+        "aihs",
+        "code-typescript"
+      ],
+      "skills": [
+        "./typescript-mcp-server-generator"
+      ]
+    },
+    {
+      "name": "frontend-web-dev",
+      "description": "Essential prompts, instructions, and chat modes for modern frontend web development including React, Angular, Vue, TypeScript, and CSS frameworks.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "code-typescript",
+      "tags": [
+        "aihs",
+        "code-typescript"
+      ],
+      "skills": [
+        "./playwright-explore-website",
+        "./playwright-generate-test"
+      ]
+    },
+    {
+      "name": "design-frontend",
+      "description": "UI/UX design — anti-AI-slop frontend design, React component building, accessible colour/typography, theming, and web artifacts. (7 plugins)",
+      "source": "./design-frontend",
+      "category": "design-frontend",
+      "tags": [
+        "aihs",
+        "design-frontend"
+      ],
+      "strict": false,
+      "dependencies": [
+        "frontend-design",
+        "skills-frontend-design",
+        "web-artifacts-builder",
+        "theme-factory",
+        "algorithmic-art",
+        "canvas-design",
+        "vercel-agent-skills"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "frontend-design",
+      "description": "Production-grade frontend interface design (HTML/CSS/React)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/frontend-design",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "design-frontend",
+      "tags": [
+        "aihs",
+        "design-frontend"
+      ]
+    },
+    {
+      "name": "skills-frontend-design",
+      "description": "Frontend design (bold decisions, anti-generic aesthetics)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "design-frontend",
+      "tags": [
+        "aihs",
+        "design-frontend"
+      ],
+      "skills": [
+        "./frontend-design"
+      ]
+    },
+    {
+      "name": "web-artifacts-builder",
+      "description": "Complex multi-component artifacts (React/shadcn/Tailwind)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "design-frontend",
+      "tags": [
+        "aihs",
+        "design-frontend"
+      ],
+      "skills": [
+        "./web-artifacts-builder"
+      ]
+    },
+    {
+      "name": "theme-factory",
+      "description": "Theme factory (10 presets + on-the-fly generation)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "design-frontend",
+      "tags": [
+        "aihs",
+        "design-frontend"
+      ],
+      "skills": [
+        "./theme-factory"
+      ]
+    },
+    {
+      "name": "algorithmic-art",
+      "description": "Algorithmic art (p5.js, generative design)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "design-frontend",
+      "tags": [
+        "aihs",
+        "design-frontend"
+      ],
+      "skills": [
+        "./algorithmic-art"
+      ]
+    },
+    {
+      "name": "canvas-design",
+      "description": "Canvas design (posters, static visuals)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "design-frontend",
+      "tags": [
+        "aihs",
+        "design-frontend"
+      ],
+      "skills": [
+        "./canvas-design"
+      ]
+    },
+    {
+      "name": "vercel-agent-skills",
+      "description": "Vercel React best practices + web design guidelines",
+      "source": {
+        "source": "github",
+        "repo": "vercel-labs/agent-skills",
+        "sha": "063bee94c3f4df8453406c830b0a7df0f2860278"
+      },
+      "category": "design-frontend",
+      "tags": [
+        "aihs",
+        "design-frontend"
+      ]
+    },
+    {
+      "name": "eng-best-practices",
+      "description": "The eng-best-practices pack (5 plugins)",
+      "source": "./eng-best-practices",
+      "category": "eng-best-practices",
+      "tags": [
+        "aihs",
+        "eng-best-practices"
+      ],
+      "strict": false,
+      "dependencies": [
+        "cflr",
+        "matt",
+        "oil",
+        "ui-design",
+        "ui-ux-pro-max"
+      ],
+      "commands": [],
+      "agents": []
+    },
+    {
+      "name": "cflr",
+      "description": "Cloudflare platform skills: Workers, Durable Objects, Wrangler, Zero Trust and more",
+      "source": {
+        "source": "git-subdir",
+        "url": "cloudflare/skills",
+        "path": "skills",
+        "sha": "41e0d19858946d18af9ee2c2feebbe2e11d829ff"
+      },
+      "category": "eng-best-practices",
+      "tags": [
+        "aihs",
+        "eng-best-practices"
+      ],
+      "skills": [
+        "./"
+      ]
+    },
+    {
+      "name": "matt",
+      "description": "Matt Pocock's engineering skills: TDD, code review, specs, triage, architecture",
+      "source": {
+        "source": "git-subdir",
+        "url": "mattpocock/skills",
+        "path": "skills/engineering",
+        "sha": "4588b32ecab9ecc9fc8cc6b6c5e7d675b6004b0d"
+      },
+      "category": "eng-best-practices",
+      "tags": [
+        "aihs",
+        "eng-best-practices"
+      ],
+      "skills": [
+        "./"
+      ]
+    },
+    {
+      "name": "oil",
+      "description": "Beautify a GitHub README",
+      "source": {
+        "source": "git-subdir",
+        "url": "oil-oil/beautify-github-readme",
+        "path": "skills",
+        "sha": "d6562a5f5c484d069f8560b39c215c9cda4b5a55"
+      },
+      "category": "eng-best-practices",
+      "tags": [
+        "aihs",
+        "eng-best-practices"
+      ],
+      "skills": [
+        "./beautify-github-readme"
+      ]
+    },
+    {
+      "name": "ui-design",
+      "description": "UI/UX design for mobile and web: design systems, accessibility, modern patterns",
+      "source": {
+        "source": "git-subdir",
+        "url": "wshobson/agents",
+        "path": "plugins/ui-design",
+        "sha": "46891e7e60da0e52baf1050b7b6391b64e84c6d9"
+      },
+      "category": "eng-best-practices",
+      "tags": [
+        "aihs",
+        "eng-best-practices"
+      ]
+    },
+    {
+      "name": "ui-ux-pro-max",
+      "description": "UI/UX design intelligence: styles, palettes, font pairings and stacks",
+      "source": {
+        "source": "github",
+        "repo": "nextlevelbuilder/ui-ux-pro-max-skill",
+        "sha": "477bcb28c9812b385cb51a4605ddf30d7b2266e2"
+      },
+      "category": "eng-best-practices",
+      "tags": [
+        "aihs",
+        "eng-best-practices"
+      ]
+    },
+    {
+      "name": "graphic-design",
+      "description": "The graphic-design pack (2 plugins)",
+      "source": "./graphic-design",
+      "category": "graphic-design",
+      "tags": [
+        "aihs",
+        "graphic-design"
+      ],
+      "strict": false,
+      "dependencies": [
+        "gemi",
+        "draw"
+      ],
+      "commands": [],
+      "agents": []
+    },
+    {
+      "name": "gemi",
+      "description": "Build with the Gemini API",
+      "source": {
+        "source": "git-subdir",
+        "url": "google-gemini/gemini-skills",
+        "path": "skills",
+        "sha": "6fee1bec62d6a0ca92c1d0e34d62ff11f70c498a"
+      },
+      "category": "graphic-design",
+      "tags": [
+        "aihs",
+        "graphic-design"
+      ],
+      "skills": [
+        "./gemini-api-dev"
+      ]
+    },
+    {
+      "name": "draw",
+      "description": "Create draw.io diagrams",
+      "source": {
+        "source": "git-subdir",
+        "url": "Agents365-ai/drawio-skill",
+        "path": "skills",
+        "sha": "88fd9236bc532aac4c25cb008a8bd59bc650b904"
+      },
+      "category": "graphic-design",
+      "tags": [
+        "aihs",
+        "graphic-design"
+      ],
+      "skills": [
+        "./drawio-skill"
+      ]
+    },
+    {
+      "name": "plan-core",
+      "description": "Planning and task management — PRD generation, requirements refinement, epic/feature breakdown, QA planning, and implementation strategy. (1 plugin)",
+      "source": "./plan-core",
+      "category": "plan-core",
+      "tags": [
+        "aihs",
+        "plan-core"
+      ],
+      "strict": false,
+      "dependencies": [
+        "project-planning"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "project-planning",
+      "description": "Tools and guidance for software project planning, feature breakdown, epic management, implementation planning, and task organization for development teams.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "plan-core",
+      "tags": [
+        "aihs",
+        "plan-core"
+      ],
+      "skills": [
+        "./breakdown-epic-arch",
+        "./breakdown-epic-pm",
+        "./breakdown-feature-implementation",
+        "./breakdown-feature-prd",
+        "./create-github-issues-feature-from-implementation-plan",
+        "./create-implementation-plan",
+        "./create-technical-spike",
+        "./update-implementation-plan"
+      ]
+    },
+    {
+      "name": "plan-docs",
+      "description": "Document generation and deliverables — Word, PDF, PowerPoint, Excel, doc co-authoring, internal comms, and brand guidelines. (8 plugins)",
+      "source": "./plan-docs",
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "strict": false,
+      "dependencies": [
+        "docx",
+        "pdf",
+        "pptx",
+        "xlsx",
+        "doc-coauthoring",
+        "internal-comms",
+        "brand-guidelines",
+        "webapp-testing"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "docx",
+      "description": "Document creation skills (Anthropic official)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "skills": [
+        "./docx"
+      ]
+    },
+    {
+      "name": "pdf",
+      "description": "Document creation skills (Anthropic official)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "skills": [
+        "./pdf"
+      ]
+    },
+    {
+      "name": "pptx",
+      "description": "Document creation skills (Anthropic official)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "skills": [
+        "./pptx"
+      ]
+    },
+    {
+      "name": "xlsx",
+      "description": "Document creation skills (Anthropic official)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "skills": [
+        "./xlsx"
+      ]
+    },
+    {
+      "name": "doc-coauthoring",
+      "description": "Structured doc co-authoring workflow",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "skills": [
+        "./doc-coauthoring"
+      ]
+    },
+    {
+      "name": "internal-comms",
+      "description": "Internal communications (status reports, newsletters, FAQs)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "skills": [
+        "./internal-comms"
+      ]
+    },
+    {
+      "name": "brand-guidelines",
+      "description": "Brand guidelines application",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "skills": [
+        "./brand-guidelines"
+      ]
+    },
+    {
+      "name": "webapp-testing",
+      "description": "Webapp testing (Playwright for UI verification)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/skills",
+        "path": "skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "plan-docs",
+      "tags": [
+        "aihs",
+        "plan-docs"
+      ],
+      "skills": [
+        "./webapp-testing"
+      ]
+    },
+    {
+      "name": "productivity",
+      "description": "The productivity pack (1 plugin)",
+      "source": "./productivity",
+      "category": "productivity",
+      "tags": [
+        "aihs",
+        "productivity"
+      ],
+      "strict": false,
+      "dependencies": [
+        "obsidian"
+      ],
+      "commands": [],
+      "agents": []
+    },
+    {
+      "name": "obsidian",
+      "description": "Create and edit Obsidian vault files: Markdown, Bases and Canvas",
+      "source": {
+        "source": "github",
+        "repo": "kepano/obsidian-skills",
+        "sha": "3ccff5338ea700537839b21900aa5358a0402c98"
+      },
+      "category": "productivity",
+      "tags": [
+        "aihs",
+        "productivity"
+      ]
+    },
+    {
+      "name": "security-core",
+      "description": "Security fundamentals — OWASP, secure coding, vulnerability scanning, secrets management, and agent safety. (1 plugin)",
+      "source": "./security-core",
+      "category": "security-core",
+      "tags": [
+        "aihs",
+        "security-core"
+      ],
+      "strict": false,
+      "dependencies": [
+        "security-best-practices"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "security-best-practices",
+      "description": "Security frameworks, accessibility guidelines, performance optimization, and code quality best practices for building secure, maintainable, and high-performance applications.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "security-core",
+      "tags": [
+        "aihs",
+        "security-core"
+      ],
+      "skills": [
+        "./ai-prompt-engineering-safety-review"
+      ]
+    },
+    {
+      "name": "test-core",
+      "description": "Testing automation — E2E, integration testing, Playwright, polyglot test agents, and test planning. (2 plugins)",
+      "source": "./test-core",
+      "category": "test-core",
+      "tags": [
+        "aihs",
+        "test-core"
+      ],
+      "strict": false,
+      "dependencies": [
+        "webapp-testing",
+        "testing-automation"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "testing-automation",
+      "description": "Comprehensive collection for writing tests, test automation, and test-driven development including unit tests, integration tests, and end-to-end testing strategies.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "test-core",
+      "tags": [
+        "aihs",
+        "test-core"
+      ],
+      "skills": [
+        "./ai-prompt-engineering-safety-review",
+        "./csharp-nunit",
+        "./java-junit",
+        "./playwright-explore-website",
+        "./playwright-generate-test"
+      ]
+    },
+    {
+      "name": "user-core",
+      "description": "Universal skills, agents, and hooks for every project — context engineering, prompt craft, research, verification, and task automation. (8 plugins)",
+      "source": "./user-core",
+      "category": "user-core",
+      "tags": [
+        "aihs",
+        "user-core"
+      ],
+      "strict": false,
+      "dependencies": [
+        "automation-recommender",
+        "claudemd-management",
+        "ralph-loop",
+        "skill-creator",
+        "find-skills",
+        "public-agent-skills",
+        "context-engineering",
+        "doublecheck"
+      ],
+      "commands": [],
+      "agents": [],
+      "version": "0.0.2"
+    },
+    {
+      "name": "automation-recommender",
+      "description": "Claude Code setup and configuration",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/claude-code-setup",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "user-core",
+      "tags": [
+        "aihs",
+        "user-core"
+      ]
+    },
+    {
+      "name": "claudemd-management",
+      "description": "CLAUDE.md file management (audit, improve, update)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/claude-md-management",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "user-core",
+      "tags": [
+        "aihs",
+        "user-core"
+      ]
+    },
+    {
+      "name": "ralph-loop",
+      "description": "Recurring task automation (polling, monitoring)",
+      "source": {
+        "source": "git-subdir",
+        "url": "anthropics/claude-plugins-official",
+        "path": "plugins/ralph-loop",
+        "sha": "d4226d062928f8d9505dbdeadd10217d23361052"
+      },
+      "category": "user-core",
+      "tags": [
+        "aihs",
+        "user-core"
+      ]
+    },
+    {
+      "name": "find-skills",
+      "description": "Skill discovery",
+      "source": {
+        "source": "git-subdir",
+        "url": "vercel-labs/skills",
+        "path": "skills",
+        "sha": "14cf84aa922cccc7e5b11fee5af9a01b3750fddf"
+      },
+      "category": "user-core",
+      "tags": [
+        "aihs",
+        "user-core"
+      ],
+      "skills": [
+        "./find-skills"
+      ]
+    },
+    {
+      "name": "public-agent-skills",
+      "description": "Public repository for Agent Skills (docs, research, content, design)",
+      "source": {
+        "source": "github",
+        "repo": "anthropics/skills",
+        "sha": "683bc88e56f3e09ba94f7055977f3d3aa499f202"
+      },
+      "category": "user-core",
+      "tags": [
+        "aihs",
+        "user-core"
+      ]
+    },
+    {
+      "name": "context-engineering",
+      "description": "Tools and techniques for maximizing GitHub Copilot effectiveness through better context management. Includes guidelines for structuring code, an agent for planning multi-file changes, and prompts for context-aware development.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "user-core",
+      "tags": [
+        "aihs",
+        "user-core"
+      ],
+      "skills": [
+        "./context-map",
+        "./refactor-plan",
+        "./what-context-needed"
+      ]
+    },
+    {
+      "name": "doublecheck",
+      "description": "Three-layer verification pipeline for AI output. Extracts claims, finds sources, and flags hallucination risks so humans can verify before acting.",
+      "source": {
+        "source": "git-subdir",
+        "url": "github/awesome-copilot",
+        "path": "skills",
+        "sha": "143a3d976b3c1603cc8932984d5e1f28501cb5fc"
+      },
+      "category": "user-core",
+      "tags": [
+        "aihs",
+        "user-core"
+      ],
+      "skills": [
+        "./doublecheck"
+      ]
+    }
+  ]
+}

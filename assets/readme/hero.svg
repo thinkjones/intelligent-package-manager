@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="460" viewBox="0 0 1200 460" role="img" aria-labelledby="title desc">
+  <title id="title">ai-harness-skills</title>
+  <desc id="desc">Skills and plugins from many GitHub repos, pinned to commits in aihs.lock and referenced in place, published by aihs as one Claude Code marketplace of 98 plugins and installed as whole stacks.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z" fill="#46c2a8"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="460" rx="24" fill="#0f1419"/>
+
+  <g id="title-block" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="56" y="92" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#93a1ad" letter-spacing="2">CLAUDE CODE · PLUGIN MARKETPLACE</text>
+    <text x="54" y="166" font-size="66" font-weight="700" fill="#e9eef2">ai-harness-skills</text>
+    <text x="56" y="226" font-size="30" fill="#e9eef2">Skills from any repo,</text>
+    <text x="56" y="266" font-size="30" fill="#e9eef2">one Claude Code marketplace.</text>
+    <text x="56" y="318" font-size="22" fill="#93a1ad">Pinned to commits. Referenced, never copied.</text>
+    <text x="56" y="350" font-size="22" fill="#93a1ad">Every pack installs as one stack.</text>
+    <text x="56" y="408" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" fill="#46c2a8">26 packs · 98 plugins · 19 upstreams pinned</text>
+  </g>
+
+  <line x1="640" y1="48" x2="640" y2="412" stroke="#2b3640" stroke-width="2"/>
+
+  <g id="pipeline" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">
+    <!-- upstreams, pinned in aihs.lock -->
+    <g fill="#161d24" stroke="#2b3640" stroke-width="2">
+      <rect x="684" y="44" width="460" height="46" rx="12"/>
+      <rect x="684" y="100" width="460" height="46" rx="12"/>
+      <rect x="684" y="156" width="460" height="46" rx="12"/>
+    </g>
+    <text x="704" y="74" fill="#e9eef2">anthropics/skills</text>
+    <text x="1124" y="74" fill="#f0b44c" text-anchor="end">@683bc88</text>
+    <text x="704" y="130" fill="#e9eef2">github/awesome-copilot</text>
+    <text x="1124" y="130" fill="#f0b44c" text-anchor="end">@143a3d9</text>
+    <text x="704" y="186" fill="#e9eef2">obra/superpowers</text>
+    <text x="1124" y="186" fill="#f0b44c" text-anchor="end">@8ca22db</text>
+
+    <line x1="914" y1="204" x2="914" y2="230" stroke="#46c2a8" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- aihs -->
+    <rect x="684" y="236" width="460" height="50" rx="12" fill="#13261f" stroke="#46c2a8" stroke-width="2"/>
+    <text x="704" y="268" fill="#46c2a8" font-weight="700">aihs</text>
+    <text x="764" y="268" fill="#e9eef2">sync · create-plugin</text>
+
+    <line x1="914" y1="288" x2="914" y2="314" stroke="#46c2a8" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <!-- marketplace -->
+    <rect x="684" y="320" width="460" height="46" rx="12" fill="#161d24" stroke="#2b3640" stroke-width="2"/>
+    <text x="704" y="350" fill="#e9eef2">marketplace.json</text>
+    <text x="1124" y="350" fill="#46c2a8" text-anchor="end">98 plugins</text>
+
+    <!-- install -->
+    <text x="686" y="408" fill="#93a1ad">$</text>
+    <text x="710" y="408" fill="#e9eef2">claude plugin install code-core</text>
+  </g>
+</svg>
