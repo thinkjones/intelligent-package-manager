@@ -12,7 +12,6 @@ Router for agents working in ai-harness-skills: the source code of `ipm` ("intel
 | `bin/ipm` | Shim that builds `cli/bin/ipm` when a Go source changes and runs it; `direnv allow` puts `bin/` on PATH. |
 | [`docs/`](docs/) | [User guide](docs/user-guide.md), [sources reference](docs/sources-reference.md), [architecture](docs/architecture.md). |
 | `docs/superpowers/` | Design specs and implementation plans. Historical: never rewrite them to match the code. |
-| [`assets/readme/`](assets/readme/) | SVGs from the earlier marketplace design; not referenced by the README. |
 
 `ipm`'s data is outside this repo, per user:
 
