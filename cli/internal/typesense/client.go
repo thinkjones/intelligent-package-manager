@@ -168,11 +168,19 @@ func (c *Client) Import(collection string, docs []map[string]any) ([]ImportResul
 	return out, nil
 }
 
-// Hit is one search result.
+// HybridInfo is how hybrid search ranked a hit: its rank-fusion score, 0–1,
+// built from the hit's positions in the keyword and semantic rankings.
+type HybridInfo struct {
+	RankFusionScore float64 `json:"rank_fusion_score"`
+}
+
+// Hit is one search result. TextMatch is 0 for a semantic-only hit;
+// VectorDistance and Hybrid are nil for keyword-only searches.
 type Hit struct {
 	Document       map[string]any `json:"document"`
 	TextMatch      int64          `json:"text_match"`
-	VectorDistance *float64       `json:"vector_distance"`
+	VectorDistance *float64       `json:"vector_distance,omitempty"`
+	Hybrid         *HybridInfo    `json:"hybrid_search_info,omitempty"`
 }
 
 // FacetCount is one facet value and how many hits have it.

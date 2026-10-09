@@ -119,12 +119,13 @@ func TestSearch(t *testing.T) {
 			t.Errorf("q %q", r.URL.Query().Get("q"))
 		}
 		io.WriteString(w, `{"found":3,"search_time_ms":7,"facet_counts":[{"field_name":"type","counts":[{"value":"skill","count":3}]}],
-			"hits":[{"document":{"id":"skill:o/r:a#x","name":"tdd"},"text_match":578730123365711993,"vector_distance":0.55,"hybrid_search_info":{}}]}`)
+			"hits":[{"document":{"id":"skill:o/r:a#x","name":"tdd"},"text_match":578730123365711993,"vector_distance":0.55,"hybrid_search_info":{"rank_fusion_score":0.71}}]}`)
 	})
 	res, err := c.Search("artifacts", url.Values{"q": {"unit tests"}})
 	if err != nil || res.Found != 3 || res.SearchTimeMS != 7 || len(res.Hits) != 1 || res.Hits[0].Document["name"] != "tdd" ||
 		res.Hits[0].TextMatch != 578730123365711993 || res.Hits[0].VectorDistance == nil || *res.Hits[0].VectorDistance != 0.55 ||
-		len(res.Facets["type"]) != 1 || res.Facets["type"][0] != (FacetCount{Value: "skill", Count: 3}) {
+		len(res.Facets["type"]) != 1 || res.Facets["type"][0] != (FacetCount{Value: "skill", Count: 3}) ||
+		res.Hits[0].Hybrid == nil || res.Hits[0].Hybrid.RankFusionScore != 0.71 {
 		t.Errorf("got %+v %v", res, err)
 	}
 	if _, err := c.Search("nope", url.Values{}); !errors.Is(err, ErrNoCollection) {

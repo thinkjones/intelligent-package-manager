@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -846,7 +847,7 @@ func TestSearchPrintsTable(t *testing.T) {
 	if last.Get("q") != "c# testing" || !strings.Contains(last.Get("filter_by"), "type:=[`skill`]") || !strings.HasSuffix(last.Get("query_by"), "embedding") {
 		t.Errorf("query %v", *last)
 	}
-	if out := f.out.String(); !strings.HasPrefix(out, "TYPE") || !strings.Contains(out, "2 match(es) · skill 2 · 3 ms") {
+	if out := f.out.String(); !strings.HasPrefix(out, "SCORE  TYPE") || !strings.Contains(out, "2 match(es) · skill 2 · 3 ms") {
 		t.Errorf("output:\n%s", out)
 	}
 }
@@ -1079,5 +1080,72 @@ func TestDoctorWarnsOnEmptyIndex(t *testing.T) {
 	f.run("doctor")
 	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "aihs load") {
 		t.Errorf("doctor:\n%s", f.out.String())
+	}
+}
+
+// pagedFake has found results, served page by page.
+func pagedFake(t *testing.T, found int) (*fake, *[]url.Values) {
+	t.Helper()
+	root := checkout(t)
+	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
+	var seen []url.Values
+	var mu sync.Mutex
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		mu.Lock()
+		seen = append(seen, q)
+		mu.Unlock()
+		per, _ := strconv.Atoi(q.Get("per_page"))
+		page, _ := strconv.Atoi(q.Get("page"))
+		page = max(page, 1)
+		hybrid := ""
+		if strings.Contains(q.Get("query_by"), "embedding") {
+			hybrid = `,"hybrid_search_info":{"rank_fusion_score":0.5}`
+		}
+		var hits []string
+		for i := (page - 1) * per; i < min(page*per, found); i++ {
+			hits = append(hits, fmt.Sprintf(`{"document":{"id":"skill:o/r:%d","type":"skill","name":"s%d","repo":"o/r","stars":0},"text_match":%d%s}`, i, i, 1000-i, hybrid))
+		}
+		fmt.Fprintf(w, `{"found":%d,"search_time_ms":1,"hits":[%s]}`, found, strings.Join(hits, ","))
+	}))
+	t.Cleanup(srv.Close)
+	f := newFake(root)
+	typesenseAt(f, srv)
+	return f, &seen
+}
+
+func TestSearchPage(t *testing.T) {
+	f, seen := pagedFake(t, 45)
+	if err := f.run("search", "--page", "2", "x"); err != nil {
+		t.Fatal(err)
+	}
+	if (*seen)[0].Get("page") != "2" || !strings.Contains(f.out.String(), "page 2 of 3") || !strings.Contains(f.out.String(), "s20") {
+		t.Errorf("params %v\n%s", *seen, f.out.String())
+	}
+}
+
+func TestSearchAll(t *testing.T) {
+	f, seen := pagedFake(t, 300)
+	if err := f.run("search", "--all", "--json", "x"); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(f.out.String(), "\n"); n != 300 || len(*seen) != 2 || (*seen)[0].Get("per_page") != "250" {
+		t.Errorf("lines %d, requests %d (%v)", n, len(*seen), *seen)
+	}
+	var usage *UsageError
+	if err := f.run("search", "--all", "--page", "2", "x"); !errors.As(err, &usage) {
+		t.Errorf("--all with --page: %v", err)
+	}
+}
+
+func TestSearchKeywordLaterPageScoresAgainstFirst(t *testing.T) {
+	f, seen := pagedFake(t, 45)
+	if err := f.run("search", "--keyword", "--page", "2", "x"); err != nil {
+		t.Fatal(err)
+	}
+	// page 1's best text_match is 1000; page 2's first hit (i=20) has 980 → 98
+	lines := strings.Split(f.out.String(), "\n")
+	if len(*seen) != 2 || (*seen)[1].Get("per_page") != "1" || !strings.HasPrefix(lines[1], "98 ") {
+		t.Errorf("requests %v\n%s", *seen, f.out.String())
 	}
 }

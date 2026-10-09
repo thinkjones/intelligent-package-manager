@@ -146,10 +146,10 @@ func TestTable(t *testing.T) {
 			{Document: map[string]any{"type": "agent", "name": "reviewer", "repo": "x/y", "stars": float64(0), "plugin_names": []any{}, "description": "Reviews"}},
 		}}
 	var b bytes.Buffer
-	Table(&b, res, 120)
+	Table(&b, res, TableOptions{Width: 120})
 	out := b.String()
 	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
-	if !strings.HasPrefix(lines[0], "TYPE") || !strings.Contains(lines[0], "DESCRIPTION") || !strings.Contains(lines[1], "31.2k") || !strings.Contains(lines[2], "—") {
+	if !strings.HasPrefix(lines[0], "SCORE  TYPE") || !strings.Contains(lines[0], "DESCRIPTION") || !strings.Contains(lines[1], "31.2k") || !strings.Contains(lines[2], "—") {
 		t.Errorf("table:\n%s", out)
 	}
 	for _, l := range lines {
@@ -161,7 +161,7 @@ func TestTable(t *testing.T) {
 		t.Errorf("summary %q", lines[len(lines)-1])
 	}
 	b.Reset()
-	Table(&b, typesense.Result{}, 120)
+	Table(&b, typesense.Result{}, TableOptions{Width: 120})
 	if strings.TrimSpace(b.String()) != "no matches" {
 		t.Errorf("zero hits: %q", b.String())
 	}
@@ -174,4 +174,63 @@ func sortedStrings(s []string) bool {
 		}
 	}
 	return true
+}
+
+func TestParamsPage(t *testing.T) {
+	if got := (Query{Text: "x", Page: 3}).Params().Get("page"); got != "3" {
+		t.Errorf("page %q", got)
+	}
+	if (Query{Text: "x"}).Params().Has("page") {
+		t.Error("no page unless asked")
+	}
+}
+
+func hit(name string, textMatch int64, fusion, dist float64) typesense.Hit {
+	h := typesense.Hit{Document: map[string]any{"type": "skill", "name": name, "repo": "o/r", "stars": float64(1)}, TextMatch: textMatch}
+	if fusion >= 0 {
+		h.Hybrid = &typesense.HybridInfo{RankFusionScore: fusion}
+	}
+	if dist >= 0 {
+		h.VectorDistance = &dist
+	}
+	return h
+}
+
+func TestTableScores(t *testing.T) {
+	var b bytes.Buffer
+	res := typesense.Result{Found: 2, Hits: []typesense.Hit{hit("a", 200, 0.713, 0.55), hit("b", 0, 0.65, 0.6)}}
+	Table(&b, res, TableOptions{Width: 120})
+	lines := strings.Split(b.String(), "\n")
+	if !strings.HasPrefix(lines[0], "SCORE  TYPE") || !strings.HasPrefix(lines[1], "71 ") || !strings.HasPrefix(lines[2], "65 ") {
+		t.Errorf("hybrid scores:\n%s", b.String())
+	}
+	b.Reset()
+	Table(&b, res, TableOptions{Width: 120, Explain: true})
+	lines = strings.Split(b.String(), "\n")
+	if !strings.HasPrefix(lines[0], "SCORE  KW  SEM ") || !strings.Contains(lines[1], "✓") || !strings.Contains(lines[1], "0.45") || !strings.Contains(lines[2], "—") {
+		t.Errorf("explain:\n%s", b.String())
+	}
+	b.Reset()
+	kw := typesense.Result{Found: 2, Hits: []typesense.Hit{hit("a", 200, -1, -1), hit("b", 100, -1, -1)}}
+	Table(&b, kw, TableOptions{Width: 120})
+	lines = strings.Split(b.String(), "\n")
+	if !strings.HasPrefix(lines[1], "100") || !strings.HasPrefix(lines[2], "50 ") {
+		t.Errorf("keyword scores:\n%s", b.String())
+	}
+}
+
+func TestTablePageLabel(t *testing.T) {
+	var b bytes.Buffer
+	Table(&b, typesense.Result{Found: 45, SearchTimeMS: 2, Hits: []typesense.Hit{hit("a", 1, 0.5, 0.5)}}, TableOptions{Width: 120, Page: 2, PerPage: 20})
+	if !strings.Contains(b.String(), "page 2 of 3 · 45 match(es)") {
+		t.Errorf("got:\n%s", b.String())
+	}
+}
+
+func TestTableKeywordScoreAgainstOverallTop(t *testing.T) {
+	var b bytes.Buffer
+	Table(&b, typesense.Result{Found: 9, Hits: []typesense.Hit{hit("a", 200, -1, -1)}}, TableOptions{Width: 120, TopTextMatch: 400})
+	if !strings.HasPrefix(strings.Split(b.String(), "\n")[1], "50 ") {
+		t.Errorf("got:\n%s", b.String())
+	}
 }

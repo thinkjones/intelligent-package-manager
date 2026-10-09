@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/thinkjones/fs-skills/cli/internal/config"
@@ -13,13 +14,16 @@ import (
 func searchFlags() (*flag.FlagSet, func(System) error) {
 	var q search.Query
 	var types, repos, tags multi
-	var asJSON bool
+	var asJSON, all, explain bool
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	fs.Var(&types, "type", "only this artifact type (repeatable): repo, marketplace, plugin, copilot-plugin, skill, agent, command, hook, mcp")
 	fs.Var(&repos, "repo", "only artifacts from this repo (repeatable)")
 	fs.Var(&tags, "tag", "only artifacts with this tag or topic (repeatable)")
 	fs.BoolVar(&q.Keyword, "keyword", false, "keyword ranking only, without semantic matching")
 	fs.IntVar(&q.Limit, "limit", 20, "results to show (max 250)")
+	fs.IntVar(&q.Page, "page", 0, "page of results to show, --limit per page")
+	fs.BoolVar(&all, "all", false, "every result, fetched 250 at a time (hybrid: keyword matches plus ~100 semantic neighbours)")
+	fs.BoolVar(&explain, "explain", false, "add KW (keyword match ✓) and SEM (semantic similarity) columns")
 	fs.BoolVar(&asJSON, "json", false, "print each hit as a JSON line")
 	return fs, func(sys System) error {
 		q.Text = strings.TrimSpace(strings.Join(fs.Args(), " "))
@@ -31,8 +35,11 @@ func searchFlags() (*flag.FlagSet, func(System) error) {
 				return usagef("search: filter value %q contains a backtick, which Typesense filters cannot express", v)
 			}
 		}
+		if all && q.Page > 0 {
+			return usagef("search: --all and --page don't combine")
+		}
 		q.Types, q.Repos, q.Tags = types, repos, tags
-		return runSearch(sys, q, asJSON)
+		return runSearch(sys, q, all, asJSON, explain)
 	}
 }
 
@@ -58,7 +65,10 @@ func interspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 	return append(words, tail...), nil
 }
 
-func runSearch(sys System, q search.Query, asJSON bool) error {
+// maxPage is Typesense's largest page size.
+const maxPage = 250
+
+func runSearch(sys System, q search.Query, all, asJSON, explain bool) error {
 	cfg, err := config.Load(sys.Getenv)
 	if err != nil {
 		return err
@@ -67,9 +77,24 @@ func runSearch(sys System, q search.Query, asJSON bool) error {
 	if err != nil {
 		return err
 	}
+	if all {
+		q.Limit, q.Page = maxPage, 1
+	}
 	res, err := c.Search(search.Collection, q.Params())
 	if err != nil {
 		return tsError(err)
+	}
+	for all && len(res.Hits) < res.Found && q.Page*maxPage < res.Found {
+		q.Page++
+		more, err := c.Search(search.Collection, q.Params())
+		if err != nil {
+			return tsError(err)
+		}
+		if len(more.Hits) == 0 {
+			break
+		}
+		res.Hits = append(res.Hits, more.Hits...)
+		res.SearchTimeMS += more.SearchTimeMS
 	}
 	if asJSON {
 		enc := json.NewEncoder(sys.Stdout)
@@ -81,6 +106,17 @@ func runSearch(sys System, q search.Query, asJSON bool) error {
 		}
 		return nil
 	}
-	search.Table(sys.Stdout, res, 120)
+	o := search.TableOptions{Width: 120, Explain: explain}
+	if q.Keyword && q.Page > 1 {
+		first := q
+		first.Page, first.Limit = 1, 1
+		if best, err := c.Search(search.Collection, first.Params()); err == nil && len(best.Hits) > 0 {
+			o.TopTextMatch = best.Hits[0].TextMatch
+		}
+	}
+	if per, _ := strconv.Atoi(q.Params().Get("per_page")); !all && res.Found > per {
+		o.Page, o.PerPage = max(q.Page, 1), per
+	}
+	search.Table(sys.Stdout, res, o)
 	return nil
 }

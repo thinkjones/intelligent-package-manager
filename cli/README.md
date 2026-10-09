@@ -13,7 +13,8 @@ aihs stats                      fetch GitHub stats for every catalog repo into c
 aihs promote <repo|plugin-id>   add repos, or an external plugin's source repo, to the root manifest.toml
 aihs serve [--stop]             run the local Typesense search server in Docker (data in .aihs/typesense/)
 aihs load                       rebuild the search index from catalog/
-aihs search <query> [flags]     hybrid search: --type, --repo, --tag (repeatable), --keyword, --limit, --json
+aihs search <query> [flags]     hybrid search with a SCORE column: --type, --repo, --tag (repeatable), --keyword,
+                                --limit, --page N, --all, --explain (KW/SEM columns), --json
 aihs show <id> [--json]         an artifact's fields, GitHub stats and neighbours
 aihs tree <id> [--up]           relationships as a tree (--depth N, --all)
 aihs graph <id> [--format dot]  the neighbourhood as Mermaid (default) or Graphviz

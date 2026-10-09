@@ -6,6 +6,7 @@ package search
 import (
 	"fmt"
 	"io"
+	"math"
 	"net/url"
 	"path/filepath"
 	"sort"
@@ -158,7 +159,8 @@ type Query struct {
 	Text               string
 	Types, Repos, Tags []string
 	Keyword            bool
-	Limit              int
+	// Limit is the page size; Page (1-based, 0 = first) picks the page.
+	Limit, Page int
 }
 
 // Params are the Typesense search parameters for q. Hybrid unless Keyword;
@@ -186,6 +188,9 @@ func (q Query) Params() url.Values {
 		limit = 250
 	}
 	p.Set("per_page", strconv.Itoa(limit))
+	if q.Page > 0 {
+		p.Set("page", strconv.Itoa(q.Page))
+	}
 	var filters []string
 	for _, f := range []struct {
 		field  string
@@ -236,15 +241,48 @@ func cut(s string, n int) string {
 	return string(r[:n-1]) + "…"
 }
 
-// Table writes hits as columns, best first, every line within width, then a
-// summary of matches per type and the search time.
-func Table(w io.Writer, res typesense.Result, width int) {
+// TableOptions shape the results table. Page and PerPage, when set, add
+// "page P of N" to the summary; Explain adds the KW and SEM columns.
+type TableOptions struct {
+	Width         int
+	Explain       bool
+	Page, PerPage int
+	// TopTextMatch is the best keyword score across all pages, so a later
+	// page's SCORE is relative to the overall best; 0 uses these hits' best.
+	TopTextMatch int64
+}
+
+// score is a hit's SCORE: its hybrid rank-fusion score × 100, or for a
+// keyword-only search, its text match as a percentage of the best hit's.
+func score(h typesense.Hit, top int64) string {
+	switch {
+	case h.Hybrid != nil:
+		return strconv.Itoa(int(math.Round(h.Hybrid.RankFusionScore * 100)))
+	case top > 0:
+		return strconv.Itoa(int(math.Round(float64(h.TextMatch) * 100 / float64(top))))
+	}
+	return "—"
+}
+
+// Table writes hits as columns, best first, every line within the width,
+// then a summary of matches per type and the search time.
+func Table(w io.Writer, res typesense.Result, o TableOptions) {
 	if len(res.Hits) == 0 {
 		fmt.Fprintln(w, "no matches")
 		return
 	}
-	header := []string{"TYPE", "NAME", "REPO", "★", "PLUGINS", "DESCRIPTION"}
-	caps := []int{14, 32, 30, 6, 24}
+	top := o.TopTextMatch
+	for _, h := range res.Hits {
+		top = max(top, h.TextMatch)
+	}
+	header := []string{"SCORE"}
+	caps := []int{5}
+	if o.Explain {
+		header = append(header, "KW", "SEM")
+		caps = append(caps, 2, 4)
+	}
+	header = append(header, "TYPE", "NAME", "REPO", "★", "PLUGINS", "DESCRIPTION")
+	caps = append(caps, 14, 32, 30, 6, 24)
 	rows := [][]string{header}
 	for _, h := range res.Hits {
 		d := h.Document
@@ -256,7 +294,18 @@ func Table(w io.Writer, res typesense.Result, width int) {
 		if plugins == "" {
 			plugins = "—"
 		}
-		rows = append(rows, []string{str(d, "type"), str(d, "name"), str(d, "repo"), Stars(stars), plugins, str(d, "description")})
+		row := []string{score(h, top)}
+		if o.Explain {
+			kw, sem := "—", "—"
+			if h.TextMatch > 0 {
+				kw = "✓"
+			}
+			if h.VectorDistance != nil {
+				sem = strconv.FormatFloat(1-*h.VectorDistance, 'f', 2, 64)
+			}
+			row = append(row, kw, sem)
+		}
+		rows = append(rows, append(row, str(d, "type"), str(d, "name"), str(d, "repo"), Stars(stars), plugins, str(d, "description")))
 	}
 	widths := make([]int, len(caps))
 	for _, r := range rows {
@@ -269,13 +318,18 @@ func Table(w io.Writer, res typesense.Result, width int) {
 	for _, wd := range widths {
 		used += wd + 2
 	}
+	last := len(header) - 1
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
 	for _, r := range rows {
-		r[5] = cut(r[5], width-used)
+		r[last] = cut(r[last], o.Width-used)
 		fmt.Fprintln(tw, strings.Join(r, "\t"))
 	}
 	tw.Flush()
-	parts := []string{fmt.Sprintf("%d match(es)", res.Found)}
+	var parts []string
+	if o.Page > 0 && o.PerPage > 0 {
+		parts = append(parts, fmt.Sprintf("page %d of %d", o.Page, (res.Found+o.PerPage-1)/o.PerPage))
+	}
+	parts = append(parts, fmt.Sprintf("%d match(es)", res.Found))
 	for _, f := range res.Facets["type"] {
 		parts = append(parts, fmt.Sprintf("%s %d", f.Value, f.Count))
 	}
