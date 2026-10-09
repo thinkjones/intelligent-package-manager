@@ -38,6 +38,9 @@ func fixture(t *testing.T) string {
 
 func TestSchema(t *testing.T) {
 	s := Schema()
+	if !reflect.DeepEqual(s["symbols_to_index"], []string{"#", "+"}) {
+		t.Errorf("c#, f#, c++ must stay whole tokens: %v", s["symbols_to_index"])
+	}
 	if s["name"] != Collection || s["default_sorting_field"] != "stars" {
 		t.Errorf("schema %v", s)
 	}

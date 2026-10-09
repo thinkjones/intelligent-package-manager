@@ -41,6 +41,9 @@ func Schema() map[string]any {
 	return map[string]any{
 		"name":                  Collection,
 		"default_sorting_field": "stars",
+		// Keep # and + inside words, so c#, f# and c++ are searchable
+		// rather than collapsing to c and f.
+		"symbols_to_index": []string{"#", "+"},
 		"fields": []map[string]any{
 			f("type", "string", "facet", true),
 			f("name", "string"),
