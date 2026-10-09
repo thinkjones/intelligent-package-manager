@@ -4,6 +4,8 @@
 //	aihs create-plugin [flags]   write .claude-plugin/marketplace.json
 //	aihs doctor                  check config and every pack manifest
 //	aihs index | stats | promote build the artifact catalog in catalog/
+//	aihs serve | load | search   local hybrid search over the catalog
+//	aihs show | tree | graph     an artifact and its relationships
 //	aihs version | help [command]
 //
 // bin/aihs at the checkout root builds this binary on demand and sets

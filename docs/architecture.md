@@ -129,6 +129,14 @@ flowchart LR
 
 The catalog is stage 1 of three: stage 2 loads it into a local Typesense index for hybrid search; stage 3 is a dashboard for searching it and saving artifacts into packs. The design is in [the catalog spec](superpowers/specs/2026-10-08-artifact-catalog-design.md).
 
+## Search
+
+`aihs serve` runs Typesense 30.2 in Docker (container `aihs-typesense`, `127.0.0.1:8108`, data and API key in gitignored `.aihs/typesense/`). `aihs load` rebuilds one collection, `artifacts`, from `catalog/*.jsonl` and `github.jsonl`: one document per record, with its repo's stars (an external plugin takes its source repo's), its owning plugins' names, and an embedding Typesense computes itself with its built-in `ts/all-MiniLM-L12-v2` model. The index is disposable — the committed catalog is the record — so there is no incremental sync.
+
+`aihs search` runs hybrid search by default: keyword matching over name (weight 4), description, tags (2 each) and plugin names (1), fused with semantic matching on the embedding (Typesense's rank fusion, 0.7 keyword / 0.3 vector), ties broken by stars. `--keyword` turns semantics off for comparison. `#` and `+` are indexed, so `c#` and `c++` are words. The code is `internal/typesense` (a plain `net/http` client) and `internal/search` (documents, schema, parameters, the results table).
+
+`aihs show`, `aihs tree` and `aihs graph` read `catalog/` only, through `internal/catgraph`: repos contain their marketplaces, marketplaces list plugins, plugins own components, and an external plugin points at its source repo — so `tree --up` from a skill also shows which other marketplaces list its repo.
+
 ## Code layout
 
 ```text

@@ -11,6 +11,12 @@ aihs doctor                     check config, every manifest, the lock and the m
 aihs index                      write catalog/*.jsonl from the repos of interest at their locked commits
 aihs stats                      fetch GitHub stats for every catalog repo into catalog/github.jsonl (needs gh)
 aihs promote <repo|plugin-id>   add repos, or an external plugin's source repo, to the root manifest.toml
+aihs serve [--stop]             run the local Typesense search server in Docker (data in .aihs/typesense/)
+aihs load                       rebuild the search index from catalog/
+aihs search <query> [flags]     hybrid search: --type, --repo, --tag (repeatable), --keyword, --limit, --json
+aihs show <id> [--json]         an artifact's fields, GitHub stats and neighbours
+aihs tree <id> [--up]           relationships as a tree (--depth N, --all)
+aihs graph <id> [--format dot]  the neighbourhood as Mermaid (default) or Graphviz
 aihs scan [--paths] [repo...]   cache repos (default: the root manifest.toml) and report their plugin, skills, hooks and agents folders
 aihs version
 aihs help [command]             usage, or one command's flags
