@@ -43,6 +43,7 @@ func run() int {
 			return string(out), err
 		},
 		HTTP:    &http.Client{},
+		Getwd:   os.Getwd,
 		Now:     time.Now,
 		Version: version,
 	})

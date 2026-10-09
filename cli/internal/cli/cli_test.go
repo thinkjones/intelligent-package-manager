@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/thinkjones/fs-skills/cli/internal/catalog"
+	"github.com/thinkjones/fs-skills/cli/internal/project"
 	"github.com/thinkjones/fs-skills/cli/internal/sources"
 )
 
@@ -35,6 +36,7 @@ type fake struct {
 	mu      sync.Mutex
 	calls   []string
 	http    *http.Client
+	cwd     string
 }
 
 type result struct {
@@ -84,7 +86,13 @@ func (f *fake) system() System {
 			r := f.results[key]
 			return r.out, r.err
 		},
-		HTTP:    f.http,
+		HTTP: f.http,
+		Getwd: func() (string, error) {
+			if f.cwd != "" {
+				return f.cwd, nil
+			}
+			return filepath.Dir(f.env["IPM_HOME"]), nil
+		},
 		Now:     func() time.Time { return time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC) },
 		Version: "test",
 	}
@@ -1094,5 +1102,114 @@ func TestSourceImportIsRepeatable(t *testing.T) {
 	}
 	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil || !strings.Contains(f.out.String(), "already") {
 		t.Errorf("second import: %v\n%s", err, f.out.String())
+	}
+}
+
+// packFake is a fake whose working directory is a project root with the
+// linked catalog from withGraphCatalog.
+func packFake(t *testing.T) (*fake, string) {
+	t.Helper()
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	f := newFake(root)
+	return f, root
+}
+
+func TestPackNewAddShow(t *testing.T) {
+	f, root := packFake(t)
+	if err := f.run("pack", "new", "csharp-sdlc", "--description", "C# kit"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("pack", "add", "csharp-sdlc", "skill:o/r:p/skills/s1", "plugin:o/r#e", "skill:o/r:p/skills/s1"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	packs, _ := project.LoadPacks(root)
+	if len(packs) != 1 || packs[0].Description != "C# kit" || !reflect.DeepEqual(packs[0].Items, []string{"skill:o/r:p/skills/s1", "plugin:o/r#e"}) {
+		t.Errorf("packs %+v", packs)
+	}
+	f.out.Reset()
+	f.run("pack", "show", "csharp-sdlc")
+	if !strings.Contains(f.out.String(), "s1") || !strings.Contains(f.out.String(), "plugin:o/r#e") {
+		t.Errorf("show:\n%s", f.out.String())
+	}
+	f.out.Reset()
+	f.run("pack", "list")
+	if !regexpMatch(`csharp-sdlc\s+2\s+C# kit`, f.out.String()) {
+		t.Errorf("list:\n%s", f.out.String())
+	}
+	if err := f.run("pack", "new", "csharp-sdlc"); err == nil {
+		t.Error("an existing pack must be refused")
+	}
+}
+
+func TestPackNewRefusesReservedNames(t *testing.T) {
+	f, _ := packFake(t)
+	for _, n := range []string{"claude-tools", "official-claude", "bad name"} {
+		if err := f.run("pack", "new", n); err == nil {
+			t.Errorf("%q accepted", n)
+		}
+	}
+}
+
+func TestPackAddRefusesUnpickable(t *testing.T) {
+	f, _ := packFake(t)
+	f.run("pack", "new", "kit")
+	err := f.run("pack", "add", "kit", "hook:o/r:p/hooks/hooks.json")
+	if err == nil || !strings.Contains(err.Error(), "plugin:o/r:p") || !strings.Contains(err.Error(), "ipm pack add kit") {
+		t.Errorf("hook: %v", err)
+	}
+	if err := f.run("pack", "add", "kit", "repo:o/r"); err == nil || !strings.Contains(err.Error(), "ipm tree") {
+		t.Errorf("repo: %v", err)
+	}
+}
+
+func TestPackAddUnknownIDAndPack(t *testing.T) {
+	f, _ := packFake(t)
+	f.run("pack", "new", "kit")
+	if err := f.run("pack", "add", "kit", "skill:nope"); err == nil || !strings.Contains(err.Error(), "skill:nope") {
+		t.Errorf("unknown id: %v", err)
+	}
+	if err := f.run("pack", "add", "nokit", "skill:o/r:p/skills/s1"); err == nil || !strings.Contains(err.Error(), "ipm pack new") {
+		t.Errorf("unknown pack: %v", err)
+	}
+}
+
+func TestPackRemove(t *testing.T) {
+	f, root := packFake(t)
+	f.run("pack", "new", "kit")
+	f.run("pack", "add", "kit", "skill:o/r:p/skills/s1", "plugin:o/r#e")
+	if err := f.run("pack", "remove", "kit", "plugin:o/r#e"); err != nil {
+		t.Fatal(err)
+	}
+	packs, _ := project.LoadPacks(root)
+	if !reflect.DeepEqual(packs[0].Items, []string{"skill:o/r:p/skills/s1"}) {
+		t.Errorf("items %v", packs[0].Items)
+	}
+}
+
+func TestPackGlobalScope(t *testing.T) {
+	f, root := packFake(t)
+	if err := f.run("pack", "-g", "new", "mine"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(f.env["IPM_HOME"], "global", "ipm.toml")); err != nil {
+		t.Errorf("global ipm.toml: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "ipm.toml")); !os.IsNotExist(err) {
+		t.Error("-g must not write the project's ipm.toml")
+	}
+}
+
+func TestPackWalksUpToProject(t *testing.T) {
+	f, root := packFake(t)
+	f.run("pack", "new", "kit")
+	sub := filepath.Join(root, "src", "deep")
+	os.MkdirAll(sub, 0o755)
+	f.cwd = sub
+	if err := f.run("pack", "add", "kit", "skill:o/r:p/skills/s1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(sub, "ipm.toml")); !os.IsNotExist(err) {
+		t.Error("must use the project's ipm.toml, not create one in a subfolder")
 	}
 }

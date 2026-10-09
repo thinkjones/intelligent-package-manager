@@ -26,6 +26,8 @@ type System struct {
 	Output func(dir, name string, args ...string) (string, error)
 	// HTTP is the client for the local Typesense server; nil uses defaults.
 	HTTP *http.Client
+	// Getwd is the working directory, where a project's ipm.toml is found.
+	Getwd func() (string, error)
 	// Now is the current time; tests fix it.
 	Now     func() time.Time
 	Version string
@@ -69,6 +71,7 @@ func init() {
 		{"show", "an artifact's fields, GitHub stats and neighbours (reads the catalog, no search server)", "<id>", showFlags},
 		{"tree", "an artifact's relationships as a tree (reads the catalog, no search server)", "<id>", treeFlags},
 		{"graph", "an artifact's neighbourhood as Mermaid or Graphviz (reads the catalog, no search server)", "<id>", graphFlags},
+		{"pack", "create and edit packs of catalog items in ipm.toml (-g for your user scope)", "<new|add|remove|list|show> …", packFlags},
 		{"stats", "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl", "", statsFlags},
 		{"scan", "report the plugin, skills, hooks and agents folders in your synced sources", "[repo...]", scanFlags},
 		{"version", "print ipm's version", "", versionFlags},
