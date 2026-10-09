@@ -31,7 +31,10 @@ const Schema = "https://anthropic.com/claude-code/marketplace.schema.json"
 
 // OwnerTag is on every entry; it is how an existing marketplace.json is
 // recognised as ours and safe to overwrite.
-const OwnerTag = "aihs"
+const OwnerTag = "ipm"
+
+// legacyOwnerTag marked entries written while ipm was called aihs.
+const legacyOwnerTag = "aihs"
 
 // Path is where the marketplace lives under a checkout root.
 func Path(root string) string {
@@ -202,7 +205,7 @@ func Build(entries []Entry, packNames []string, o Options) Marketplace {
 	return Marketplace{Schema: Schema, Name: o.Name, Description: desc, Owner: owner, Plugins: entries}
 }
 
-// IsOurs reports whether the marketplace.json at path was written by aihs:
+// IsOurs reports whether the marketplace.json at path was written by ipm:
 // every entry carries OwnerTag. A missing or unparseable file is not ours.
 func IsOurs(path string) bool {
 	data, err := os.ReadFile(path)
@@ -218,7 +221,7 @@ func IsOurs(path string) bool {
 		return false
 	}
 	for _, p := range m.Plugins {
-		if !slices.Contains(p.Tags, OwnerTag) {
+		if !slices.Contains(p.Tags, OwnerTag) && !slices.Contains(p.Tags, legacyOwnerTag) {
 			return false
 		}
 	}

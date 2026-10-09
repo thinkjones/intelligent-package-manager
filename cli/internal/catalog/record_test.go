@@ -59,7 +59,7 @@ func TestWriteSortsAndWritesEveryFile(t *testing.T) {
 	if err != nil || len(loaded) != 2 || loaded[0]["id"] != "skill:o/r:a" {
 		t.Errorf("Load: %v %v", loaded, err)
 	}
-	if _, err := Load(t.TempDir(), TypeSkill); err == nil || !strings.Contains(err.Error(), "aihs index") {
+	if _, err := Load(t.TempDir(), TypeSkill); err == nil || !strings.Contains(err.Error(), "ipm index") {
 		t.Errorf("Load of a missing file: %v", err)
 	}
 }

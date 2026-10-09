@@ -40,7 +40,7 @@ func doctor(sys System) error {
 	}
 	defer func() {
 		tw.Flush()
-		fmt.Fprintf(sys.Stdout, "\naihs doctor: %d problem(s), %d warning(s)\n", problems, warnings)
+		fmt.Fprintf(sys.Stdout, "\nipm doctor: %d problem(s), %d warning(s)\n", problems, warnings)
 	}()
 
 	cfg, err := config.Load(sys.Getenv)
@@ -81,7 +81,7 @@ func doctor(sys System) error {
 	default:
 		ups := pack.Upstreams(loaded)
 		if missing := lock.Missing(ups); len(missing) > 0 {
-			row(warn, upstream.LockFile, fmt.Sprintf("%d of %d upstream(s) not pinned — run `aihs sync`", len(missing), len(ups)))
+			row(warn, upstream.LockFile, fmt.Sprintf("%d of %d upstream(s) not pinned — run `ipm sync`", len(missing), len(ups)))
 		} else {
 			row(ok, upstream.LockFile, fmt.Sprintf("%d upstream(s) pinned", len(ups)))
 		}
@@ -90,9 +90,9 @@ func doctor(sys System) error {
 	path := marketplace.Path(cfg.Root)
 	switch _, err := os.Stat(path); {
 	case err != nil:
-		row(warn, "marketplace", "not generated yet — run `aihs create-plugin`")
+		row(warn, "marketplace", "not generated yet — run `ipm create-plugin`")
 	case !marketplace.IsOurs(path):
-		row(warn, "marketplace", path+" was not written by aihs")
+		row(warn, "marketplace", path+" was not written by ipm")
 	default:
 		row(ok, "marketplace", path)
 	}

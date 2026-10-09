@@ -44,7 +44,7 @@ type result struct {
 
 func newFake(root string) *fake {
 	return &fake{
-		env:    map[string]string{"AIHS_ROOT": root},
+		env:    map[string]string{"IPM_ROOT": root},
 		onPath: map[string]bool{},
 		results: map[string]result{
 			"git conf":    {"Ada Lovelace\n", nil},
@@ -133,7 +133,7 @@ func TestHelpAndVersion(t *testing.T) {
 		t.Fatalf("create-plugin --help: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("--version"); err != nil || f.out.String() != "aihs test\n" {
+	if err := f.run("--version"); err != nil || f.out.String() != "ipm test\n" {
 		t.Fatalf("version: %v %q", err, f.out.String())
 	}
 }
@@ -272,12 +272,12 @@ func TestCreatePluginRefusals(t *testing.T) {
 	t.Run("upstream not in the lock", func(t *testing.T) {
 		root := checkout(t)
 		write(t, filepath.Join(root, "aihs.lock"), lockFor("cloudflare/skills"))
-		if err := newFake(root).run("create-plugin"); err == nil || !strings.Contains(err.Error(), "does not pin kepano/obsidian-skills — run `aihs sync`") {
+		if err := newFake(root).run("create-plugin"); err == nil || !strings.Contains(err.Error(), "does not pin kepano/obsidian-skills — run `ipm sync`") {
 			t.Fatalf("got %v", err)
 		}
 	})
 	t.Run("no root", func(t *testing.T) {
-		if err := newFake("").run("create-plugin"); err == nil || !strings.Contains(err.Error(), "AIHS_ROOT is not set") {
+		if err := newFake("").run("create-plugin"); err == nil || !strings.Contains(err.Error(), "IPM_ROOT is not set") {
 			t.Fatalf("got %v", err)
 		}
 	})
@@ -419,7 +419,7 @@ func TestIndexRefusesUnpinnedRepoAndWritesNothing(t *testing.T) {
 	root := checkout(t)
 	write(t, filepath.Join(root, "manifest.toml"), "[[repo]]\nrepo = \"a/b\"\n")
 	err := newFake(root).run("index")
-	if err == nil || !strings.Contains(err.Error(), "aihs sync") {
+	if err == nil || !strings.Contains(err.Error(), "ipm sync") {
 		t.Errorf("got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, "catalog")); !os.IsNotExist(err) {
@@ -510,7 +510,7 @@ func TestPromoteExternalPlugin(t *testing.T) {
 	if !strings.HasPrefix(string(data), "# repos of interest") || !strings.Contains(string(data), `repo = "x/c"`) || !strings.Contains(string(data), `repo = "y/z"`) {
 		t.Errorf("manifest:\n%s", data)
 	}
-	if !strings.Contains(f.out.String(), "aihs sync && aihs index") {
+	if !strings.Contains(f.out.String(), "ipm sync && ipm index") {
 		t.Errorf("output:\n%s", f.out.String())
 	}
 }
@@ -786,14 +786,14 @@ func TestLoadNeedsServer(t *testing.T) {
 	root := checkout(t)
 	withCatalog(t, root, 1)
 	os.Remove(filepath.Join(root, ".aihs", "typesense", "api-key"))
-	if err := newFake(root).run("load"); err == nil || !strings.Contains(err.Error(), "aihs serve") {
+	if err := newFake(root).run("load"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
 		t.Errorf("no key: %v", err)
 	}
 	f, _ := loadFake(t, 1)
 	srv := httptest.NewServer(http.NotFoundHandler())
 	typesenseAt(f, srv)
 	srv.Close()
-	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "aihs serve") {
+	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
 		t.Errorf("server down: %v", err)
 	}
 }
@@ -808,8 +808,8 @@ func TestLoadWrongKey(t *testing.T) {
 
 func TestLoadWithoutCatalog(t *testing.T) {
 	f, rec := loadFake(t, 1)
-	os.RemoveAll(filepath.Join(f.env["AIHS_ROOT"], "catalog"))
-	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "aihs index") {
+	os.RemoveAll(filepath.Join(f.env["IPM_ROOT"], "catalog"))
+	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "ipm index") {
 		t.Errorf("got %v", err)
 	}
 	if len(rec.requests) != 0 {
@@ -885,13 +885,13 @@ func TestSearchNeedsQuery(t *testing.T) {
 
 func TestSearchNoIndex(t *testing.T) {
 	f, _ := searchFake(t, 404)
-	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "aihs load") {
+	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm load") {
 		t.Errorf("404: %v", err)
 	}
 	srv := httptest.NewServer(http.NotFoundHandler())
 	typesenseAt(f, srv)
 	srv.Close()
-	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "aihs serve") {
+	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
 		t.Errorf("down: %v", err)
 	}
 }
@@ -955,7 +955,7 @@ func TestShowExternalPlugin(t *testing.T) {
 	f := graphFake(t)
 	f.run("show", "plugin:o/r#e")
 	lines := strings.Split(strings.TrimSpace(f.out.String()), "\n")
-	if lines[len(lines)-1] != "promote: aihs promote plugin:o/r#e" {
+	if lines[len(lines)-1] != "promote: ipm promote plugin:o/r#e" {
 		t.Errorf("output:\n%s", f.out.String())
 	}
 }
@@ -994,7 +994,7 @@ func TestTreeAndGraphCommands(t *testing.T) {
 func TestShowWithoutCatalog(t *testing.T) {
 	f := newFake(checkout(t))
 	for _, cmd := range []string{"show", "tree", "graph"} {
-		if err := f.run(cmd, "skill:o/r:x"); err == nil || !strings.Contains(err.Error(), "aihs index") {
+		if err := f.run(cmd, "skill:o/r:x"); err == nil || !strings.Contains(err.Error(), "ipm index") {
 			t.Errorf("%s: %v", cmd, err)
 		}
 	}
@@ -1038,7 +1038,7 @@ func TestServeRecreatesContainerWithStaleKey(t *testing.T) {
 	if callWith(f, "docker rm -f aihs-typesense") == "" || callWith(f, "docker run") == "" {
 		t.Errorf("calls %v", f.calls)
 	}
-	if strings.Contains(f.out.String(), "aihs load") {
+	if strings.Contains(f.out.String(), "ipm load") {
 		t.Errorf("a populated index needs no load hint:\n%s", f.out.String())
 	}
 }
@@ -1078,7 +1078,7 @@ func TestDoctorWarnsOnEmptyIndex(t *testing.T) {
 	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
 	typesenseAt(f, healthy(t, 0))
 	f.run("doctor")
-	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "aihs load") {
+	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "ipm load") {
 		t.Errorf("doctor:\n%s", f.out.String())
 	}
 }

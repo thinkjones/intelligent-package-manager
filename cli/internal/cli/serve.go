@@ -42,7 +42,7 @@ func apiKey(root string, create bool) (string, error) {
 		return "", err
 	}
 	if !create {
-		return "", fmt.Errorf("no search server set up — run `aihs serve`")
+		return "", fmt.Errorf("no search server set up — run `ipm serve`")
 	}
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
@@ -68,13 +68,13 @@ func tsClient(sys System, root string) (*typesense.Client, error) {
 func tsError(err error) error {
 	switch {
 	case errors.Is(err, typesense.ErrUnreachable):
-		return fmt.Errorf("the search server is not running — run `aihs serve`")
+		return fmt.Errorf("the search server is not running — run `ipm serve`")
 	case errors.Is(err, typesense.ErrUnauthorized):
 		return fmt.Errorf("the search server rejected the API key — another Typesense may be using port 8108 (check `docker ps`)")
 	case errors.Is(err, typesense.ErrTimeout):
 		return fmt.Errorf("the search server did not answer in time — it may still be busy (see `docker logs %s`)", tsContainer)
 	case errors.Is(err, typesense.ErrNoCollection):
-		return fmt.Errorf("the search index is empty — run `aihs load`")
+		return fmt.Errorf("the search index is empty — run `ipm load`")
 	}
 	return err
 }
@@ -88,7 +88,7 @@ func serveFlags() (*flag.FlagSet, func(System) error) {
 
 func dockerReady(sys System, root string) error {
 	if _, err := sys.LookPath("docker"); err != nil {
-		return fmt.Errorf("aihs serve runs Typesense in Docker — install Docker (or OrbStack) first")
+		return fmt.Errorf("ipm serve runs Typesense in Docker — install Docker (or OrbStack) first")
 	}
 	if out, err := sys.Output(root, "docker", "info", "--format", "{{.ServerVersion}}"); err != nil {
 		return fmt.Errorf("Docker is not running — start it, then rerun: %s", strings.TrimSpace(out))
@@ -156,7 +156,7 @@ func runServe(sys System, stop bool) error {
 	}
 	fmt.Fprintf(sys.Stdout, "%s Typesense running at %s (container %s)\n", ok, tsURL, tsContainer)
 	if n == 0 {
-		fmt.Fprintln(sys.Stdout, "Next: aihs load")
+		fmt.Fprintln(sys.Stdout, "Next: ipm load")
 	}
 	return nil
 }
@@ -202,7 +202,7 @@ func waitHealthy(c *typesense.Client) error {
 // are warnings at worst — search is optional.
 func searchHealth(sys System, root string) ([2]string, [2]string) {
 	if err := dockerReady(sys, root); err != nil {
-		return [2]string{warn, err.Error()}, [2]string{warn, "not running — run `aihs serve`"}
+		return [2]string{warn, err.Error()}, [2]string{warn, "not running — run `ipm serve`"}
 	}
 	dockerRow := [2]string{ok, "available"}
 	c, err := tsClient(sys, root)
@@ -214,7 +214,7 @@ func searchHealth(sys System, root string) ([2]string, [2]string) {
 		return dockerRow, [2]string{warn, tsError(err).Error()}
 	}
 	if n == 0 {
-		return dockerRow, [2]string{warn, "running, but the index is empty — run `aihs load`"}
+		return dockerRow, [2]string{warn, "running, but the index is empty — run `ipm load`"}
 	}
 	return dockerRow, [2]string{ok, fmt.Sprintf("%s, %d document(s)", tsURL, n)}
 }

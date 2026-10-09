@@ -30,7 +30,7 @@ func createPluginFlags() (*flag.FlagSet, func(System) error) {
 	fs.StringVar(&o.description, "description", "", "marketplace description")
 	fs.StringVar(&o.owner, "owner", "", "maintainer name (default: git user.name)")
 	fs.StringVar(&o.url, "repo-url", "", "this repo's `URL`, recorded as the owner URL (default: the GitHub origin remote, if any)")
-	fs.BoolVar(&o.force, "force", false, "overwrite a marketplace.json aihs didn't write")
+	fs.BoolVar(&o.force, "force", false, "overwrite a marketplace.json ipm didn't write")
 	fs.BoolVar(&o.dryRun, "dry-run", false, "report what would be written, write nothing")
 	fs.BoolVar(&o.noValidate, "no-validate", false, "skip `claude plugin validate`")
 	return fs, func(sys System) error { return createPlugin(sys, o) }
@@ -72,7 +72,7 @@ func createPlugin(sys System, o createPluginOpts) error {
 		for i, u := range missing {
 			keys[i] = u.Key()
 		}
-		return fmt.Errorf("%s does not pin %s — run `aihs sync`", upstream.LockFile, strings.Join(keys, ", "))
+		return fmt.Errorf("%s does not pin %s — run `ipm sync`", upstream.LockFile, strings.Join(keys, ", "))
 	}
 	expanded := map[pack.CopilotItem][]pack.Plugin{} // an item listed by several packs is expanded once
 	for i, p := range publishing {
@@ -130,7 +130,7 @@ func createPlugin(sys System, o createPluginOpts) error {
 
 	path := marketplace.Path(root)
 	if _, err := os.Stat(path); err == nil && !o.force && !marketplace.IsOurs(path) {
-		return fmt.Errorf("%s exists and was not written by aihs — pass --force to overwrite", path)
+		return fmt.Errorf("%s exists and was not written by ipm — pass --force to overwrite", path)
 	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return err
 	}

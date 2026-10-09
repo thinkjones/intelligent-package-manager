@@ -17,14 +17,14 @@ import (
 var bin string
 
 func TestMain(m *testing.M) {
-	dir, err := os.MkdirTemp("", "aihs-test")
+	dir, err := os.MkdirTemp("", "ipm-test")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	bin = filepath.Join(dir, "aihs")
+	bin = filepath.Join(dir, "ipm")
 	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
-		fmt.Fprintf(os.Stderr, "build aihs: %v\n%s", err, out)
+		fmt.Fprintf(os.Stderr, "build ipm: %v\n%s", err, out)
 		os.Exit(1)
 	}
 	code := m.Run()
@@ -32,12 +32,12 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func aihs(t *testing.T, root string, args ...string) (stdout, stderr string, code int) {
+func ipm(t *testing.T, root string, args ...string) (stdout, stderr string, code int) {
 	t.Helper()
 	cmd := exec.Command(bin, args...)
 	cmd.Env = []string{"PATH=/usr/bin:/bin", "HOME=" + t.TempDir()}
 	if root != "" {
-		cmd.Env = append(cmd.Env, "AIHS_ROOT="+root)
+		cmd.Env = append(cmd.Env, "IPM_ROOT="+root)
 	}
 	var o, e bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &o, &e
@@ -77,13 +77,13 @@ func TestSyncThenCreatePlugin(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, errOut, code := aihs(t, root, "create-plugin", "--no-validate"); code != 1 || !strings.Contains(errOut, "run `aihs sync`") {
+	if _, errOut, code := ipm(t, root, "create-plugin", "--no-validate"); code != 1 || !strings.Contains(errOut, "run `ipm sync`") {
 		t.Fatalf("before sync: exit %d, %s", code, errOut)
 	}
-	if out, errOut, code := aihs(t, root, "sync"); code != 0 || !strings.Contains(out, "fetched") {
+	if out, errOut, code := ipm(t, root, "sync"); code != 0 || !strings.Contains(out, "fetched") {
 		t.Fatalf("sync: exit %d\n%s%s", code, out, errOut)
 	}
-	if _, errOut, code := aihs(t, root, "create-plugin", "--no-validate", "--owner", "me"); code != 0 {
+	if _, errOut, code := ipm(t, root, "create-plugin", "--no-validate", "--owner", "me"); code != 0 {
 		t.Fatalf("create-plugin: exit %d: %s", code, errOut)
 	}
 	data, err := os.ReadFile(filepath.Join(root, ".claude-plugin", "marketplace.json"))
@@ -102,15 +102,15 @@ func TestExitCodes(t *testing.T) {
 		inStderr string
 	}{
 		{"ok", "", []string{"version"}, 0, ""},
-		{"usage error", root, []string{"--upgrade"}, 2, "Try `aihs help`"},
+		{"usage error", root, []string{"--upgrade"}, 2, "Try `ipm help`"},
 		{"unknown command", root, []string{"nope"}, 2, "unknown command"},
 		{"bad flag", root, []string{"create-plugin", "--bogus"}, 2, "flag provided but not defined"},
-		{"missing config", "", []string{"create-plugin"}, 1, "AIHS_ROOT is not set"},
+		{"missing config", "", []string{"create-plugin"}, 1, "IPM_ROOT is not set"},
 		{"nothing to publish", root, []string{"create-plugin"}, 1, "nothing to publish"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, errOut, code := aihs(t, tt.root, tt.args...)
+			_, errOut, code := ipm(t, tt.root, tt.args...)
 			if code != tt.code || !strings.Contains(errOut, tt.inStderr) {
 				t.Fatalf("exit %d (want %d), stderr %q (want %q)", code, tt.code, errOut, tt.inStderr)
 			}

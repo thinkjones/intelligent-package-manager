@@ -24,7 +24,7 @@ func promoteFlags() (*flag.FlagSet, func(System) error) {
 // promotes the repo it lives in.
 func runPromote(sys System, args []string) error {
 	if len(args) == 0 {
-		return usagef("promote: name at least one repo (owner/repo or URL) or external plugin ID. Try `aihs help promote`.")
+		return usagef("promote: name at least one repo (owner/repo or URL) or external plugin ID. Try `ipm help promote`.")
 	}
 	cfg, err := config.Load(sys.Getenv)
 	if err != nil {
@@ -58,7 +58,7 @@ func runPromote(sys System, args []string) error {
 	for _, r := range repos {
 		fmt.Fprintf(sys.Stdout, "%s %s added to %s\n", ok, r, pack.ManifestFile)
 	}
-	fmt.Fprintln(sys.Stdout, "\nNext: aihs sync && aihs index")
+	fmt.Fprintln(sys.Stdout, "\nNext: ipm sync && ipm index")
 	return nil
 }
 
@@ -73,5 +73,5 @@ func sourceRepo(plugins []map[string]any, id string) (string, error) {
 		}
 		return "", fmt.Errorf("%s is not an external plugin — its repo is already a repo of interest", id)
 	}
-	return "", fmt.Errorf("no plugin %s in catalog/plugins.jsonl — run `aihs index`", id)
+	return "", fmt.Errorf("no plugin %s in catalog/plugins.jsonl — run `ipm index`", id)
 }

@@ -29,7 +29,7 @@ func runStats(sys System) error {
 		return err
 	}
 	if _, err := sys.LookPath("gh"); err != nil {
-		return fmt.Errorf("aihs stats needs the GitHub CLI: install gh and run `gh auth login`")
+		return fmt.Errorf("ipm stats needs the GitHub CLI: install gh and run `gh auth login`")
 	}
 	if out, err := sys.Output(cfg.Root, "gh", "auth", "status"); err != nil {
 		return fmt.Errorf("gh is not logged in — run `gh auth login`: %s", strings.TrimSpace(out))

@@ -171,11 +171,11 @@ func TestUnknownID(t *testing.T) {
 	g := load(t)
 	var b bytes.Buffer
 	for _, err := range []error{g.Tree(&b, "skill:nope", Options{}), g.Mermaid(&b, "skill:nope", Options{})} {
-		if err == nil || !strings.Contains(err.Error(), "aihs search") {
+		if err == nil || !strings.Contains(err.Error(), "ipm search") {
 			t.Errorf("got %v", err)
 		}
 	}
-	if _, err := Load(t.TempDir()); err == nil || !strings.Contains(err.Error(), "aihs index") {
+	if _, err := Load(t.TempDir()); err == nil || !strings.Contains(err.Error(), "ipm index") {
 		t.Errorf("missing catalog: %v", err)
 	}
 }

@@ -23,7 +23,7 @@ func write(t *testing.T, path, body string) {
 
 const repo = "github/awesome-copilot"
 
-// cache lays out repo at a commit, as aihs sync does, and returns the lock.
+// cache lays out repo at a commit, as ipm sync does, and returns the lock.
 func cache(t *testing.T, root string, files map[string]string) upstream.Lock {
 	t.Helper()
 	commit := strings.Repeat("c", 40)
@@ -108,7 +108,7 @@ func TestExpandErrors(t *testing.T) {
 		})
 	}
 
-	if _, err := Expand(root, item("plugins/solo"), upstream.Lock{repo: strings.Repeat("e", 40)}); err == nil || !strings.Contains(err.Error(), "run `aihs sync`") {
+	if _, err := Expand(root, item("plugins/solo"), upstream.Lock{repo: strings.Repeat("e", 40)}); err == nil || !strings.Contains(err.Error(), "run `ipm sync`") {
 		t.Fatalf("a cache not at the locked commit must be refused: %v", err)
 	}
 }

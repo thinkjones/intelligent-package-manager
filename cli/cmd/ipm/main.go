@@ -1,15 +1,15 @@
-// aihs is local tooling for this checkout's packs. Every command is Go code
+// ipm is local tooling for this checkout's packs. Every command is Go code
 // in internal/cli:
 //
-//	aihs create-plugin [flags]   write .claude-plugin/marketplace.json
-//	aihs doctor                  check config and every pack manifest
-//	aihs index | stats | promote build the artifact catalog in catalog/
-//	aihs serve | load | search   local hybrid search over the catalog
-//	aihs show | tree | graph     an artifact and its relationships
-//	aihs version | help [command]
+//	ipm create-plugin [flags]   write .claude-plugin/marketplace.json
+//	ipm doctor                  check config and every pack manifest
+//	ipm index | stats | promote build the artifact catalog in catalog/
+//	ipm serve | load | search   local hybrid search over the catalog
+//	ipm show | tree | graph     an artifact and its relationships
+//	ipm version | help [command]
 //
-// bin/aihs at the checkout root builds this binary on demand and sets
-// AIHS_ROOT. main only wires the process into cli.Run. See cli/README.md.
+// bin/ipm at the checkout root builds this binary on demand and sets
+// IPM_ROOT. main only wires the process into cli.Run. See cli/README.md.
 package main
 
 import (
@@ -53,9 +53,9 @@ func run() int {
 	case errors.As(err, &exit):
 		return exit.Code
 	case errors.As(err, &usage):
-		fmt.Fprintf(os.Stderr, "aihs: %v\n", err)
+		fmt.Fprintf(os.Stderr, "ipm: %v\n", err)
 		return 2
 	}
-	fmt.Fprintf(os.Stderr, "aihs: %v\n", err)
+	fmt.Fprintf(os.Stderr, "ipm: %v\n", err)
 	return 1
 }

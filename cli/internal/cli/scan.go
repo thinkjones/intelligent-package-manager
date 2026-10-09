@@ -31,7 +31,7 @@ type scanned struct {
 // runScan caches each repo — the repos of interest in the root manifest.toml
 // when none are named — and reports what it holds. A repo aihs.lock pins is
 // scanned at that commit; any other at its remote's current commit, cached
-// until the next `aihs sync` prunes it.
+// until the next `ipm sync` prunes it.
 func runScan(sys System, args []string, paths bool) error {
 	cfg, err := config.Load(sys.Getenv)
 	if err != nil {
@@ -47,7 +47,7 @@ func runScan(sys System, args []string, paths bool) error {
 			return err
 		}
 		if len(ups) == 0 {
-			return fmt.Errorf("no repos to scan: name one (`aihs scan owner/repo`) or list repos of interest as [[repo]] in %s", filepath.Join(cfg.Root, pack.ManifestFile))
+			return fmt.Errorf("no repos to scan: name one (`ipm scan owner/repo`) or list repos of interest as [[repo]] in %s", filepath.Join(cfg.Root, pack.ManifestFile))
 		}
 	}
 	lock, err := upstream.ReadLock(cfg.Root)

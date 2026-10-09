@@ -1,4 +1,4 @@
-// Package cli is aihs's command line. Every command is Go code in this
+// Package cli is ipm's command line. Every command is Go code in this
 // package, registered in the commands table; Run picks one from argv.
 //
 // Commands reach the outside world only through System, so tests drive them
@@ -31,13 +31,13 @@ type System struct {
 	Version string
 }
 
-// ExitError ends aihs with Code and no further message: the output already
+// ExitError ends ipm with Code and no further message: the output already
 // said why.
 type ExitError struct{ Code int }
 
 func (e *ExitError) Error() string { return fmt.Sprintf("exit status %d", e.Code) }
 
-// UsageError is a malformed command line; aihs exits 2.
+// UsageError is a malformed command line; ipm exits 2.
 type UsageError struct{ msg string }
 
 func (e *UsageError) Error() string { return e.msg }
@@ -65,14 +65,14 @@ func init() {
 		{"index", "write catalog/*.jsonl from the repos of interest at their locked commits", "", indexFlags},
 		{"serve", "start the local Typesense search server in Docker (--stop to stop it)", "", serveFlags},
 		{"load", "rebuild the search index from catalog/", "", loadFlags},
-		{"search", "hybrid search over the catalog (needs aihs serve and aihs load)", "<query>", searchFlags},
+		{"search", "hybrid search over the catalog (needs ipm serve and ipm load)", "<query>", searchFlags},
 		{"show", "an artifact's fields, GitHub stats and neighbours (reads catalog/)", "<id>", showFlags},
 		{"tree", "an artifact's relationships as a tree (reads catalog/)", "<id>", treeFlags},
 		{"graph", "an artifact's neighbourhood as Mermaid or Graphviz (reads catalog/)", "<id>", graphFlags},
 		{"stats", "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl", "", statsFlags},
 		{"promote", "add repos (or an external plugin's source repo) to the root manifest.toml", "<repo|plugin-id>...", promoteFlags},
 		{"scan", "cache repos and report their plugin, skills, hooks and agents folders", "[repo...]", scanFlags},
-		{"version", "print aihs's version", "", versionFlags},
+		{"version", "print ipm's version", "", versionFlags},
 		{"help", "this text, or `help <command>` for one command's flags", "", nil},
 	}
 }
@@ -102,9 +102,9 @@ func Run(args []string, sys System) error {
 	cmd, ok := lookup(name)
 	if !ok {
 		if strings.HasPrefix(name, "-") {
-			return usagef("unknown flag %q. Try `aihs help`.", name)
+			return usagef("unknown flag %q. Try `ipm help`.", name)
 		}
-		return usagef("unknown command %q. Try `aihs help`.", name)
+		return usagef("unknown command %q. Try `ipm help`.", name)
 	}
 	fs, run := cmd.flags()
 	fs.SetOutput(io.Discard)
@@ -124,10 +124,10 @@ func Run(args []string, sys System) error {
 			printCommandHelp(sys.Stdout, cmd)
 			return nil
 		}
-		return usagef("%s: %v. Try `aihs help %s`.", cmd.name, err, cmd.name)
+		return usagef("%s: %v. Try `ipm help %s`.", cmd.name, err, cmd.name)
 	}
 	if fs.NArg() > 0 && cmd.args == "" {
-		return usagef("%s: unexpected argument %q. Try `aihs help %s`.", cmd.name, fs.Arg(0), cmd.name)
+		return usagef("%s: unexpected argument %q. Try `ipm help %s`.", cmd.name, fs.Arg(0), cmd.name)
 	}
 	return run(sys)
 }
@@ -140,7 +140,7 @@ func runHelp(args []string, sys System) error {
 	case 1:
 		cmd, ok := lookup(args[0])
 		if !ok || cmd.flags == nil {
-			return usagef("no command %q. Try `aihs help`.", args[0])
+			return usagef("no command %q. Try `ipm help`.", args[0])
 		}
 		printCommandHelp(sys.Stdout, cmd)
 		return nil
@@ -149,10 +149,10 @@ func runHelp(args []string, sys System) error {
 }
 
 func printHelp(w io.Writer) {
-	fmt.Fprintln(w, "aihs — local tooling for this checkout's packs")
+	fmt.Fprintln(w, "ipm — local tooling for this checkout's packs")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Usage")
-	fmt.Fprintln(w, "  aihs <command> [flags]")
+	fmt.Fprintln(w, "  ipm <command> [flags]")
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Commands")
 	for _, c := range commands {
@@ -160,13 +160,13 @@ func printHelp(w io.Writer) {
 	}
 	fmt.Fprintln(w)
 	fmt.Fprintln(w, "Config")
-	fmt.Fprintln(w, "  AIHS_ROOT       this checkout's root, set by bin/aihs (on PATH after direnv allow)")
+	fmt.Fprintln(w, "  IPM_ROOT       this checkout's root, set by bin/ipm (on PATH after direnv allow)")
 }
 
 func printCommandHelp(w io.Writer, cmd command) {
-	fmt.Fprintf(w, "aihs %s — %s\n", cmd.name, cmd.summary)
+	fmt.Fprintf(w, "ipm %s — %s\n", cmd.name, cmd.summary)
 	if cmd.args != "" {
-		fmt.Fprintf(w, "\nUsage\n  aihs %s [flags] %s\n", cmd.name, cmd.args)
+		fmt.Fprintf(w, "\nUsage\n  ipm %s [flags] %s\n", cmd.name, cmd.args)
 	}
 	fs, _ := cmd.flags()
 	any := false
@@ -182,7 +182,7 @@ func printCommandHelp(w io.Writer, cmd command) {
 func versionFlags() (*flag.FlagSet, func(System) error) {
 	fs := flag.NewFlagSet("version", flag.ContinueOnError)
 	return fs, func(sys System) error {
-		fmt.Fprintf(sys.Stdout, "aihs %s\n", sys.Version)
+		fmt.Fprintf(sys.Stdout, "ipm %s\n", sys.Version)
 		return nil
 	}
 }

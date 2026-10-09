@@ -67,7 +67,7 @@ func Reserved(s string) bool {
 	return false
 }
 
-// Upstream is one repo at one version that packs read from. aihs sync pins
+// Upstream is one repo at one version that packs read from. ipm sync pins
 // each to a commit in aihs.lock.
 type Upstream struct {
 	// Repo is a GitHub owner/repo, or a full git URL.

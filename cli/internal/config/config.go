@@ -1,9 +1,9 @@
-// Package config resolves aihs's configuration from the environment.
+// Package config resolves ipm's configuration from the environment.
 //
-// There is one value, AIHS_ROOT, and only the checkout's bin/aihs shim
-// sets it — to the checkout's root, where the packs live. aihs is a local
+// There is one value, IPM_ROOT, and only the checkout's bin/ipm shim
+// sets it — to the checkout's root, where the packs live. ipm is a local
 // tool: there is no user config file, no installed binary, and nothing shared
-// with Gas City or fsh. Missing config is an error that says how to run aihs.
+// with Gas City or fsh. Missing config is an error that says how to run ipm.
 package config
 
 import (
@@ -12,10 +12,10 @@ import (
 	"path/filepath"
 )
 
-// RootVar is the variable aihs reads, set by bin/aihs.
-const RootVar = "AIHS_ROOT"
+// RootVar is the variable ipm reads, set by bin/ipm.
+const RootVar = "IPM_ROOT"
 
-const source = "bin/aihs sets it; run aihs inside the ai-harness-skills checkout after `direnv allow`"
+const source = "bin/ipm sets it; run ipm inside the ai-harness-skills checkout after `direnv allow`"
 
 type Config struct {
 	// Root is the checkout's root, where the packs live.

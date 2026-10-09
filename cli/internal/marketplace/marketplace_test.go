@@ -65,12 +65,12 @@ func TestEntriesAndJSON(t *testing.T) {
 		`"description":"Plugins from base, eng"`,
 		`"owner":{"name":"Me"}`,
 		// a stack entry: in place, no components, depends on its plugins then its includes
-		`{"name":"eng","description":"Engineering (2 plugins; includes base)","source":"./eng","category":"eng","tags":["aihs","eng"],"strict":false,"dependencies":["obsidian","cflr","base"],"commands":[],"agents":[],"version":"1.0.0"}`,
-		`{"name":"base","description":"The base pack (1 plugin)","source":"./base","category":"base","tags":["aihs","base"],"strict":false,"dependencies":["cflr"],"commands":[],"agents":[]}`,
+		`{"name":"eng","description":"Engineering (2 plugins; includes base)","source":"./eng","category":"eng","tags":["ipm","eng"],"strict":false,"dependencies":["obsidian","cflr","base"],"commands":[],"agents":[],"version":"1.0.0"}`,
+		`{"name":"base","description":"The base pack (1 plugin)","source":"./base","category":"base","tags":["ipm","base"],"strict":false,"dependencies":["cflr"],"commands":[],"agents":[]}`,
 		// upstream plugins, pinned to their locked commits; no strict/commands/agents,
 		// so an upstream plugin.json stays in charge
-		`{"name":"cflr","description":"CF","source":{"source":"git-subdir","url":"cloudflare/skills","path":"skills","sha":"cccccccccccccccccccccccccccccccccccccccc"},"category":"base","tags":["aihs","base"],"skills":["./"]}`,
-		`{"name":"obsidian","source":{"source":"github","repo":"kepano/obsidian-skills","sha":"dddddddddddddddddddddddddddddddddddddddd"},"category":"eng","tags":["aihs","eng"]}`,
+		`{"name":"cflr","description":"CF","source":{"source":"git-subdir","url":"cloudflare/skills","path":"skills","sha":"cccccccccccccccccccccccccccccccccccccccc"},"category":"base","tags":["ipm","base"],"skills":["./"]}`,
+		`{"name":"obsidian","source":{"source":"github","repo":"kepano/obsidian-skills","sha":"dddddddddddddddddddddddddddddddddddddddd"},"category":"eng","tags":["ipm","eng"]}`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("JSON missing\n  %s\nin\n  %s", want, got)
@@ -101,6 +101,17 @@ func TestWriteAndIsOurs(t *testing.T) {
 		t.Fatal(err)
 	}
 	if IsOurs(path) {
-		t.Fatal("an entry without the aihs tag is not ours")
+		t.Fatal("an entry without the ipm tag is not ours")
+	}
+}
+
+func TestIsOursAcceptsLegacyTag(t *testing.T) {
+	dir := t.TempDir()
+	for tag, want := range map[string]bool{"ipm": true, "aihs": true, "other": false} {
+		path := filepath.Join(dir, tag+".json")
+		os.WriteFile(path, []byte(`{"plugins":[{"name":"x","tags":["`+tag+`"]}]}`), 0o644)
+		if got := IsOurs(path); got != want {
+			t.Errorf("tag %q: IsOurs = %v, want %v", tag, got, want)
+		}
 	}
 }

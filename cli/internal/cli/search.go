@@ -28,7 +28,7 @@ func searchFlags() (*flag.FlagSet, func(System) error) {
 	return fs, func(sys System) error {
 		q.Text = strings.TrimSpace(strings.Join(fs.Args(), " "))
 		if q.Text == "" {
-			return usagef("search: give a query (or * for everything). Try `aihs help search`.")
+			return usagef("search: give a query (or * for everything). Try `ipm help search`.")
 		}
 		for _, v := range slices.Concat(types, repos, tags) {
 			if strings.Contains(v, "`") {

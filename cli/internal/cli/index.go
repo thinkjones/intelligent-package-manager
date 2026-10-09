@@ -30,7 +30,7 @@ func runIndex(sys System) error {
 		return err
 	}
 	if len(ups) == 0 {
-		return fmt.Errorf("no repos of interest: list them as [[repo]] in %s, then run `aihs sync`", filepath.Join(cfg.Root, pack.ManifestFile))
+		return fmt.Errorf("no repos of interest: list them as [[repo]] in %s, then run `ipm sync`", filepath.Join(cfg.Root, pack.ManifestFile))
 	}
 	lock, err := upstream.ReadLock(cfg.Root)
 	if err != nil {

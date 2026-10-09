@@ -1,11 +1,11 @@
-# The one piece of code here is aihs (cli/), a local-only Go CLI for this
-# repo's packs. `direnv allow` puts its bin/aihs shim on PATH; nothing is
+# The one piece of code here is ipm (cli/), a local-only Go CLI for this
+# repo's packs. `direnv allow` puts its bin/ipm shim on PATH; nothing is
 # installed globally. See cli/README.md.
 
 [tasks."cli:build"]
-description = "Build aihs into cli/bin/ (bin/aihs also does this on demand)"
+description = "Build ipm into cli/bin/ (bin/ipm also does this on demand)"
 dir = "cli"
-run = "go build -o bin/aihs ./cmd/aihs"
+run = "go build -o bin/ipm ./cmd/ipm"
 
 [tasks."cli:test"]
 description = "gofmt check, go vet, go test — what a change to cli/ must pass"

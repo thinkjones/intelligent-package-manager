@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# aihs shim — .envrc puts this directory on PATH, so `aihs` works in any shell
-# inside the checkout after `direnv allow`. aihs is local-only: nothing is
+# ipm shim — .envrc puts this directory on PATH, so `ipm` works in any shell
+# inside the checkout after `direnv allow`. ipm is local-only: nothing is
 # installed or configured outside this checkout. The shim (re)builds
-# cli/bin/aihs whenever a Go source is newer than the binary, points it at this
+# cli/bin/ipm whenever a Go source is newer than the binary, points it at this
 # checkout's root (where the packs live), and replaces itself with it.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cli="$root/cli"
-bin="$cli/bin/aihs"
+bin="$cli/bin/ipm"
 
 if [[ ! -x $bin ]] || [[ -n $(find "$cli" -path "$cli/bin" -prune -o \( -name '*.go' -o -name go.mod -o -name go.sum \) -newer "$bin" -print -quit) ]]; then
-  (cd "$cli" && go build -o bin/aihs ./cmd/aihs) >&2
+  (cd "$cli" && go build -o bin/ipm ./cmd/ipm) >&2
 fi
 
-export AIHS_ROOT="$root"
+export IPM_ROOT="$root"
 exec "$bin" "$@"

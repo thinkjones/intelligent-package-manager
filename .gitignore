@@ -162,5 +162,5 @@ creds.env
 # OpenTofu / Terraform state
 infra/.terraform/
 infra/.terraform.lock.hcl
-# aihs: cached upstream checkouts (aihs.lock pins them; it is committed)
+# ipm: cached upstream checkouts (aihs.lock pins them; it is committed)
 /.aihs/

@@ -22,7 +22,7 @@ import (
 func oneID(name string, fs *flag.FlagSet) (string, error) {
 	words := fs.Args()
 	if len(words) != 1 {
-		return "", usagef("%s: give one artifact ID (find IDs with `aihs search`). Try `aihs help %s`.", name, name)
+		return "", usagef("%s: give one artifact ID (find IDs with `ipm search`). Try `ipm help %s`.", name, name)
 	}
 	return words[0], nil
 }
@@ -59,7 +59,7 @@ func runShow(sys System, id string, asJSON bool) error {
 	}
 	n, found := g.Node(id)
 	if !found {
-		return fmt.Errorf("no artifact %q in the catalog — find IDs with `aihs search`", id)
+		return fmt.Errorf("no artifact %q in the catalog — find IDs with `ipm search`", id)
 	}
 	if asJSON {
 		enc := json.NewEncoder(sys.Stdout)
@@ -111,7 +111,7 @@ func runShow(sys System, id string, asJSON bool) error {
 	neighbours(sys.Stdout, g, "up:", g.Children(id, true))
 	neighbours(sys.Stdout, g, "down:", g.Children(id, false))
 	if s("type") == catalog.TypePlugin && s("source_repo") != "" {
-		fmt.Fprintf(sys.Stdout, "\npromote: aihs promote %s\n", id)
+		fmt.Fprintf(sys.Stdout, "\npromote: ipm promote %s\n", id)
 	}
 	return nil
 }

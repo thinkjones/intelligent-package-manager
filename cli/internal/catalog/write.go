@@ -12,7 +12,7 @@ import (
 
 // Write writes every type's file under dir, records sorted by ID, one per
 // line. A type with no records gets an empty file. github.jsonl, written by
-// `aihs stats`, is left alone.
+// `ipm stats`, is left alone.
 func Write(dir string, recs []Record) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
@@ -60,7 +60,7 @@ func Load(dir, typ string) ([]map[string]any, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("%s does not exist — run `aihs index`", path)
+			return nil, fmt.Errorf("%s does not exist — run `ipm index`", path)
 		}
 		return nil, err
 	}

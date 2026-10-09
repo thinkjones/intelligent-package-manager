@@ -362,7 +362,7 @@ func (x *repoIndex) marketplaces() []string {
 			case map[string]any:
 				id = x.externalEntry(m.ID, e, src, sources)
 			default:
-				x.warn("%s: entry %q has a source aihs cannot read", m.ID, e.Name)
+				x.warn("%s: entry %q has a source ipm cannot read", m.ID, e.Name)
 			}
 			if id != "" && !slices.Contains(listed, id) {
 				listed = append(listed, id)

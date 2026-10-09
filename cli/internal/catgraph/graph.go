@@ -152,7 +152,7 @@ func (g *Graph) Stars(repo string) (int, bool) {
 
 func (g *Graph) check(id string) error {
 	if _, ok := g.nodes[id]; !ok {
-		return fmt.Errorf("no artifact %q in the catalog — find IDs with `aihs search`", id)
+		return fmt.Errorf("no artifact %q in the catalog — find IDs with `ipm search`", id)
 	}
 	return nil
 }

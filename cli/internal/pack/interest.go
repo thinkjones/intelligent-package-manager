@@ -12,8 +12,8 @@ import (
 )
 
 // interest is the root manifest.toml: upstream repos worth watching for
-// plugins, skills, hooks and agents. aihs sync pins and caches them alongside
-// the packs' upstreams; aihs scan reports what each one holds. They publish
+// plugins, skills, hooks and agents. ipm sync pins and caches them alongside
+// the packs' upstreams; ipm scan reports what each one holds. They publish
 // nothing.
 type interest struct {
 	Repo []struct {
