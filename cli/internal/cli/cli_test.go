@@ -815,3 +815,92 @@ func TestLoadWithoutCatalog(t *testing.T) {
 		t.Errorf("no request should be sent: %v", rec.requests)
 	}
 }
+
+// searchFake answers searches with two hits and records the last query.
+func searchFake(t *testing.T, status int) (*fake, *url.Values) {
+	t.Helper()
+	root := checkout(t)
+	write(t, filepath.Join(root, ".aihs", "typesense", "api-key"), "k")
+	var last url.Values
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		last = r.URL.Query()
+		if status != 0 {
+			w.WriteHeader(status)
+			return
+		}
+		fmt.Fprint(w, `{"found":2,"search_time_ms":3,"facet_counts":[{"field_name":"type","counts":[{"value":"skill","count":2}]}],"hits":[
+			{"document":{"id":"skill:o/r:a","type":"skill","name":"tdd","repo":"o/r","stars":12,"plugin_names":["tools"],"description":"Test first"}},
+			{"document":{"id":"skill:o/r:b","type":"skill","name":"pdf","repo":"o/r","stars":0,"plugin_names":[],"description":"PDFs"}}]}`)
+	}))
+	t.Cleanup(srv.Close)
+	f := newFake(root)
+	typesenseAt(f, srv)
+	return f, &last
+}
+
+func TestSearchPrintsTable(t *testing.T) {
+	f, last := searchFake(t, 0)
+	if err := f.run("search", "--type", "skill", "c#", "testing"); err != nil {
+		t.Fatal(err)
+	}
+	if last.Get("q") != "c# testing" || !strings.Contains(last.Get("filter_by"), "type:=[`skill`]") || !strings.HasSuffix(last.Get("query_by"), "embedding") {
+		t.Errorf("query %v", *last)
+	}
+	if out := f.out.String(); !strings.HasPrefix(out, "TYPE") || !strings.Contains(out, "2 match(es) · skill 2 · 3 ms") {
+		t.Errorf("output:\n%s", out)
+	}
+}
+
+func TestSearchKeyword(t *testing.T) {
+	f, last := searchFake(t, 0)
+	f.run("search", "--keyword", "tdd")
+	if strings.Contains(last.Get("query_by"), "embedding") {
+		t.Errorf("query_by %q", last.Get("query_by"))
+	}
+}
+
+func TestSearchJSON(t *testing.T) {
+	f, _ := searchFake(t, 0)
+	if err := f.run("search", "--json", "tdd"); err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(f.out.String()), "\n")
+	var hit map[string]any
+	if len(lines) != 2 || json.Unmarshal([]byte(lines[0]), &hit) != nil || hit["document"] == nil {
+		t.Errorf("output:\n%s", f.out.String())
+	}
+}
+
+func TestSearchNeedsQuery(t *testing.T) {
+	f, _ := searchFake(t, 0)
+	var usage *UsageError
+	if err := f.run("search"); !errors.As(err, &usage) {
+		t.Errorf("got %v", err)
+	}
+	if err := f.run("search", "--type", "skill"); !errors.As(err, &usage) {
+		t.Errorf("flags only: got %v", err)
+	}
+}
+
+func TestSearchNoIndex(t *testing.T) {
+	f, _ := searchFake(t, 404)
+	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "aihs load") {
+		t.Errorf("404: %v", err)
+	}
+	srv := httptest.NewServer(http.NotFoundHandler())
+	typesenseAt(f, srv)
+	srv.Close()
+	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "aihs serve") {
+		t.Errorf("down: %v", err)
+	}
+}
+
+func TestSearchFlagsAnywhere(t *testing.T) {
+	f, last := searchFake(t, 0)
+	if err := f.run("search", "c#", "--type", "skill", "testing"); err != nil {
+		t.Fatal(err)
+	}
+	if last.Get("q") != "c# testing" || !strings.Contains(last.Get("filter_by"), "`skill`") {
+		t.Errorf("query %v", *last)
+	}
+}

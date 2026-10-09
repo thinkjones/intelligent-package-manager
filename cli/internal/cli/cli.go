@@ -65,6 +65,7 @@ func init() {
 		{"index", "write catalog/*.jsonl from the repos of interest at their locked commits", "", indexFlags},
 		{"serve", "start the local Typesense search server in Docker (--stop to stop it)", "", serveFlags},
 		{"load", "rebuild the search index from catalog/", "", loadFlags},
+		{"search", "hybrid search over the catalog (needs aihs serve and aihs load)", "<query>", searchFlags},
 		{"stats", "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl", "", statsFlags},
 		{"promote", "add repos (or an external plugin's source repo) to the root manifest.toml", "<repo|plugin-id>...", promoteFlags},
 		{"scan", "cache repos and report their plugin, skills, hooks and agents folders", "[repo...]", scanFlags},
