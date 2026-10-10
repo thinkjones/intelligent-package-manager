@@ -328,3 +328,94 @@ func TestQuit(t *testing.T) {
 		t.Error("q in the search box is a letter")
 	}
 }
+
+func withDetails(f fakes) {
+	f.c.details["skill:o/r:skills/tdd"] = Detail{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd", Repo: "o/r", Stars: 31234,
+		Description: "Test first.",
+		Up:          []Neighbour{{ID: "plugin:o/r:p", Type: "plugin", Name: "p"}, {ID: "repo:o/r", Type: "repo", Name: "o/r"}},
+		Down:        []Neighbour{{ID: "agent:o/r:agents/helper.md", Type: "agent", Name: "helper"}}}
+	f.c.details["skill:o/r:skills/tdd-guard"] = Detail{ID: "skill:o/r:skills/tdd-guard", Type: "skill", Name: "tdd-guard", Repo: "o/r"}
+}
+
+func TestDetailFollowsSelection(t *testing.T) {
+	m, f := newTest(t)
+	withDetails(f)
+	typeText(t, m, "tdd")
+	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd" {
+		t.Fatalf("detail asked for %q", last)
+	}
+	v := view(m)
+	for _, want := range []string{"skill:o/r:skills/tdd", "31.2k", "Test first.", "plugin", "p", "helper"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("detail lacks %q:\n%s", want, v)
+		}
+	}
+	press(t, m, "down", "j")
+	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd-guard" {
+		t.Errorf("moving should show the new selection, asked %q", last)
+	}
+}
+
+func TestWalkNeighbours(t *testing.T) {
+	m, f := newTest(t)
+	withDetails(f)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "right")
+	if m.focus != focusDetail {
+		t.Fatalf("right should focus the detail pane")
+	}
+	press(t, m, "down", "enter")
+	if last := f.c.asked[len(f.c.asked)-1]; last != "repo:o/r" {
+		t.Fatalf("enter should open the second neighbour, asked %q", last)
+	}
+	press(t, m, "backspace")
+	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd" || m.detail.ID != "skill:o/r:skills/tdd" {
+		t.Errorf("backspace should go back, asked %q", last)
+	}
+	press(t, m, "left")
+	if m.focus != focusResults {
+		t.Errorf("left should return to the results")
+	}
+}
+
+func TestNarrowHidesDetail(t *testing.T) {
+	m, f := newTest(t)
+	withDetails(f)
+	m.Update(tea.WindowSizeMsg{Width: 90, Height: 30})
+	typeText(t, m, "tdd")
+	if strings.Contains(view(m), "Test first.") {
+		t.Fatalf("a 90-column terminal should not show the detail pane:\n%s", view(m))
+	}
+	press(t, m, "down", "enter")
+	if !strings.Contains(view(m), "Test first.") || strings.Contains(view(m), "tdd-guard") {
+		t.Errorf("enter should show the detail full-width:\n%s", view(m))
+	}
+	press(t, m, "esc")
+	if strings.Contains(view(m), "Test first.") || m.focus != focusResults {
+		t.Errorf("esc should return to the results:\n%s", view(m))
+	}
+}
+
+func TestTooSmall(t *testing.T) {
+	m, _ := newTest(t)
+	m.Update(tea.WindowSizeMsg{Width: 50, Height: 12})
+	if !strings.Contains(view(m), "enlarge") {
+		t.Errorf("want a request to enlarge the terminal:\n%s", view(m))
+	}
+	press(t, m, "x")
+	if m.input.Value() != "" {
+		t.Errorf("keys other than q and ctrl+c should do nothing")
+	}
+	if !press(t, m, "q") {
+		t.Error("q should still quit")
+	}
+}
+
+func TestDetailError(t *testing.T) {
+	m, f := newTest(t)
+	f.c.err = errors.New("catalog record broken")
+	typeText(t, m, "tdd")
+	if !strings.Contains(m.status, "catalog record broken") {
+		t.Errorf("status %q", m.status)
+	}
+}

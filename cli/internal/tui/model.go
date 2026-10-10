@@ -43,7 +43,22 @@ type Model struct {
 	width    int
 	height   int
 	debounce time.Duration
+
+	detail Detail
+	nbSel  int      // selected neighbour in the detail pane
+	back   []string // detail IDs to return to with backspace
+	full   bool     // narrow terminal: the detail is shown full-width
 }
+
+// Layout limits from the spec.
+const (
+	wideWidth = 100 // below this the detail pane hides
+	minWidth  = 60
+	minHeight = 15
+)
+
+func (m *Model) tooSmall() bool { return m.width < minWidth || m.height < minHeight }
+func (m *Model) wide() bool     { return m.width >= wideWidth }
 
 // New is the TUI over d.
 func New(d Deps) *Model {
@@ -80,6 +95,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.res, m.sel, m.offset = msg.res, 0, 0
+		m.followSelection()
 		return m, nil
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
@@ -93,6 +109,19 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	k := msg.String()
 	if k == "ctrl+c" {
 		return tea.Quit
+	}
+	if m.tooSmall() {
+		if k == "q" {
+			return tea.Quit
+		}
+		return nil
+	}
+	if m.focus == focusDetail {
+		if k == "q" {
+			return tea.Quit
+		}
+		m.detailKey(k)
+		return nil
 	}
 	if m.focus == focusSearch {
 		switch k {
@@ -120,6 +149,16 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.move(1)
 	case "up", "k":
 		m.move(-1)
+	case "right", "l":
+		if m.detail.ID != "" {
+			m.full = !m.wide()
+			m.setFocus(focusDetail)
+		}
+	case "enter":
+		if !m.wide() && m.detail.ID != "" {
+			m.full = true
+			m.setFocus(focusDetail)
+		}
 	case "tab":
 		m.setFocus(focusSearch)
 	}
@@ -136,7 +175,11 @@ func (m *Model) setFocus(f focus) {
 }
 
 func (m *Model) move(by int) {
-	m.sel = max(0, min(len(m.res.Hits)-1, m.sel+by))
+	sel := max(0, min(len(m.res.Hits)-1, m.sel+by))
+	if sel != m.sel {
+		m.sel = sel
+		m.followSelection()
+	}
 }
 
 // queryChanged invalidates any search in flight and schedules a new one, or
@@ -145,6 +188,7 @@ func (m *Model) queryChanged() tea.Cmd {
 	m.seq++
 	if strings.TrimSpace(m.input.Value()) == "" {
 		m.res, m.sel, m.offset = Results{}, 0, 0
+		m.followSelection()
 		return nil
 	}
 	seq := m.seq
@@ -161,6 +205,11 @@ func (m *Model) searchCmd(seq int) tea.Cmd {
 
 // View draws the screen.
 func (m *Model) View() tea.View {
+	if m.tooSmall() {
+		v := tea.NewView(fmt.Sprintf("ipm needs at least %d×%d — enlarge the terminal (q quits)", minWidth, minHeight))
+		v.AltScreen = true
+		return v
+	}
 	var b strings.Builder
 	w := m.width
 	mode := stTeal.Render("● hybrid")
@@ -177,7 +226,7 @@ func (m *Model) View() tea.View {
 	}
 	b.WriteString(stRule.Render(strings.Repeat("─", w)) + "\n")
 	rows := max(1, m.height-strings.Count(b.String(), "\n")-4)
-	for _, line := range m.resultLines(w, rows) {
+	for _, line := range m.bodyLines(w, rows) {
 		b.WriteString(line + "\n")
 	}
 	b.WriteString(stRule.Render(strings.Repeat("─", w)) + "\n")
@@ -200,4 +249,22 @@ func (m *Model) countLine() string {
 		return "no matches"
 	}
 	return fmt.Sprintf("%d of %d", len(m.res.Hits), m.res.Found)
+}
+
+// bodyLines is the results and detail panes side by side, or one of them in
+// a narrow terminal.
+func (m *Model) bodyLines(w, rows int) []string {
+	switch {
+	case m.full:
+		return m.detailLines(w, rows)
+	case !m.wide():
+		return m.resultLines(w, rows)
+	}
+	left := w * 45 / 100
+	res, det := m.resultLines(left, rows), m.detailLines(w-left-3, rows)
+	out := make([]string, rows)
+	for i := range out {
+		out[i] = res[i] + stRule.Render(" │ ") + det[i]
+	}
+	return out
 }
