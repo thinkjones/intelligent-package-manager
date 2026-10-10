@@ -1990,3 +1990,17 @@ func TestTuiDeployerPlanGlobal(t *testing.T) {
 		t.Errorf("plan %v %v", plan, err)
 	}
 }
+
+func TestShowUsedBy(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	f := newFake(root)
+	if err := f.run("show", "repo:x/c"); err != nil {
+		t.Fatal(err)
+	}
+	out := f.out.String()
+	i := strings.Index(out, "used by:")
+	if i < 0 || !strings.Contains(out[i:], "plugin:o/r#e") {
+		t.Errorf("show:\n%s", out)
+	}
+}

@@ -65,7 +65,7 @@ func TestChildrenDown(t *testing.T) {
 		"repo:o/r":              {"marketplace:o/r:.", "plugin:o/r:p2", "plugin:o/r:q", "skill:o/r:s3"},
 		"marketplace:o/r:.":     {"plugin:o/r#e", "plugin:o/r:p"},
 		"plugin:o/r:p":          {"skill:o/r:p/skills/s1", "skill:o/r:p/skills/s2", "hook:o/r:p/hooks/hooks.json"},
-		"plugin:o/r#e":          {"repo:x/c"},
+		"plugin:o/r#e":          nil, // references x/c (RefTarget), not a child
 		"skill:o/r:p/skills/s1": nil,
 	} {
 		if got := g.Children(id, false); !reflect.DeepEqual(got, want) {
@@ -177,5 +177,43 @@ func TestUnknownID(t *testing.T) {
 	}
 	if _, err := Load(t.TempDir()); err == nil || !strings.Contains(err.Error(), "ipm index") {
 		t.Errorf("missing catalog: %v", err)
+	}
+}
+
+func TestRepoHasNoParents(t *testing.T) {
+	g := load(t)
+	if up := g.Children("repo:x/c", true); len(up) != 0 {
+		t.Errorf("a repo has no parents: %v", up)
+	}
+	for _, c := range g.Children("plugin:o/r#e", false) {
+		if c == "repo:x/c" {
+			t.Error("an external entry no longer has its source repo as a child")
+		}
+	}
+}
+
+func TestRefTargetAndRefsTo(t *testing.T) {
+	g := load(t)
+	if target, ok := g.RefTarget("plugin:o/r#e"); !ok || target != "repo:x/c" {
+		t.Errorf("target %q %v", target, ok)
+	}
+	if !reflect.DeepEqual(g.RefsTo("repo:x/c"), []string{"plugin:o/r#e"}) || !g.External("plugin:o/r#e") || g.External("plugin:o/r:p") {
+		t.Errorf("refs %v", g.RefsTo("repo:x/c"))
+	}
+	if !reflect.DeepEqual(g.UsedBy("x/c"), []string{"o/r"}) {
+		t.Errorf("used by %v", g.UsedBy("x/c"))
+	}
+}
+
+func TestTreeUpStaysInRepo(t *testing.T) {
+	var b bytes.Buffer
+	load(t).Tree(&b, "repo:x/c", Options{Up: true})
+	if strings.Contains(b.String(), "o/r") {
+		t.Errorf("tree --up from x/c must not climb into o/r:\n%s", b.String())
+	}
+	b.Reset()
+	load(t).Tree(&b, "plugin:o/r#e", Options{})
+	if !strings.Contains(b.String(), "↗") || !strings.Contains(b.String(), "x/c") {
+		t.Errorf("tree from an external entry shows its target:\n%s", b.String())
 	}
 }

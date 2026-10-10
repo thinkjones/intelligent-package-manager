@@ -22,21 +22,25 @@ var componentKeys = []string{"skills", "agents", "commands", "hooks", "mcp"}
 type Graph struct {
 	nodes    map[string]map[string]any
 	down, up map[string][]string
+	refs     catalog.Refs
 	stars    map[string]int // normalized owner/repo → stars
 }
 
 // Load reads every catalog file under catalogDir and github.jsonl.
 func Load(catalogDir string) (*Graph, error) {
 	g := &Graph{nodes: map[string]map[string]any{}, down: map[string][]string{}, up: map[string][]string{}, stars: map[string]int{}}
+	records := map[string][]map[string]any{}
 	for _, typ := range catalog.Types {
 		recs, err := catalog.Load(catalogDir, typ)
 		if err != nil {
 			return nil, err
 		}
+		records[typ] = recs
 		for _, r := range recs {
 			g.nodes[str(r, "id")] = r
 		}
 	}
+	g.refs = catalog.BuildRefs(records)
 	stats, err := github.Read(filepath.Join(catalogDir, "github.jsonl"))
 	if err != nil {
 		return nil, err
@@ -80,9 +84,6 @@ func (g *Graph) link() {
 				for _, c := range strs(n[key]) {
 					g.edge(id, c)
 				}
-			}
-			if src := str(n, "source_repo"); src != "" {
-				g.edge(id, repoID[pack.NormalizeRepo(src)])
 			}
 		}
 	}
@@ -143,6 +144,24 @@ func (g *Graph) Children(id string, up bool) []string {
 	}
 	return g.down[id]
 }
+
+// RefTarget is what an external entry references in another repo.
+func (g *Graph) RefTarget(id string) (string, bool) {
+	t, ok := g.refs.Target[id]
+	return t, ok
+}
+
+// RefsTo is the external entries, in other repos, that reference id.
+func (g *Graph) RefsTo(id string) []string { return g.refs.By[id] }
+
+// UsedBy is the other repos whose external entries reference anything in repo.
+func (g *Graph) UsedBy(repo string) []string {
+	return g.refs.UsedBy[strings.ToLower(pack.NormalizeRepo(repo))]
+}
+
+// External reports whether id is a marketplace entry for a plugin that lives
+// in another repo.
+func (g *Graph) External(id string) bool { return g.refs.External[id] }
 
 // Stars is the repo's star count, if GitHub stats know it.
 func (g *Graph) Stars(repo string) (int, bool) {
