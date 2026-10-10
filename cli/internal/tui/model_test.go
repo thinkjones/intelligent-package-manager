@@ -443,7 +443,7 @@ func TestActivePackAtStart(t *testing.T) {
 	if m.active != "a" {
 		t.Errorf("active %q, want the first by name", m.active)
 	}
-	if v := view(m); !strings.Contains(v, "project /work · a (1)") || !strings.Contains(v, "skill tdd") {
+	if v := view(m); !strings.Contains(v, "a (1) · project /work") || !strings.Contains(v, "skill tdd") {
 		t.Errorf("tray:\n%s", v)
 	}
 }
@@ -635,5 +635,16 @@ func TestRecheck(t *testing.T) {
 	press(t, m, "ctrl+r")
 	if f.s.checks != 1 || len(f.s.queries) != n+1 {
 		t.Errorf("checks %d, searches %d → %d", f.s.checks, n, len(f.s.queries))
+	}
+}
+
+func TestTrayKeepsPackNameWithLongScope(t *testing.T) {
+	m, _ := newTestWith(t, func(f fakes) {
+		f.p.scope = "project /" + strings.Repeat("very/long/path/", 12)
+		f.p.packs = []Pack{{Name: "kit", Items: []string{tddID}}}
+	})
+	m.dirty = true
+	if v := view(m); !strings.Contains(v, "kit (1) • not built") {
+		t.Errorf("a long scope must not hide the pack name:\n%s", v)
 	}
 }

@@ -131,10 +131,12 @@ func (m *Model) trayLines(w int) []string {
 		head := stMuted.Render("─ "+m.d.Packs.Scope()+" · ") + stAmber.Render("no pack — press p to create one")
 		return []string{fit(head, w), spaces(w)}
 	}
-	head := stMuted.Render("─ ") + stText.Render(fmt.Sprintf("%s · %s (%d)", m.d.Packs.Scope(), p.Name, len(p.Items)))
+	// The pack comes first so a long project path is what gets cut.
+	head := stMuted.Render("─ ") + stTitle.Render(fmt.Sprintf("%s (%d)", p.Name, len(p.Items)))
 	if m.dirty {
 		head += stAmber.Render(" • not built")
 	}
+	head += stMuted.Render(" · " + m.d.Packs.Scope())
 	var items []string
 	for i, id := range p.Items {
 		label := itemLabel(id)
