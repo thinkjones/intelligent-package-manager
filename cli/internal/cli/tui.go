@@ -361,5 +361,6 @@ func (d tuiDeployer) Plan(pack string, t tui.Target) ([]string, error) {
 }
 
 func (d tuiDeployer) Deploy(_ context.Context, pack string, t tui.Target, out io.Writer) error {
-	return runDeploy(d.sys, d.global, pack, deployTarget{Scope: t.Scope, Path: t.Path}, out)
+	_, err := runDeploy(d.sys, d.global, pack, deployTarget{Scope: t.Scope, Path: t.Path}, out)
+	return err
 }

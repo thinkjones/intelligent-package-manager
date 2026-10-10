@@ -1943,3 +1943,21 @@ func TestTuiDeployerPlan(t *testing.T) {
 		t.Errorf("no claude: %v", err)
 	}
 }
+
+func TestDeployOutputSaysEachThingOnce(t *testing.T) {
+	f, root := deployFake(t)
+	var out bytes.Buffer
+	if err := (tuiDeployer{sys: f.system(), scope: project.Scope{Root: root}}).Deploy(context.Background(), "kit", tui.Target{Scope: "project", Path: root}, &out); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "✓ deployed") || strings.Contains(out.String(), "Install in Claude Code") {
+		t.Errorf("the TUI shows its own result, and deploy installs it itself:\n%s", out.String())
+	}
+	f.out.Reset()
+	if err := f.run("deploy", "kit"); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(f.out.String(), "✓ deployed kit"); n != 1 || strings.Contains(f.out.String(), "Install in Claude Code") {
+		t.Errorf("ipm deploy prints its result once (%d) and no install hints:\n%s", n, f.out.String())
+	}
+}

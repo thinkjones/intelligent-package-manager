@@ -43,7 +43,12 @@ func newDeployCmd(sys System) *cobra.Command {
 			if len(args) == 1 {
 				pack = args[0]
 			}
-			return runDeploy(sys, global, pack, t, sys.Stdout)
+			deployed, err := runDeploy(sys, global, pack, t, sys.Stdout)
+			if err != nil {
+				return err
+			}
+			fmt.Fprintf(sys.Stdout, "%s deployed %s\n", ok, deployed)
+			return nil
 		},
 	}
 	f := cmd.Flags()
@@ -148,30 +153,31 @@ func samePath(a, b string) bool {
 }
 
 // runDeploy builds the scope's packs, then installs pack into Claude Code at
-// t, writing everything it does to out.
-func runDeploy(sys System, global bool, pack string, t deployTarget, out io.Writer) error {
+// t, writing everything it does to out. It returns what it deployed where,
+// as "kit (project /work)".
+func runDeploy(sys System, global bool, pack string, t deployTarget, out io.Writer) (string, error) {
 	if err := needClaude(sys); err != nil {
-		return err
+		return "", err
 	}
 	scope, err := currentScope(sys, global)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if pack, err = deployPack(scope, pack); err != nil {
-		return err
+		return "", err
 	}
 	t = deployDefaults(scope, t)
 	if t, err = cleanTarget(t, workDir(sys, scope), sys.Getenv("HOME")); err != nil {
-		return err
+		return "", err
 	}
-	build := sys
-	build.Stdout = out
-	if err := runInstall(build, global, false, false); err != nil {
-		return err
+	buildSys := sys
+	buildSys.Stdout = out
+	if err := build(buildSys, global, false, false, false); err != nil {
+		return "", err
 	}
 	cmds, err := planDeploy(sys, scope.IPMDir(), marketName(scope), pack, t)
 	if err != nil {
-		return err
+		return "", err
 	}
 	for _, c := range cmds {
 		fmt.Fprintf(out, "$ %s\n", c)
@@ -180,11 +186,10 @@ func runDeploy(sys System, global bool, pack string, t deployTarget, out io.Writ
 			fmt.Fprintln(out, res)
 		}
 		if err != nil {
-			return fmt.Errorf("`%s` failed: %v", c, err)
+			return "", fmt.Errorf("`%s` failed: %v", c, err)
 		}
 	}
-	fmt.Fprintf(out, "%s deployed %s (%s)\n", ok, pack, describeTarget(t))
-	return nil
+	return pack + " (" + describeTarget(t) + ")", nil
 }
 
 // deployPack is the pack to deploy: the one named, or the scope's only pack.
