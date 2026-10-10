@@ -929,3 +929,119 @@ func TestDeployShowsCleanedTarget(t *testing.T) {
 		t.Errorf("deployed %v:\n%s", f.d.deployed, view(m))
 	}
 }
+
+// withExternal gives the fake catalog repo a/m whose marketplace lists a local
+// plugin and an external entry for b/s's plugin cf, and b/s itself.
+func withExternal(f fakes) {
+	ref := func(id, typ, name, repo string) Ref { return Ref{ID: id, Type: typ, Name: name, Repo: repo} }
+	d := f.c.details
+	d["repo:a/m"] = Node{ID: "repo:a/m", Type: "repo", Name: "a/m", Repo: "a/m", Children: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	entry := ref("plugin:a/m#cf", "plugin", "cf", "a/m")
+	entry.External = true
+	d["marketplace:a/m:."] = Node{ID: "marketplace:a/m:.", Type: "marketplace", Name: "m", Repo: "a/m",
+		Parents: []Ref{ref("repo:a/m", "repo", "a/m", "a/m")}, Children: []Ref{entry, ref("plugin:a/m:local", "plugin", "local", "a/m")}}
+	target := ref("plugin:b/s:cf", "plugin", "cf", "b/s")
+	d["plugin:a/m#cf"] = Node{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: &target,
+		Parents: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	d["plugin:a/m:local"] = Node{ID: "plugin:a/m:local", Type: "plugin", Name: "local", Repo: "a/m", Parents: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	d["repo:b/s"] = Node{ID: "repo:b/s", Type: "repo", Name: "b/s", Repo: "b/s", Children: []Ref{ref("marketplace:b/s:.", "marketplace", "m", "b/s")}}
+	d["marketplace:b/s:."] = Node{ID: "marketplace:b/s:.", Type: "marketplace", Name: "m", Repo: "b/s",
+		Parents: []Ref{ref("repo:b/s", "repo", "b/s", "b/s")}, Children: []Ref{target}}
+	d["plugin:b/s:cf"] = Node{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s", Parents: []Ref{ref("marketplace:b/s:.", "marketplace", "m", "b/s")}}
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: true}}, Found: 1}
+}
+
+func externalTest(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	m, f := newTestWith(t, withExternal)
+	typeText(t, m, "cf")
+	press(t, m, "down")
+	return m, f
+}
+
+func TestJumpIntoExternal(t *testing.T) {
+	m, _ := externalTest(t)
+	press(t, m, "tab", "right")
+	if m.cursor != "plugin:b/s:cf" || len(m.tree.Path) == 0 || m.tree.Path[0].ID != "repo:b/s" {
+		t.Fatalf("cursor %q path %v", m.cursor, m.tree.Path)
+	}
+	if len(m.backStack) != 1 || m.backStack[0] != "plugin:a/m#cf" {
+		t.Errorf("back stack %v", m.backStack)
+	}
+	tree := panels(view(m))[1]
+	if !strings.Contains(ansiStrip(tree[1]), "↩ a/m — back to cf") {
+		t.Errorf("the first tree row should be the back root:\n%s", strings.Join(tree, "\n"))
+	}
+}
+
+func TestBackRootReturns(t *testing.T) {
+	m, _ := externalTest(t)
+	press(t, m, "tab", "right", "up")
+	if m.treeSel != backRow {
+		t.Fatalf("up from the first sibling selects the back root, treeSel %d", m.treeSel)
+	}
+	press(t, m, "enter")
+	if m.cursor != "plugin:a/m#cf" || len(m.backStack) != 0 || strings.Contains(view(m), "↩") {
+		t.Errorf("cursor %q stack %v", m.cursor, m.backStack)
+	}
+}
+
+func TestJumpUnresolved(t *testing.T) {
+	m, f := newTestWith(t, withExternal)
+	e := f.c.details["plugin:a/m#cf"]
+	e.External, e.Unresolved = nil, "c/missing"
+	f.c.details["plugin:a/m#cf"] = e
+	typeText(t, m, "cf")
+	press(t, m, "down", "right")
+	if m.cursor != "plugin:a/m#cf" || !strings.Contains(m.status, "ipm source add plugin:a/m#cf") {
+		t.Errorf("cursor %q status %q", m.cursor, m.status)
+	}
+}
+
+func TestJumpCycleBackStack(t *testing.T) {
+	m, f := newTest(t)
+	d := f.c.details
+	toB := Ref{ID: "plugin:b:x", Type: "plugin", Name: "x", Repo: "b"}
+	toA := Ref{ID: "plugin:a:y", Type: "plugin", Name: "y", Repo: "a"}
+	d["plugin:a#tob"] = Node{ID: "plugin:a#tob", Type: "plugin", Name: "tob", Repo: "a", External: &toB}
+	d["plugin:b#toa"] = Node{ID: "plugin:b#toa", Type: "plugin", Name: "toa", Repo: "b", External: &toA}
+	m.setCursor("plugin:a#tob")
+	m.treeDown()
+	m.setCursor("plugin:b#toa")
+	m.treeDown()
+	if m.cursor != "plugin:a:y" || len(m.backStack) != 2 {
+		t.Fatalf("cursor %q stack %v", m.cursor, m.backStack)
+	}
+	m.back()
+	m.back()
+	if m.cursor != "plugin:a#tob" || len(m.backStack) != 0 {
+		t.Errorf("two backs: cursor %q stack %v", m.cursor, m.backStack)
+	}
+	for range 21 {
+		m.setCursor("plugin:a#tob")
+		m.treeDown()
+	}
+	if len(m.backStack) != 20 {
+		t.Errorf("the back stack holds 20, has %d", len(m.backStack))
+	}
+}
+
+func TestMovingResultClearsBackStack(t *testing.T) {
+	m, _ := newTestWith(t, func(f fakes) {
+		withExternal(f)
+		r := f.s.results["cf"]
+		r.Hits, r.Found = append(r.Hits, Hit{ID: "plugin:a/m:local", Type: "plugin", Name: "local", Repo: "a/m"}), 2
+		f.s.results["cf"] = r
+	})
+	typeText(t, m, "cf")
+	press(t, m, "down", "right")
+	if len(m.backStack) != 1 {
+		t.Fatalf("search-mode → on an external entry jumps too: %v", m.backStack)
+	}
+	press(t, m, "down")
+	if len(m.backStack) != 0 {
+		t.Errorf("moving the result clears the back stack: %v", m.backStack)
+	}
+}
+
+func ansiStrip(s string) string { return ansi.Strip(s) }

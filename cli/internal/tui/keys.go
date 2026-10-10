@@ -23,6 +23,8 @@ var treeKeys = [][2]string{
 	{"↑ ↓  k j", "siblings and 'also in' rows"},
 	{"← →  h l", "parent / first child"},
 	{"enter", "on an 'also in' row: follow it"},
+	{"→ on ↗", "jump into the repo it points at"},
+	{"↑ to ↩", "back to where you jumped from"},
 	{"a / d", "add / remove the node"},
 	{"tab / esc", "back to search mode"},
 }

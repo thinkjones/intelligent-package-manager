@@ -22,6 +22,9 @@ const (
 // parent, its siblings (Siblings[Cursor] is the node), its children, and its
 // other parents.
 type treeView struct {
+	// Back is the external entry the user jumped here from, drawn as a
+	// second root above the tree.
+	Back     *Ref
 	Path     []Ref
 	Siblings []Ref
 	Cursor   int
@@ -115,7 +118,11 @@ const (
 	rowText // a continuation of the cursor's description
 	rowAlso
 	rowMore
+	rowBack
 )
+
+// backRow is the tree-mode selection of the back root.
+const backRow = -2
 
 type treeRow struct {
 	kind  int
@@ -152,6 +159,9 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 	}
 	if len(head) > rows-3 {
 		head = head[len(head)-max(0, rows-3):]
+	}
+	if tv.Back != nil {
+		head = append([]treeRow{{kind: rowBack, text: "↩ " + tv.Back.Repo + " — back to " + tv.Back.Name, sel: backRow}}, head...)
 	}
 
 	sibGuide := func(last bool) string {
@@ -301,6 +311,11 @@ func (tv treeView) render(r treeRow, col, descW, sel int, focused bool) string {
 		return spaces(col) + stText.Render(r.text)
 	case rowMore:
 		return guide + stMuted.Render(r.text)
+	case rowBack:
+		if focused && sel == backRow {
+			return stSelected.Render(r.text)
+		}
+		return stAmber.Render(r.text)
 	case rowAlso:
 		text := stMuted.Render(r.text)
 		if focused && r.sel == sel {
