@@ -136,7 +136,7 @@ func TestTreeLines(t *testing.T) {
 		}
 	}
 	text := ansi.Strip(strings.Join(lines, "\n"))
-	for _, want := range []string{"repo   o/r", "market m", "plugin p", "skill  a", "▶b", "also in: plugin p2"} {
+	for _, want := range []string{"repo    o/r", "market  m", "plugin  p", "skill   a", "skill  ▶b", "also in: plugin p2"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("tree lacks %q:\n%s", want, text)
 		}

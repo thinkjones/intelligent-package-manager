@@ -1,30 +1,30 @@
-ipm  o/r › p › tdd  ─ search: tdd                                                                             … ● hybrid
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-Packs in project /work                                                                                                  
-                                                                                                                        
-▶csharp-sdlc  C# lifecycle                                                                                              
- docs  Writing                                                                                                          
-                                                                                                                        
-enter switch · n new pack · esc cancel                                                                                  
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
+ipm  o/r › p › tdd                                                                                              ● hybrid
+╭─ packs ──────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Packs in project /work                                                                                               │
+│                                                                                                                      │
+│ ▶csharp-sdlc  C# lifecycle                                                                                           │
+│  docs  Writing                                                                                                       │
+│                                                                                                                      │
+│ enter switch · n new pack · esc cancel                                                                               │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
 2 of 100                                                                                                                
-/ search  a add  d remove  p packs  i install  f type  ? help  q quit                                                   
+enter choose  n new pack  esc cancel                                                                                    

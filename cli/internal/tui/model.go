@@ -3,11 +3,13 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type focus int
@@ -56,8 +58,9 @@ type Model struct {
 	picker   *picker
 	statusOK bool // status is a note, not an error
 
-	inst *install // the install modal, while open
-	help bool     // the ? overlay
+	inst  *install // the install modal, while open
+	help  bool     // the ? overlay
+	plain bool     // NO_COLOR: draw without colour
 }
 
 type keyMsg = tea.KeyPressMsg
@@ -83,6 +86,7 @@ func New(d Deps) *Model {
 	in.Focus()
 	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
 	m.input.SetWidth(m.width - 30)
+	m.plain = os.Getenv("NO_COLOR") != ""
 	m.reloadPacks()
 	return m
 }
@@ -349,49 +353,65 @@ func (m *Model) searchCmd(seq int) tea.Cmd {
 	}
 }
 
-// View draws the screen.
+// View draws the screen: a header with the cursor's breadcrumb, the results
+// and tree panels (or a modal), the pack tray, the status line and the keys
+// for the current mode.
 func (m *Model) View() tea.View {
-	if m.tooSmall() {
-		v := tea.NewView(fmt.Sprintf("ipm needs at least %d×%d — enlarge the terminal (q quits)", minWidth, minHeight))
-		v.AltScreen = true
-		return v
+	content := m.render()
+	if m.plain {
+		content = ansi.Strip(content)
 	}
-	var b strings.Builder
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
+}
+
+func (m *Model) render() string {
+	if m.tooSmall() {
+		return fmt.Sprintf("ipm needs at least %d×%d — enlarge the terminal (q quits)", minWidth, minHeight)
+	}
 	w := m.width
+	var top []string
 	mode := stTeal.Render("● hybrid")
 	if m.d.Searcher.Mode() != "hybrid" {
 		mode = stMuted.Render("○ local")
 	}
-	head := stTitle.Render("ipm") + stMuted.Render(" ─ search: ") + m.input.View()
-	if crumb := m.breadcrumb(w / 2); crumb != "" {
-		head = stTitle.Render("ipm") + "  " + crumb + stMuted.Render("  ─ search: ") + m.input.View()
-	}
-	b.WriteString(fit(head, w-lipglossWidth(mode)-1) + " " + mode + "\n")
+	head := stTitle.Render("ipm") + "  " + m.breadcrumb(w-lipglossWidth(mode)-8)
+	top = append(top, fit(head, w-lipglossWidth(mode)-1)+" "+mode)
 	if n := m.d.Searcher.Notice(); n != "" {
-		b.WriteString(fit(stAmber.Render(n), w) + "\n")
+		top = append(top, fit(stAmber.Render(n), w))
 	}
-	if f := typeFilters[m.filter]; f != "" {
-		b.WriteString(fit(stMuted.Render("type: ")+stAmber.Render(f), w) + "\n")
-	}
-	b.WriteString(stRule.Render(strings.Repeat("─", w)) + "\n")
-	rows := max(1, m.height-strings.Count(b.String(), "\n")-4)
-	var body []string
+	tray := m.trayLines(w)
+	body := max(6, m.height-len(top)-len(tray)-2)
+
+	var mid []string
 	switch {
 	case m.inst != nil:
-		body = m.installLines(w, rows)
+		mid = panel(stTitle.Render("install"), m.installLines(w-4, body-2), w, true)
 	case m.help:
-		body = m.helpLines(w, rows)
+		mid = panel(stTitle.Render("keys"), m.helpLines(w-4, body-2), w, true)
 	case m.picker != nil:
-		body = m.pickerLines(w, rows)
+		mid = panel(stTitle.Render("packs"), m.pickerLines(w-4, body-2), w, true)
 	default:
-		body = m.bodyLines(w, rows)
+		resH := max(5, body*40/100)
+		m.input.SetWidth(min(w-24, max(lipglossWidth(m.input.Placeholder), lipglossWidth(m.input.Value())+1)))
+		search := stMuted.Render("search: ") + m.input.View()
+		if f := typeFilters[m.filter]; f != "" {
+			search += stMuted.Render("  type: ") + stAmber.Render(f)
+		}
+		resultsFocused := m.focus == focusSearch || m.focus == focusResults
+		mid = panel(search, m.resultLines(w-4, resH-2), w, resultsFocused)
+		sel := -1
+		if m.focus == focusTree {
+			sel = m.treeSel
+		}
+		title := stMuted.Render("tree")
+		if m.cursor != "" {
+			title += stMuted.Render(" ── ") + stText.Render(m.cursor)
+		}
+		mid = append(mid, panel(title, m.tree.lines(w-4, body-resH-2, sel, m.focus == focusTree), w, m.focus == focusTree)...)
 	}
-	for _, line := range body {
-		b.WriteString(line + "\n")
-	}
-	for _, line := range m.trayLines(w) {
-		b.WriteString(line + "\n")
-	}
+
 	status := stMuted.Render(m.countLine())
 	switch {
 	case m.status != "" && m.statusOK:
@@ -399,11 +419,27 @@ func (m *Model) View() tea.View {
 	case m.status != "":
 		status = stError.Render(m.status)
 	}
-	b.WriteString(fit(status, w) + "\n")
-	b.WriteString(fit(stMuted.Render("/ search  a add  d remove  p packs  i install  f type  ? help  q quit"), w))
-	v := tea.NewView(b.String())
-	v.AltScreen = true
-	return v
+	lines := append(append(append(top, mid...), tray...), fit(status, w), fit(stMuted.Render(m.hints()), w))
+	return strings.Join(lines, "\n")
+}
+
+// hints is the footer: the keys that matter where the focus is.
+func (m *Model) hints() string {
+	switch {
+	case m.inst != nil:
+		return "esc close (when finished)"
+	case m.help:
+		return "esc or ? close"
+	case m.picker != nil:
+		return "enter choose  n new pack  esc cancel"
+	case m.focus == focusSearch:
+		return "type to search  ↓ results  ctrl+c quit"
+	case m.focus == focusTree:
+		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help"
+	case m.focus == focusTray:
+		return "←→ items  d remove  esc back"
+	}
+	return "↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  b build  D deploy  ? help  q quit"
 }
 
 func (m *Model) countLine() string {
@@ -414,28 +450,6 @@ func (m *Model) countLine() string {
 		return "no matches"
 	}
 	return fmt.Sprintf("%d of %d", len(m.res.Hits), m.res.Found)
-}
-
-// bodyLines is the results and the tree side by side, or the results alone
-// in a narrow terminal.
-func (m *Model) bodyLines(w, rows int) []string {
-	sel := -1
-	if m.focus == focusTree {
-		sel = m.treeSel
-	}
-	if !m.wide() {
-		if m.focus == focusTree {
-			return m.tree.lines(w, rows, sel, true)
-		}
-		return m.resultLines(w, rows)
-	}
-	left := w * 45 / 100
-	res, det := m.resultLines(left, rows), m.tree.lines(w-left-3, rows, sel, m.focus == focusTree)
-	out := make([]string, rows)
-	for i := range out {
-		out[i] = res[i] + stRule.Render(" │ ") + det[i]
-	}
-	return out
 }
 
 // followSelection centres the tree on the selected result.

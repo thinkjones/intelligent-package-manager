@@ -162,7 +162,7 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 	for _, r := range head {
 		guideW = max(guideW, lipgloss.Width(r.guide))
 	}
-	col := guideW + labelWidth + 1 + nameWidth + 3
+	col := guideW + labelWidth + 2 + nameWidth + 3
 	descW := w - col
 
 	var body []treeRow
@@ -254,12 +254,12 @@ func (tv treeView) render(r treeRow, col, descW, sel int, focused bool) string {
 		if focused && r.sel == sel {
 			text = stSelected.Render(r.text)
 		}
-		return guide + spaces(labelWidth+1) + text
+		return guide + spaces(labelWidth+2) + text
 	}
 	name := ansi.Truncate(r.ref.Name, nameWidth, "…")
 	label := typeStyle(r.ref.Type).Render(fit(typeLabel(r.ref.Type), labelWidth))
-	prefix := guide + label
-	lead := lipgloss.Width(r.guide) + labelWidth + 1 + lipgloss.Width(name)
+	prefix := guide + label + " "
+	lead := lipgloss.Width(r.guide) + labelWidth + 2 + lipgloss.Width(name)
 	if r.kind == rowCursor {
 		nameStyle := stTitle
 		if focused && r.sel == sel {

@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"strings"
+
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -52,4 +54,34 @@ func spaces(n int) string {
 		b[i] = ' '
 	}
 	return string(b)
+}
+
+// panel draws lines in a rounded border with title in its top edge: exactly
+// len(lines)+2 rows of width w. The focused panel's border is amber.
+func panel(title string, lines []string, w int, focused bool) []string {
+	border := stRule
+	if focused {
+		border = stAmber
+	}
+	inner := max(0, w-4)
+	title = ansi.Truncate(title, max(0, w-6), "…")
+	top := border.Render("╭─ ") + title + " "
+	top += border.Render(strings.Repeat("─", max(0, w-lipgloss.Width(top)-1)) + "╮")
+	out := []string{fit(top, w)}
+	for _, l := range lines {
+		out = append(out, border.Render("│")+" "+fit(l, inner)+" "+border.Render("│"))
+	}
+	return append(out, border.Render("╰"+strings.Repeat("─", max(0, w-2))+"╯"))
+}
+
+// starStyle tints a star count by size: under 100 muted, under 10k soft,
+// otherwise bright.
+func starStyle(n int) lipgloss.Style {
+	switch {
+	case n < 100:
+		return stMuted
+	case n < 10_000:
+		return stText
+	}
+	return lipgloss.NewStyle().Foreground(colText)
 }
