@@ -23,7 +23,7 @@ func (m *Model) showDetail(id string, push bool) {
 	if push && m.detail.ID != "" {
 		m.back = append(m.back, m.detail.ID)
 	}
-	m.detail, m.nbSel = d, 0
+	m.detail, m.nbSel, m.nbOff = d, 0, 0
 }
 
 // followSelection shows the selected result, starting a fresh back stack.
@@ -46,7 +46,7 @@ func (m *Model) detailKey(k string) {
 	nb := m.neighbours()
 	switch k {
 	case "down", "j":
-		m.nbSel = min(len(nb)-1, m.nbSel+1)
+		m.nbSel = max(0, min(len(nb)-1, m.nbSel+1))
 	case "up", "k":
 		m.nbSel = max(0, m.nbSel-1)
 	case "enter":
@@ -88,7 +88,18 @@ func (m *Model) detailLines(w, rows int) []string {
 			}
 		}
 		lines = append(lines, "")
+		// Scroll the relationships so the selected one stays in view.
+		room := max(1, rows-len(lines))
+		if m.nbSel < m.nbOff {
+			m.nbOff = m.nbSel
+		}
+		if m.nbSel >= m.nbOff+room {
+			m.nbOff = m.nbSel - room + 1
+		}
 		for i, n := range m.neighbours() {
+			if i < m.nbOff {
+				continue
+			}
 			dir := "down"
 			if i < len(d.Up) {
 				dir = "up"

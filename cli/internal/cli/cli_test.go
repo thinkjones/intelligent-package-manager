@@ -1713,3 +1713,44 @@ func TestTuiNeedsTerminal(t *testing.T) {
 		t.Errorf("no catalog: %v", err)
 	}
 }
+
+func TestTuiSearcherNoCollectionIsEmptyIndex(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"ok":true}`)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, `{"message":"Not Found"}`)
+	}))
+	t.Cleanup(srv.Close)
+	root := checkout(t)
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
+	f := newFake(root)
+	typesenseAt(f, srv)
+	if s := newTuiSearcher(f.system(), nil, ""); s.Notice() != noticeIndexEmpty {
+		t.Errorf("server up, no collection: notice %q", s.Notice())
+	}
+}
+
+func TestTuiSearcherConcurrentFirstSearches(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	dir := filepath.Join(cacheOf(root), "catalog")
+	want := 0
+	for _, typ := range catalog.Types {
+		recs, _ := catalog.Load(dir, typ)
+		want += len(recs)
+	}
+	s := newTuiSearcher(newFake(root).system(), nil, dir)
+	var wg sync.WaitGroup
+	for range 8 {
+		wg.Add(2)
+		go func() { defer wg.Done(); s.Search(context.Background(), "s1", tui.Filter{}) }()
+		go func() { defer wg.Done(); s.Recheck() }()
+	}
+	wg.Wait()
+	if len(s.records) != want {
+		t.Errorf("records loaded %d times over: %d, want %d", len(s.records)/max(1, want), len(s.records), want)
+	}
+}

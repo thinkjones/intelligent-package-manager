@@ -46,6 +46,7 @@ type Model struct {
 
 	detail Detail
 	nbSel  int      // selected neighbour in the detail pane
+	nbOff  int      // first neighbour shown
 	back   []string // detail IDs to return to with backspace
 	full   bool     // narrow terminal: the detail is shown full-width
 

@@ -49,7 +49,7 @@ func (m *Model) pickerKey(msg keyMsg) {
 	if !p.creating {
 		switch k {
 		case "down", "j":
-			p.sel = min(len(m.packs)-1, p.sel+1)
+			p.sel = max(0, min(len(m.packs)-1, p.sel+1))
 		case "up", "k":
 			p.sel = max(0, p.sel-1)
 		case "n":

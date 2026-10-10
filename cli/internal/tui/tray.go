@@ -147,7 +147,18 @@ func (m *Model) trayLines(w int) []string {
 			items = append(items, stText.Render(label))
 		}
 	}
-	line := strings.Join(items, stMuted.Render(" · "))
+	// Start the line late enough that the selected item fits on it.
+	sep := stMuted.Render(" · ")
+	start := 0
+	if m.focus == focusTray {
+		for start < m.traySel && lipgloss.Width(strings.Join(items[start:m.traySel+1], sep))+4 > w {
+			start++
+		}
+	}
+	line := strings.Join(items[start:], sep)
+	if start > 0 {
+		line = stMuted.Render("… · ") + line
+	}
 	if len(items) == 0 {
 		line = stMuted.Render("empty — select a result and press a")
 	}

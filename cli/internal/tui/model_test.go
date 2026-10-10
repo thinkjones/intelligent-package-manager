@@ -7,6 +7,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -646,5 +647,76 @@ func TestTrayKeepsPackNameWithLongScope(t *testing.T) {
 	m.dirty = true
 	if v := view(m); !strings.Contains(v, "kit (1) • not built") {
 		t.Errorf("a long scope must not hide the pack name:\n%s", v)
+	}
+}
+
+func TestPickerWithNoPacks(t *testing.T) {
+	m, _ := newTest(t)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "p", "down", "j", "enter")
+	if m.active != "" {
+		t.Errorf("no pack to switch to, active %q", m.active)
+	}
+}
+
+func TestDetailWithoutNeighbours(t *testing.T) {
+	m, _ := newTestWith(t, withPacks(Pack{Name: "a"}))
+	typeText(t, m, "tdd") // the fake catalog's default detail has no neighbours
+	press(t, m, "down", "right", "down", "j", "enter", "a", "d")
+	if m.detail.ID != tddID {
+		t.Errorf("detail %q", m.detail.ID)
+	}
+}
+
+func TestTraySelectionStaysVisible(t *testing.T) {
+	var items []string
+	for i := range 15 {
+		items = append(items, fmt.Sprintf("skill:o/r:skills/item-number-%c-with-a-long-name", 'a'+i))
+	}
+	m, _ := newTestWith(t, withPacks(Pack{Name: "a", Items: items}))
+	press(t, m, "tab", "tab")
+	if m.focus != focusTray {
+		t.Fatalf("focus %v", m.focus)
+	}
+	for range 14 {
+		press(t, m, "right")
+	}
+	if v := view(m); !strings.Contains(v, "▶skill item-number-o-with-a-long-name") {
+		t.Errorf("the selected tray item must be visible:\n%s", v)
+	}
+}
+
+func TestDetailNeighboursScroll(t *testing.T) {
+	m, f := newTest(t)
+	var down []Neighbour
+	for i := range 40 {
+		down = append(down, Neighbour{ID: fmt.Sprintf("plugin:o/r#p%02d", i), Type: "plugin", Name: fmt.Sprintf("plugin-%02d", i)})
+	}
+	f.c.details[tddID] = Detail{ID: tddID, Type: "skill", Name: "tdd", Down: down}
+	typeText(t, m, "tdd")
+	press(t, m, "down", "right")
+	for range 35 {
+		press(t, m, "down")
+	}
+	if v := view(m); !strings.Contains(v, "▶down  plugin         plugin-35") {
+		t.Errorf("the selected neighbour must be visible:\n%s", v)
+	}
+}
+
+func TestInstallLongLineDoesNotHang(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	f.i.lines = []string{strings.Repeat("x", 70*1024), "validate: ok"}
+	typeText(t, m, "tdd")
+	press(t, m, "down")
+	_, cmd := m.Update(key("i"))
+	done := make(chan struct{})
+	go func() { drain(t, m, cmd); close(done) }()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("install never finished")
+	}
+	if !m.inst.done {
+		t.Error("install should be done")
 	}
 }

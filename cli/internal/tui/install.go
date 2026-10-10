@@ -3,6 +3,7 @@ package tui
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 
 	tea "charm.land/bubbletea/v2"
@@ -20,6 +21,7 @@ type install struct {
 	done    bool
 	err     error
 	scanner *bufio.Scanner
+	pipe    *io.PipeReader
 	result  chan error
 }
 
@@ -27,7 +29,8 @@ type install struct {
 // the modal line by line.
 func (m *Model) startInstall() tea.Cmd {
 	pr, pw := io.Pipe()
-	in := &install{scanner: bufio.NewScanner(pr), result: make(chan error, 1)}
+	in := &install{scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
+	in.scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	m.inst = in
 	go func() {
 		err := m.d.Installer.Install(context.Background(), pw)
@@ -41,6 +44,14 @@ func (m *Model) startInstall() tea.Cmd {
 func (in *install) next() tea.Msg {
 	if in.scanner.Scan() {
 		return installLine{in.scanner.Text()}
+	}
+	if err := in.scanner.Err(); err != nil {
+		// A line too long to show: keep reading so the install can finish.
+		io.Copy(io.Discard, in.pipe)
+		if res := <-in.result; res != nil {
+			return installDone{res}
+		}
+		return installDone{fmt.Errorf("install output not shown: %v", err)}
 	}
 	return installDone{<-in.result}
 }

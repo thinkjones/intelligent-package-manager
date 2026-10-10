@@ -7,6 +7,7 @@ import (
 	"io"
 	"sort"
 	"strings"
+	"sync"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
@@ -69,10 +70,14 @@ type tuiSearcher struct {
 	sys        System
 	g          *catgraph.Graph
 	catalogDir string
-	client     *typesense.Client
-	mode       string
-	notice     string
-	records    []map[string]any
+
+	// mu guards the fields below: searches run on Bubble Tea's command
+	// goroutines while ctrl+r rechecks on its update goroutine.
+	mu      sync.Mutex
+	client  *typesense.Client
+	mode    string
+	notice  string
+	records []map[string]any
 }
 
 func newTuiSearcher(sys System, g *catgraph.Graph, catalogDir string) *tuiSearcher {
@@ -81,37 +86,55 @@ func newTuiSearcher(sys System, g *catgraph.Graph, catalogDir string) *tuiSearch
 	return s
 }
 
-func (s *tuiSearcher) Mode() string   { return s.mode }
-func (s *tuiSearcher) Notice() string { return s.notice }
+func (s *tuiSearcher) Mode() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mode
+}
+
+func (s *tuiSearcher) Notice() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.notice
+}
+
+func (s *tuiSearcher) set(c *typesense.Client, mode, notice string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.client, s.mode, s.notice = c, mode, notice
+}
 
 // Recheck picks hybrid mode when the server answers and its index has
 // documents, local mode otherwise.
 func (s *tuiSearcher) Recheck() {
-	s.client, s.mode, s.notice = nil, "local", noticeServerOff
 	c, err := tsClient(s.sys)
 	if err != nil || c.Health() != nil {
+		s.set(nil, "local", noticeServerOff)
 		return
 	}
 	n, err := c.NumDocuments(search.Collection)
-	if err != nil {
-		return
+	switch {
+	case errors.Is(err, typesense.ErrNoCollection) || err == nil && n == 0:
+		s.set(nil, "local", noticeIndexEmpty)
+	case err != nil:
+		s.set(nil, "local", noticeServerOff)
+	default:
+		s.set(c, "hybrid", "")
 	}
-	if n == 0 {
-		s.notice = noticeIndexEmpty
-		return
-	}
-	s.client, s.mode, s.notice = c, "hybrid", ""
 }
 
 func (s *tuiSearcher) Search(_ context.Context, q string, f tui.Filter) (tui.Results, error) {
-	if s.mode != "hybrid" {
+	s.mu.Lock()
+	client := s.client
+	s.mu.Unlock()
+	if client == nil {
 		return s.local(q, f)
 	}
 	query := search.Query{Text: q, Limit: tuiLimit}
 	if f.Type != "" {
 		query.Types = []string{f.Type}
 	}
-	res, err := s.client.Search(search.Collection, query.Params())
+	res, err := client.Search(search.Collection, query.Params())
 	if err != nil {
 		return tui.Results{}, tsError(err)
 	}
@@ -133,20 +156,26 @@ func (s *tuiSearcher) Search(_ context.Context, q string, f tui.Filter) (tui.Res
 }
 
 func (s *tuiSearcher) local(q string, f tui.Filter) (tui.Results, error) {
+	s.mu.Lock()
 	if s.records == nil {
+		var all []map[string]any
 		for _, typ := range catalog.Types {
 			recs, err := catalog.Load(s.catalogDir, typ)
 			if err != nil {
+				s.mu.Unlock()
 				return tui.Results{}, err
 			}
-			s.records = append(s.records, recs...)
+			all = append(all, recs...)
 		}
+		s.records = all
 	}
+	records := s.records
+	s.mu.Unlock()
 	stars := func(string) (int, bool) { return 0, false }
 	if s.g != nil {
 		stars = s.g.Stars
 	}
-	return localSearch(s.records, stars, q, f), nil
+	return localSearch(records, stars, q, f), nil
 }
 
 // localSearch ranks catalog records by the query's words: 4 for each word in
