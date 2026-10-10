@@ -98,6 +98,12 @@ func TestGoldenViews(t *testing.T) {
 			press(t, m, "down", "D", "enter", "enter")
 			return m
 		},
+		"external-modal": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withRefs)
+			typeText(t, m, "cf")
+			press(t, m, "down", "e")
+			return m
+		},
 		"picker": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
 			typeText(t, m, "tdd")

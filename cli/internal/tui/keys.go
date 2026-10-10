@@ -14,6 +14,7 @@ var searchKeys = [][2]string{
 	{"p", "switch pack, or n for a new one"},
 	{"b / i", "build every pack (ipm install)"},
 	{"D", "deploy the active pack to Claude Code"},
+	{"e", "external references to this repo"},
 	{"ctrl+r", "check the search server again"},
 	{"?", "this help"},
 	{"q  ctrl+c", "quit"},

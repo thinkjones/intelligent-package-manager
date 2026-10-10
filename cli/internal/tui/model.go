@@ -61,6 +61,7 @@ type Model struct {
 
 	inst   *install     // the install or deploy output modal, while open
 	deploy *deployModal // the deploy modal before it runs
+	ext    *extModal    // the e modal: external references
 	help   bool         // the ? overlay
 	plain  bool         // NO_COLOR: draw without colour
 }
@@ -170,6 +171,10 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.deploy != nil {
 		return m.deployKey(msg)
 	}
+	if m.ext != nil {
+		m.extKey(k)
+		return nil
+	}
 	if m.picker != nil {
 		m.pickerKey(msg)
 		return nil
@@ -189,6 +194,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return m.startInstall()
 		case "D":
 			m.openDeploy()
+			return nil
+		case "e":
+			m.openExternal()
 			return nil
 		case "t":
 			m.setFocus(focusTray)
@@ -426,6 +434,8 @@ func (m *Model) render() string {
 		mid = panel(stTitle.Render(m.inst.title), m.installLines(w-4, body-2), w, true)
 	case m.deploy != nil:
 		mid = panel(stTitle.Render("deploy"), m.deployLines(w-4, body-2), w, true)
+	case m.ext != nil:
+		mid = panel(stTitle.Render("external references"), m.extLines(w-4, body-2), w, true)
 	case m.help:
 		mid = panel(stTitle.Render("keys"), m.helpLines(w-4, body-2), w, true)
 	case m.picker != nil:
@@ -470,6 +480,8 @@ func (m *Model) hints() string {
 		return "y deploy  esc cancel"
 	case m.deploy != nil:
 		return "enter next  esc cancel"
+	case m.ext != nil:
+		return "↑↓ move  enter jump  esc close"
 	case m.help:
 		return "esc or ? close"
 	case m.picker != nil:

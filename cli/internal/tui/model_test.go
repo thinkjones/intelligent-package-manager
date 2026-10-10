@@ -1045,3 +1045,75 @@ func TestMovingResultClearsBackStack(t *testing.T) {
 }
 
 func ansiStrip(s string) string { return ansi.Strip(s) }
+
+// withRefs gives b/s's repo node references from a/m (twice) and c/n.
+func withRefs(f fakes) {
+	withExternal(f)
+	d := f.c.details
+	b := d["repo:b/s"]
+	b.UsedByRepos = 2
+	b.UsedBy = []Ref{
+		{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: true},
+		{ID: "plugin:c/n#cloud", Type: "plugin", Name: "cloud", Repo: "c/n", External: true},
+		{ID: "plugin:a/m#cf2", Type: "plugin", Name: "cf2", Repo: "a/m", External: true},
+	}
+	d["repo:b/s"] = b
+	a := d["repo:a/m"]
+	a.Stars = 37600
+	d["repo:a/m"] = a
+	d["repo:c/n"] = Node{ID: "repo:c/n", Type: "repo", Name: "c/n", Repo: "c/n", Stars: 120}
+	d["plugin:c/n#cloud"] = Node{ID: "plugin:c/n#cloud", Type: "plugin", Name: "cloud", Repo: "c/n",
+		Parents: []Ref{{ID: "marketplace:c/n:.", Type: "marketplace", Name: "plugins", Repo: "c/n"}}}
+	d["plugin:a/m#cf2"] = Node{ID: "plugin:a/m#cf2", Type: "plugin", Name: "cf2", Repo: "a/m",
+		Parents: []Ref{{ID: "marketplace:a/m:.", Type: "marketplace", Name: "m", Repo: "a/m"}}}
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+}
+
+func TestExternalModal(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	v := view(m)
+	for _, want := range []string{"External references to b/s — used by 2 repos", "a/m", "★37.6k", "cf", "c/n", "cloud", "enter jump · esc close"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("modal lacks %q:\n%s", want, v)
+		}
+	}
+}
+
+func TestExternalModalGroups(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	var order []string
+	for _, r := range m.ext.rows {
+		order = append(order, r.ref.Repo+" "+r.ref.Name)
+	}
+	if strings.Join(order, ";") != "a/m cf;a/m cf2;c/n cloud" {
+		t.Errorf("rows grouped by repo: %v", order)
+	}
+}
+
+func TestExternalModalJump(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e", "down", "enter")
+	if m.ext != nil || m.cursor != "plugin:a/m#cf2" || len(m.backStack) != 1 || m.backStack[0] != "plugin:b/s:cf" {
+		t.Errorf("modal %v cursor %q stack %v", m.ext, m.cursor, m.backStack)
+	}
+}
+
+func TestExternalModalEmpty(t *testing.T) {
+	m, _ := newTestWith(t, withExternal)
+	f := m.d.Searcher.(*fakeSearcher)
+	f.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	if !strings.Contains(view(m), "no other repo references b/s") {
+		t.Errorf("empty modal:\n%s", view(m))
+	}
+	press(t, m, "esc")
+	if m.ext != nil {
+		t.Error("esc should close")
+	}
+}

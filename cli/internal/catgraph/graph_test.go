@@ -217,3 +217,9 @@ func TestTreeUpStaysInRepo(t *testing.T) {
 		t.Errorf("tree from an external entry shows its target:\n%s", b.String())
 	}
 }
+
+func TestRefsInto(t *testing.T) {
+	if got := load(t).RefsInto("x/c"); !reflect.DeepEqual(got, []string{"plugin:o/r#e"}) {
+		t.Errorf("refs into x/c: %v", got)
+	}
+}

@@ -272,6 +272,9 @@ func (c tuiCatalog) Node(id string) (tui.Node, error) {
 		out.Unresolved = str(n, "source_repo")
 	}
 	out.UsedBy = c.refs(c.g.RefsTo(id))
+	if out.Type == catalog.TypeRepo {
+		out.UsedBy = c.refs(c.g.RefsInto(out.Repo))
+	}
 	out.UsedByRepos = len(c.g.UsedBy(out.Repo))
 	return out, nil
 }

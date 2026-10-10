@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
@@ -157,6 +158,20 @@ func (g *Graph) RefsTo(id string) []string { return g.refs.By[id] }
 // UsedBy is the other repos whose external entries reference anything in repo.
 func (g *Graph) UsedBy(repo string) []string {
 	return g.refs.UsedBy[strings.ToLower(pack.NormalizeRepo(repo))]
+}
+
+// RefsInto is the external entries, in other repos, that reference repo or
+// anything in it, sorted.
+func (g *Graph) RefsInto(repo string) []string {
+	want := catalog.NormRepo(repo)
+	var out []string
+	for entry, target := range g.refs.Target {
+		if catalog.NormRepo(str(g.nodes[target], "repo")) == want {
+			out = append(out, entry)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // External reports whether id is a marketplace entry for a plugin that lives
