@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // key is a key press as Bubble Tea delivers it: a single character, or a
@@ -87,7 +88,8 @@ func typeText(t *testing.T, m *Model, s string) {
 	}
 }
 
-func view(m *Model) string { return m.View().Content }
+// view is the screen as text, without styling.
+func view(m *Model) string { return ansi.Strip(m.View().Content) }
 
 type fakeSearcher struct {
 	queries []string
@@ -213,6 +215,13 @@ type fakes struct {
 
 func newTest(t *testing.T) (*Model, fakes) {
 	t.Helper()
+	return newTestWith(t, nil)
+}
+
+// newTestWith lets setup change the fakes before the model is built (packs
+// are read once at start).
+func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
+	t.Helper()
 	f := fakes{
 		s: &fakeSearcher{mode: "hybrid", results: map[string]Results{
 			"tdd": {Hits: hits("tdd", "tdd-guard"), Found: 100},
@@ -220,6 +229,9 @@ func newTest(t *testing.T) (*Model, fakes) {
 		c: &fakeCatalog{details: map[string]Detail{}},
 		p: &fakePacks{scope: "project /work"},
 		i: &fakeInstaller{},
+	}
+	if setup != nil {
+		setup(f)
 	}
 	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Installer: f.i})
 	m.debounce = 0
@@ -417,5 +429,127 @@ func TestDetailError(t *testing.T) {
 	typeText(t, m, "tdd")
 	if !strings.Contains(m.status, "catalog record broken") {
 		t.Errorf("status %q", m.status)
+	}
+}
+
+func withPacks(packs ...Pack) func(fakes) {
+	return func(f fakes) { f.p.packs = packs }
+}
+
+const tddID = "skill:o/r:skills/tdd"
+
+func TestActivePackAtStart(t *testing.T) {
+	m, _ := newTestWith(t, withPacks(Pack{Name: "b"}, Pack{Name: "a", Items: []string{tddID}}))
+	if m.active != "a" {
+		t.Errorf("active %q, want the first by name", m.active)
+	}
+	if v := view(m); !strings.Contains(v, "project /work · a (1)") || !strings.Contains(v, "skill tdd") {
+		t.Errorf("tray:\n%s", v)
+	}
+}
+
+func TestAddAndMark(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	typeText(t, m, "tdd")
+	press(t, m, "down", "a")
+	if strings.Join(f.p.calls, ";") != "add a "+tddID {
+		t.Fatalf("calls %v", f.p.calls)
+	}
+	v := view(m)
+	if !strings.Contains(v, "✓ tdd") || !strings.Contains(v, "a (1) • not built") {
+		t.Errorf("want the ✓ mark and the not-built tray:\n%s", v)
+	}
+}
+
+func TestAddFromDetail(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	withDetails(f)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "right", "a")
+	if strings.Join(f.p.calls, ";") != "add a plugin:o/r:p" {
+		t.Errorf("a in the detail pane adds the selected neighbour: %v", f.p.calls)
+	}
+}
+
+func TestAddExistingItem(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a", Items: []string{tddID}}))
+	typeText(t, m, "tdd")
+	press(t, m, "down", "a")
+	if len(f.p.calls) != 0 || !strings.Contains(m.status, "already in a") {
+		t.Errorf("calls %v status %q", f.p.calls, m.status)
+	}
+}
+
+func TestAddRefused(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	f.p.addErr = errors.New("hook:o/r:h comes only with its plugin: `ipm pack add a plugin:o/r:p`")
+	typeText(t, m, "tdd")
+	press(t, m, "down", "a")
+	if !strings.Contains(m.status, "comes only with its plugin") || m.dirty {
+		t.Errorf("status %q dirty %v", m.status, m.dirty)
+	}
+}
+
+func TestRemove(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a", Items: []string{tddID, "agent:o/r:agents/x.md"}}))
+	typeText(t, m, "tdd")
+	press(t, m, "down", "d")
+	if f.p.calls[0] != "remove a "+tddID {
+		t.Fatalf("calls %v", f.p.calls)
+	}
+	press(t, m, "tab")
+	if m.focus != focusTray {
+		t.Fatalf("tab from results should focus the tray")
+	}
+	press(t, m, "d")
+	if f.p.calls[1] != "remove a agent:o/r:agents/x.md" {
+		t.Errorf("d in the tray removes its selected item: %v", f.p.calls)
+	}
+	press(t, m, "tab")
+	if m.focus != focusSearch {
+		t.Errorf("tab from the tray should return to search")
+	}
+}
+
+func TestPickerSwitchAndCreate(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}, Pack{Name: "b"}))
+	typeText(t, m, "tdd")
+	press(t, m, "down", "p", "down", "enter")
+	if m.active != "b" || m.picker != nil {
+		t.Fatalf("active %q picker %v", m.active, m.picker)
+	}
+	press(t, m, "p", "n")
+	typeText(t, m, "kit")
+	press(t, m, "enter")
+	typeText(t, m, "My kit")
+	press(t, m, "enter")
+	if f.p.calls[len(f.p.calls)-1] != `create kit "My kit"` || m.active != "kit" {
+		t.Errorf("calls %v active %q", f.p.calls, m.active)
+	}
+	press(t, m, "p", "esc")
+	if m.picker != nil || m.active != "kit" {
+		t.Errorf("esc should close the picker without changes")
+	}
+}
+
+func TestNoPacksAddOpensNew(t *testing.T) {
+	m, _ := newTest(t)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "a")
+	if m.picker == nil || !m.picker.creating {
+		t.Errorf("with no packs, a should open the picker on a new pack")
+	}
+}
+
+func TestPacksErrorShown(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	typeText(t, m, "tdd")
+	f.p.listErr = errors.New("ipm.toml: unknown key(s) packs.a.oops")
+	press(t, m, "down", "a")
+	if !strings.Contains(m.status, "unknown key") {
+		t.Errorf("status %q", m.status)
+	}
+	if strings.Contains(view(m), "panic") {
+		t.Error("the TUI must keep running")
 	}
 }

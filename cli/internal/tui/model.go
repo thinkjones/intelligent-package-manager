@@ -48,7 +48,16 @@ type Model struct {
 	nbSel  int      // selected neighbour in the detail pane
 	back   []string // detail IDs to return to with backspace
 	full   bool     // narrow terminal: the detail is shown full-width
+
+	packs    []Pack
+	active   string // the active pack's name
+	traySel  int
+	dirty    bool // a pack changed since the last install
+	picker   *picker
+	statusOK bool // status is a note, not an error
 }
+
+type keyMsg = tea.KeyPressMsg
 
 // Layout limits from the spec.
 const (
@@ -69,7 +78,9 @@ func New(d Deps) *Model {
 	in.Prompt = ""
 	in.Placeholder = "type to search"
 	in.Focus()
-	return &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond}
+	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond}
+	m.reloadPacks()
+	return m
 }
 
 // Init starts nothing; the first search waits for typing.
@@ -105,7 +116,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // key handles a key press for whatever has focus.
 func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
-	m.status = ""
+	m.status, m.statusOK = "", false
 	k := msg.String()
 	if k == "ctrl+c" {
 		return tea.Quit
@@ -116,11 +127,35 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	}
+	if m.picker != nil {
+		m.pickerKey(msg)
+		return nil
+	}
+	if m.focus != focusSearch {
+		switch k {
+		case "a":
+			m.addSelected()
+			return nil
+		case "d":
+			m.removeSelected()
+			return nil
+		case "p":
+			m.openPicker(false)
+			return nil
+		}
+	}
 	if m.focus == focusDetail {
 		if k == "q" {
 			return tea.Quit
 		}
 		m.detailKey(k)
+		return nil
+	}
+	if m.focus == focusTray {
+		m.trayKey(k)
+		if k == "q" {
+			return tea.Quit
+		}
 		return nil
 	}
 	if m.focus == focusSearch {
@@ -160,9 +195,27 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			m.setFocus(focusDetail)
 		}
 	case "tab":
-		m.setFocus(focusSearch)
+		m.setFocus(focusTray)
 	}
 	return nil
+}
+
+// trayKey handles keys while the tray has focus.
+func (m *Model) trayKey(k string) {
+	n := 0
+	if p := m.activePack(); p != nil {
+		n = len(p.Items)
+	}
+	switch k {
+	case "right", "l", "down", "j":
+		m.traySel = min(max(0, n-1), m.traySel+1)
+	case "left", "h", "up", "k":
+		m.traySel = max(0, m.traySel-1)
+	case "tab", "/":
+		m.setFocus(focusSearch)
+	case "esc":
+		m.setFocus(focusResults)
+	}
 }
 
 func (m *Model) setFocus(f focus) {
@@ -226,16 +279,25 @@ func (m *Model) View() tea.View {
 	}
 	b.WriteString(stRule.Render(strings.Repeat("─", w)) + "\n")
 	rows := max(1, m.height-strings.Count(b.String(), "\n")-4)
-	for _, line := range m.bodyLines(w, rows) {
+	body := m.bodyLines(w, rows)
+	if m.picker != nil {
+		body = m.pickerLines(w, rows)
+	}
+	for _, line := range body {
 		b.WriteString(line + "\n")
 	}
-	b.WriteString(stRule.Render(strings.Repeat("─", w)) + "\n")
+	for _, line := range m.trayLines(w) {
+		b.WriteString(line + "\n")
+	}
 	status := stMuted.Render(m.countLine())
-	if m.status != "" {
+	switch {
+	case m.status != "" && m.statusOK:
+		status = stTeal.Render(m.status)
+	case m.status != "":
 		status = stError.Render(m.status)
 	}
 	b.WriteString(fit(status, w) + "\n")
-	b.WriteString(fit(stMuted.Render("/ search  ↑↓ move  f type  ? help  q quit"), w))
+	b.WriteString(fit(stMuted.Render("/ search  a add  d remove  p packs  i install  f type  ? help  q quit"), w))
 	v := tea.NewView(b.String())
 	v.AltScreen = true
 	return v

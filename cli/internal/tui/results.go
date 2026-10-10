@@ -20,7 +20,11 @@ func (m *Model) resultLines(w, rows int) []string {
 	lines := make([]string, 0, rows)
 	for i := m.offset; i < len(m.res.Hits) && len(lines) < rows; i++ {
 		h := m.res.Hits[i]
-		row := fmt.Sprintf("%-4s %-14s %s", h.Score, h.Type, h.Name)
+		mark := " "
+		if m.inPack(h.ID) {
+			mark = "✓"
+		}
+		row := fmt.Sprintf("%-4s %-14s %s %s", h.Score, h.Type, mark, h.Name)
 		switch {
 		case i == m.sel && m.focus == focusResults:
 			lines = append(lines, stSelected.Render(fit("▶"+row, w)))
