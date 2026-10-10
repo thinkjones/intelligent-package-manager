@@ -311,3 +311,9 @@ func TestTableWiderShowsMoreAndZeroCutsNothing(t *testing.T) {
 		t.Errorf("width 0 (not a terminal) must not cut: %q", full)
 	}
 }
+
+func TestScoreExported(t *testing.T) {
+	if got := Score(hit("x", 0, 0.42, -1), 0); got != "42" {
+		t.Errorf("Score = %q", got)
+	}
+}

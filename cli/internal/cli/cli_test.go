@@ -1513,3 +1513,32 @@ func TestCommandLineHints(t *testing.T) {
 		}
 	}
 }
+
+func TestPackOperationsWithoutOutput(t *testing.T) {
+	f, root := packFake(t)
+	scope := project.Scope{Root: root}
+	sys := f.system()
+	if err := createPack(scope, "kit", "My kit"); err != nil {
+		t.Fatal(err)
+	}
+	s1 := "skill:o/r:p/skills/s1"
+	p, err := addToPack(sys, scope, "kit", []string{s1})
+	if err != nil || !reflect.DeepEqual(p.Items, []string{s1}) {
+		t.Fatalf("add: %v %v", p.Items, err)
+	}
+	if p, _ = addToPack(sys, scope, "kit", []string{s1}); len(p.Items) != 1 {
+		t.Errorf("a second add duplicated: %v", p.Items)
+	}
+	if _, err := addToPack(sys, scope, "kit", []string{"hook:o/r:p/hooks/hooks.json"}); err == nil || !strings.Contains(err.Error(), "comes only with its plugin") {
+		t.Errorf("hook: %v", err)
+	}
+	if packs, _ := project.LoadPacks(root); !reflect.DeepEqual(packs[0].Items, []string{s1}) {
+		t.Errorf("a refused add must not write: %v", packs[0].Items)
+	}
+	if p, err = removeFromPack(scope, "kit", []string{s1}); err != nil || len(p.Items) != 0 {
+		t.Errorf("remove: %v %v", p.Items, err)
+	}
+	if f.out.Len() != 0 {
+		t.Errorf("pack operations must not print: %q", f.out.String())
+	}
+}
