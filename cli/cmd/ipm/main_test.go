@@ -116,7 +116,7 @@ func TestExitCodes(t *testing.T) {
 		{"ok", "", []string{"version"}, 0, ""},
 		{"usage error", root, []string{"--upgrade"}, 2, "Try `ipm help`"},
 		{"unknown command", root, []string{"nope"}, 2, "unknown command"},
-		{"bad flag", root, []string{"sync", "--bogus"}, 2, "flag provided but not defined"},
+		{"bad flag", root, []string{"sync", "--bogus"}, 2, "unknown flag: --bogus"},
 		{"no pnpm", root, []string{"sync"}, 1, "pnpm"},
 		{"no sources", root, []string{"index"}, 1, "ipm source add"},
 	}

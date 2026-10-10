@@ -1,17 +1,22 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"text/tabwriter"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
+
+	"github.com/spf13/cobra"
 )
 
-func indexFlags() (*flag.FlagSet, func(System) error) {
-	fs := flag.NewFlagSet("index", flag.ContinueOnError)
-	return fs, runIndex
+func newIndexCmd(sys System) *cobra.Command {
+	return &cobra.Command{
+		Use:   "index",
+		Short: "rebuild the catalog from your synced sources",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return runIndex(sys) },
+	}
 }
 
 // runIndex writes the catalog from every synced source at its pinned commit.

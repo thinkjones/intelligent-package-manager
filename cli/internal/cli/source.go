@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -14,6 +13,8 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/paths"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
+
+	"github.com/spf13/cobra"
 )
 
 // ipmPaths is where this user's ipm keeps things.
@@ -21,40 +22,66 @@ func ipmPaths(sys System) (paths.Paths, error) {
 	return paths.Resolve(sys.Getenv, runtime.GOOS)
 }
 
-func sourceFlags() (*flag.FlagSet, func(System) error) {
-	fs := flag.NewFlagSet("source", flag.ContinueOnError)
-	return fs, func(sys System) error {
-		args := fs.Args()
-		if len(args) == 0 {
-			return usagef("source: say add, remove, list or import. Try `ipm help source`.")
-		}
-		p, err := ipmPaths(sys)
-		if err != nil {
-			return err
-		}
-		verb, rest := args[0], args[1:]
-		switch verb {
-		case "add":
-			return sourceAdd(sys, p, rest)
-		case "remove":
-			if len(rest) == 0 {
-				return usagef("source remove: name at least one repo")
-			}
-			if err := sources.Remove(p.Sources(), rest); err != nil {
-				return err
-			}
-			fmt.Fprintf(sys.Stdout, "%s removed %s — run `ipm sync` to reindex\n", ok, strings.Join(rest, ", "))
-			return nil
-		case "list":
-			return sourceList(sys, p)
-		case "import":
-			if len(rest) != 1 {
-				return usagef("source import: give the path of one manifest.toml")
-			}
-			return sourceImport(sys, p, rest[0])
-		}
-		return usagef("source: unknown action %q — use add, remove, list or import", verb)
-	}
+func newSourceCmd(sys System) *cobra.Command {
+	cmd := verbs(&cobra.Command{
+		Use:   "source",
+		Short: "add, remove, list or import your repos of interest",
+	}, "add, remove, list or import")
+	cmd.AddCommand(
+		&cobra.Command{
+			Use:   "add <repo>...",
+			Short: "add sources: owner/repo[@ref], a git URL[#ref], or an external plugin ID",
+			Args:  minArgs(1, "at least one repo"),
+			RunE: func(_ *cobra.Command, args []string) error {
+				p, err := ipmPaths(sys)
+				if err != nil {
+					return err
+				}
+				return sourceAdd(sys, p, args)
+			},
+		},
+		&cobra.Command{
+			Use:   "remove <repo>...",
+			Short: "remove sources",
+			Args:  minArgs(1, "at least one repo"),
+			RunE: func(_ *cobra.Command, args []string) error {
+				p, err := ipmPaths(sys)
+				if err != nil {
+					return err
+				}
+				if err := sources.Remove(p.Sources(), args); err != nil {
+					return err
+				}
+				fmt.Fprintf(sys.Stdout, "%s removed %s — run `ipm sync` to reindex\n", ok, strings.Join(args, ", "))
+				return nil
+			},
+		},
+		&cobra.Command{
+			Use:   "list",
+			Short: "alias, repo, ref and pinned commit of every source",
+			Args:  noArgs,
+			RunE: func(*cobra.Command, []string) error {
+				p, err := ipmPaths(sys)
+				if err != nil {
+					return err
+				}
+				return sourceList(sys, p)
+			},
+		},
+		&cobra.Command{
+			Use:   "import <path/to/manifest.toml>",
+			Short: "one-time: add the [[repo]] entries of an aihs-era manifest.toml",
+			Args:  exactArgs(1, "the path of one manifest.toml"),
+			RunE: func(_ *cobra.Command, args []string) error {
+				p, err := ipmPaths(sys)
+				if err != nil {
+					return err
+				}
+				return sourceImport(sys, p, args[0])
+			},
+		},
+	)
+	return cmd
 }
 
 // sourceAdd adds repos; an external plugin's catalog ID adds the repo it

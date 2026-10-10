@@ -13,7 +13,7 @@ Every `ipm` command and flag. `ipm help <command>` prints the same from the CLI.
 1. TOC
 {:toc}
 
-Flags may come before or after positional arguments, and take one dash or two (`-g`, `--update`).
+Flags may come before or after positional arguments. Long flags take two dashes (`--update`); `-g` is short for `--global`. `ipm <command> --help` and `ipm help <command>` print a command's usage and flags, and a mistyped command gets a suggestion.
 
 ## Sources
 
@@ -211,9 +211,17 @@ Checks the home and cache folders, pnpm, sources, catalog, Docker, the search se
 ### `ipm version`, `ipm help`
 
 ```text
-ipm version
-ipm help [command]
+ipm version              (or ipm --version)
+ipm help [command]       (or ipm <command> --help)
 ```
+
+### `ipm completion`
+
+```text
+ipm completion zsh|bash|fish|powershell
+```
+
+Prints a shell completion script for commands and flags. For zsh: `ipm completion zsh > "${fpath[1]}/_ipm"`, then start a new shell; `ipm completion <shell> --help` shows the steps for each shell.
 
 ## Exit codes
 

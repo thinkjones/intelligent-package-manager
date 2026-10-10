@@ -1,20 +1,25 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"strings"
 	"text/tabwriter"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/scan"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
+
+	"github.com/spf13/cobra"
 )
 
-func scanFlags() (*flag.FlagSet, func(System) error) {
+func newScanCmd(sys System) *cobra.Command {
 	var paths bool
-	fs := flag.NewFlagSet("scan", flag.ContinueOnError)
-	fs.BoolVar(&paths, "paths", false, "list every folder found, not only the counts")
-	return fs, func(sys System) error { return runScan(sys, fs.Args(), paths) }
+	cmd := &cobra.Command{
+		Use:   "scan [owner/repo...]",
+		Short: "report the plugin, skills, hooks and agents folders in your synced sources",
+		RunE:  func(_ *cobra.Command, args []string) error { return runScan(sys, args, paths) },
+	}
+	cmd.Flags().BoolVar(&paths, "paths", false, "list every folder found, not only the counts")
+	return cmd
 }
 
 // scanned is one source's scan.

@@ -134,7 +134,7 @@ func TestHelpAndVersion(t *testing.T) {
 		t.Fatalf("help sync: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("search", "--help"); err != nil || !strings.Contains(f.out.String(), "-type value") {
+	if err := f.run("search", "--help"); err != nil || !strings.Contains(f.out.String(), "--type stringArray") {
 		t.Fatalf("search --help: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
@@ -155,6 +155,14 @@ func TestUsageErrors(t *testing.T) {
 		{"sync", "stray"},
 		{"help", "nope"},
 		{"help", "a", "b"},
+		{"sync", "-upgrade"}, // POSIX flags: long flags take two dashes
+		{"source"},
+		{"source", "bogus"},
+		{"source", "add"},
+		{"pack", "add", "kit"},
+		{"pack", "new"},
+		{"show"},
+		{"show", "a", "b"},
 	} {
 		var usage *UsageError
 		if err := newFake("").run(args...); !errors.As(err, &usage) {
@@ -1456,5 +1464,52 @@ func TestSearchUsesTheTerminalWidth(t *testing.T) {
 	f.run("search", "tdd")
 	if strings.Contains(f.out.String(), "…") {
 		t.Errorf("piped output (no terminal, no COLUMNS) must not be cut:\n%s", f.out.String())
+	}
+}
+
+func TestCobraCommandLine(t *testing.T) {
+	f := newFake("")
+	err := f.run("instal")
+	if err == nil || !strings.Contains(err.Error(), "did you mean install?") {
+		t.Errorf("want a suggestion, got %v", err)
+	}
+	f.out.Reset()
+	if err := f.run("help", "pack", "add"); err != nil || !strings.Contains(f.out.String(), "ipm pack add <pack> <id>...") || !strings.Contains(f.out.String(), "-g, --global") {
+		t.Errorf("help pack add: %v\n%s", err, f.out.String())
+	}
+	f.out.Reset()
+	if err := f.run("completion", "zsh"); err != nil || !strings.Contains(f.out.String(), "compdef") {
+		t.Errorf("completion zsh: %v", err)
+	}
+	f.out.Reset()
+	if err := f.run("version"); err != nil || f.out.String() != "ipm test\n" {
+		t.Errorf("version: %v %q", err, f.out.String())
+	}
+}
+
+func TestPackGlobalFlagEitherSide(t *testing.T) {
+	f, _ := packFake(t)
+	if err := f.run("pack", "-g", "new", "one"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("pack", "new", "two", "--global", "--description", "Second"); err != nil {
+		t.Fatal(err)
+	}
+	f.out.Reset()
+	if err := f.run("pack", "list", "-g"); err != nil || !strings.Contains(f.out.String(), "one") || !strings.Contains(f.out.String(), "Second") {
+		t.Errorf("pack list -g: %v\n%s", err, f.out.String())
+	}
+}
+
+func TestCommandLineHints(t *testing.T) {
+	for args, want := range map[string]string{
+		"serach tdd":    "did you mean search?",
+		"pack ad kit":   "did you mean add?",
+		"sync -upgrade": "long flags take two dashes: --upgrade",
+	} {
+		err := newFake("").run(strings.Fields(args)...)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: want %q, got %v", args, want, err)
+		}
 	}
 }

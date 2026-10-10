@@ -1,21 +1,26 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"text/tabwriter"
 	"time"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
+
+	"github.com/spf13/cobra"
 )
 
 // importBatch is how many documents go in one import request.
 const importBatch = 500
 
-func loadFlags() (*flag.FlagSet, func(System) error) {
-	fs := flag.NewFlagSet("load", flag.ContinueOnError)
-	return fs, runLoad
+func newLoadCmd(sys System) *cobra.Command {
+	return &cobra.Command{
+		Use:   "load",
+		Short: "rebuild the search index from the catalog",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return runLoad(sys) },
+	}
 }
 
 // runLoad rebuilds the search index from catalog/: drop, create, import.

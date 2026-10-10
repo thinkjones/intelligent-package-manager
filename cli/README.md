@@ -29,7 +29,8 @@ ipm install [-g] [--update] [--no-validate]   build each pack into .ipm/plugins/
 ipm scan [--paths] [repo...]   report the plugin, skills, hooks and agents folders in synced sources
 ipm doctor                     check home, cache, pnpm, sources, catalog, docker, typesense, claude
 ipm version
-ipm help [command]             usage, or one command's flags
+ipm help [command]             usage, or one command's flags (or ipm <command> --help)
+ipm completion zsh|bash|fish|powershell   shell completion script
 ```
 
 Exit codes: `0` success; `1` failure (bad source, pnpm missing or failed, unsynced sources, an item not pickable or not found, validation failed, doctor problems); `2` malformed command line.
@@ -51,7 +52,7 @@ Users install the same binary with `go install github.com/thinkjones/intelligent
 
 ```text
 cmd/ipm/main.go           wires the process into cli.Run: argv, real commands, HTTP client, exit codes
-internal/cli/              the commands table, help, and one file per command (packcmd.go is ipm pack); pnpm.go finds pnpm and writes .pnpmfile.cjs
+internal/cli/              the Cobra command tree (cli.go: newRootCmd, usage errors, argument checks) and one file per command (packcmd.go is ipm pack); pnpm.go finds pnpm and writes .pnpmfile.cjs
 internal/paths/            IPM_HOME and the cache dir: platform defaults, overrides, the folders under them
 internal/sources/          sources/package.json (aliases, specifiers), pnpm-lock.yaml commits, Checkouts; WriteProject for .ipm/package.json
 internal/catalog/          walk, parse and link a source into catalog records; read and write *.jsonl
@@ -71,7 +72,7 @@ Commands reach the outside world only through `cli.System` — stdout, stderr, e
 
 ## Adding a command
 
-Add `internal/cli/<name>.go` with a `<name>Flags()` function returning the command's `flag.FlagSet` and its run function, and a row in the `commands` table in `cli.go`. Write its tests in `internal/cli` against the fake `System`. Resolve data folders with `ipmPaths(sys)`.
+Add `internal/cli/<name>.go` with a `new<Name>Cmd(sys System) *cobra.Command` and register it in `newRootCmd` in `cli.go`. Check positional arguments with `noArgs`, `exactArgs` or `minArgs` (a parent with subcommands uses `verbs`), so a malformed command line is a `UsageError` and exits 2. Write its tests in `internal/cli` against the fake `System` (`f.run("name", "args"…)`). Resolve data folders with `ipmPaths(sys)`.
 
 ## Testing
 

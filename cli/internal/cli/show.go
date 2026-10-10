@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"path/filepath"
@@ -14,17 +13,9 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/github"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
-)
 
-// oneID is the single artifact ID a relationship command takes; flags may
-// come after it.
-func oneID(name string, fs *flag.FlagSet) (string, error) {
-	words := fs.Args()
-	if len(words) != 1 {
-		return "", usagef("%s: give one artifact ID (find IDs with `ipm search`). Try `ipm help %s`.", name, name)
-	}
-	return words[0], nil
-}
+	"github.com/spf13/cobra"
+)
 
 func loadGraph(sys System) (*catgraph.Graph, string, error) {
 	p, err := ipmPaths(sys)
@@ -36,17 +27,16 @@ func loadGraph(sys System) (*catgraph.Graph, string, error) {
 	return g, dir, err
 }
 
-func showFlags() (*flag.FlagSet, func(System) error) {
+func newShowCmd(sys System) *cobra.Command {
 	var asJSON bool
-	fs := flag.NewFlagSet("show", flag.ContinueOnError)
-	fs.BoolVar(&asJSON, "json", false, "print the catalog record as JSON")
-	return fs, func(sys System) error {
-		id, err := oneID("show", fs)
-		if err != nil {
-			return err
-		}
-		return runShow(sys, id, asJSON)
+	cmd := &cobra.Command{
+		Use:   "show <id>",
+		Short: "an artifact's fields, GitHub stats and neighbours (reads the catalog, no search server)",
+		Args:  exactArgs(1, "one artifact ID (find IDs with `ipm search`)"),
+		RunE:  func(_ *cobra.Command, args []string) error { return runShow(sys, args[0], asJSON) },
 	}
+	cmd.Flags().BoolVar(&asJSON, "json", false, "print the catalog record as JSON")
+	return cmd
 }
 
 // runShow prints one artifact's fields, its repo's GitHub stats and its
@@ -125,54 +115,57 @@ func neighbours(w io.Writer, g *catgraph.Graph, title string, ids []string) {
 	}
 }
 
-func treeFlags() (*flag.FlagSet, func(System) error) {
+func newTreeCmd(sys System) *cobra.Command {
 	var o catgraph.Options
-	fs := flag.NewFlagSet("tree", flag.ContinueOnError)
-	fs.BoolVar(&o.Up, "up", false, "walk to what contains the artifact instead of what it contains")
-	fs.IntVar(&o.Depth, "depth", -1, "levels to show (default: 3 from a repo, else all)")
-	fs.BoolVar(&o.All, "all", false, "show every child, not the first 25")
-	return fs, func(sys System) error {
-		id, err := oneID("tree", fs)
-		if err != nil {
-			return err
-		}
-		g, _, err := loadGraph(sys)
-		if err != nil {
-			return err
-		}
-		if o.Depth < 0 {
-			o.Depth = 0
-			if strings.HasPrefix(id, catalog.TypeRepo+":") && !o.Up {
-				o.Depth = 3
+	cmd := &cobra.Command{
+		Use:   "tree <id>",
+		Short: "an artifact's relationships as a tree (reads the catalog, no search server)",
+		Args:  exactArgs(1, "one artifact ID (find IDs with `ipm search`)"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			id := args[0]
+			g, _, err := loadGraph(sys)
+			if err != nil {
+				return err
 			}
-		}
-		return g.Tree(sys.Stdout, id, o)
+			if o.Depth < 0 {
+				o.Depth = 0
+				if strings.HasPrefix(id, catalog.TypeRepo+":") && !o.Up {
+					o.Depth = 3
+				}
+			}
+			return g.Tree(sys.Stdout, id, o)
+		},
 	}
+	cmd.Flags().BoolVar(&o.Up, "up", false, "walk to what contains the artifact instead of what it contains")
+	cmd.Flags().IntVar(&o.Depth, "depth", -1, "levels to show (default: 3 from a repo, else all)")
+	cmd.Flags().BoolVar(&o.All, "all", false, "show every child, not the first 25")
+	return cmd
 }
 
-func graphFlags() (*flag.FlagSet, func(System) error) {
+func newGraphCmd(sys System) *cobra.Command {
 	var o catgraph.Options
 	var format string
-	fs := flag.NewFlagSet("graph", flag.ContinueOnError)
-	fs.BoolVar(&o.Up, "up", false, "walk to what contains the artifact instead of what it contains")
-	fs.IntVar(&o.Depth, "depth", 2, "levels to include")
-	fs.BoolVar(&o.All, "all", false, "include every child, not the first 25")
-	fs.StringVar(&format, "format", "mermaid", "mermaid or dot")
-	return fs, func(sys System) error {
-		id, err := oneID("graph", fs)
-		if err != nil {
-			return err
-		}
-		if format != "mermaid" && format != "dot" {
-			return usagef("graph: --format is mermaid or dot, not %q", format)
-		}
-		g, _, err := loadGraph(sys)
-		if err != nil {
-			return err
-		}
-		if format == "dot" {
-			return g.DOT(sys.Stdout, id, o)
-		}
-		return g.Mermaid(sys.Stdout, id, o)
+	cmd := &cobra.Command{
+		Use:   "graph <id>",
+		Short: "an artifact's neighbourhood as Mermaid or Graphviz (reads the catalog, no search server)",
+		Args:  exactArgs(1, "one artifact ID (find IDs with `ipm search`)"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			if format != "mermaid" && format != "dot" {
+				return usagef("graph: --format is mermaid or dot, not %q", format)
+			}
+			g, _, err := loadGraph(sys)
+			if err != nil {
+				return err
+			}
+			if format == "dot" {
+				return g.DOT(sys.Stdout, args[0], o)
+			}
+			return g.Mermaid(sys.Stdout, args[0], o)
+		},
 	}
+	cmd.Flags().BoolVar(&o.Up, "up", false, "walk to what contains the artifact instead of what it contains")
+	cmd.Flags().IntVar(&o.Depth, "depth", 2, "levels to include")
+	cmd.Flags().BoolVar(&o.All, "all", false, "include every child, not the first 25")
+	cmd.Flags().StringVar(&format, "format", "mermaid", "mermaid or dot")
+	return cmd
 }

@@ -43,7 +43,7 @@ Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.lo
 - **Generated files are regenerated, not edited.** Change sources with `ipm source`, then `ipm sync`; change packs with `ipm pack`, then `ipm install`.
 - **No upstream code runs.** pnpm always runs with `--ignore-scripts`, and sources' own npm dependencies are never installed.
 - **`ipm` is self-contained.** It works from any directory, keeps its data only in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), never installs into Claude Code, and shares no configuration with fsh or Gas City.
-- **All CLI commands are Go**, in `cli/internal/cli`. There are no script commands.
+- **All CLI commands are Go**, built with [Cobra](https://cobra.dev), in `cli/internal/cli`. There are no script commands. Flags are POSIX style: long flags take two dashes.
 - **Prose in Markdown is not hard-wrapped**: one line per paragraph or list item.
 - **User docs change with the code.** A change to a command, flag, message or file format updates `docs/reference/commands.md`, the guide that uses it and `docs/troubleshooting.md` in the same commit. Each site page has Just the Docs front matter (`title`, `nav_order`, `parent` under `guides/` and `reference/`); link between pages with relative `.md` links, which work on GitHub and on the site. Don't link to `docs/superpowers/` with a relative link from a site page (it isn't published); use its GitHub URL.
 

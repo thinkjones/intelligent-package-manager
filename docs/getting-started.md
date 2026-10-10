@@ -35,6 +35,8 @@ ipm version
 
 This puts `ipm` in `$(go env GOPATH)/bin`; make sure that folder is on your `PATH`.
 
+For tab completion of commands and flags, install the script for your shell, for example zsh: `ipm completion zsh > "${fpath[1]}/_ipm"`. `ipm completion --help` lists the shells.
+
 ### From a clone
 
 If you want to work on `ipm`, or track `main` closely:

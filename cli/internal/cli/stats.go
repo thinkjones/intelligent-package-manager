@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"path/filepath"
 	"regexp"
@@ -11,13 +10,19 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/github"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
+
+	"github.com/spf13/cobra"
 )
 
 var ownerRepoRE = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
 
-func statsFlags() (*flag.FlagSet, func(System) error) {
-	fs := flag.NewFlagSet("stats", flag.ContinueOnError)
-	return fs, runStats
+func newStatsCmd(sys System) *cobra.Command {
+	return &cobra.Command{
+		Use:   "stats",
+		Short: "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return runStats(sys) },
+	}
 }
 
 // runStats fetches GitHub stats for every repo in catalog/repos.jsonl into

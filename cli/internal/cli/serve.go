@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +13,8 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/paths"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/typesense"
+
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -84,11 +85,16 @@ func tsError(err error) error {
 	return err
 }
 
-func serveFlags() (*flag.FlagSet, func(System) error) {
+func newServeCmd(sys System) *cobra.Command {
 	var stop bool
-	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
-	fs.BoolVar(&stop, "stop", false, "stop the server (its data is kept)")
-	return fs, func(sys System) error { return runServe(sys, stop) }
+	cmd := &cobra.Command{
+		Use:   "serve",
+		Short: "start the local Typesense search server in Docker (--stop to stop it)",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return runServe(sys, stop) },
+	}
+	cmd.Flags().BoolVar(&stop, "stop", false, "stop the server (its data is kept)")
+	return cmd
 }
 
 func dockerReady(sys System) error {

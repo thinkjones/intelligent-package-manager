@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,45 +11,61 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
+
+	"github.com/spf13/cobra"
 )
 
-func packFlags() (*flag.FlagSet, func(System) error) {
+func newPackCmd(sys System) *cobra.Command {
 	var global bool
 	var description string
-	fs := flag.NewFlagSet("pack", flag.ContinueOnError)
-	fs.BoolVar(&global, "g", false, "use your user scope ($IPM_HOME/global) instead of the project")
-	fs.StringVar(&description, "description", "", "pack description (pack new)")
-	return fs, func(sys System) error {
-		args := fs.Args()
-		if len(args) == 0 {
-			return usagef("pack: say new, add, remove, list or show. Try `ipm help pack`.")
-		}
-		scope, err := currentScope(sys, global)
-		if err != nil {
-			return err
-		}
-		verb, rest := args[0], args[1:]
-		switch verb {
-		case "new":
-			if len(rest) != 1 {
-				return usagef("pack new: give one pack name")
+	cmd := verbs(&cobra.Command{
+		Use:   "pack",
+		Short: "create and edit packs of catalog items in ipm.toml (-g for your user scope)",
+	}, "new, add, remove, list or show")
+	cmd.PersistentFlags().BoolVarP(&global, "global", "g", false, "use your user scope ($IPM_HOME/global) instead of the project")
+	// inScope runs f in the project's scope, or the user's with -g.
+	inScope := func(f func(project.Scope, []string) error) func(*cobra.Command, []string) error {
+		return func(_ *cobra.Command, args []string) error {
+			scope, err := currentScope(sys, global)
+			if err != nil {
+				return err
 			}
-			return packNew(sys, scope, rest[0], description)
-		case "add", "remove":
-			if len(rest) < 2 {
-				return usagef("pack %s: give a pack name and at least one item ID", verb)
-			}
-			return packEdit(sys, scope, verb, rest[0], rest[1:])
-		case "list":
-			return packList(sys, scope)
-		case "show":
-			if len(rest) != 1 {
-				return usagef("pack show: give one pack name")
-			}
-			return packShow(sys, scope, rest[0])
+			return f(scope, args)
 		}
-		return usagef("pack: unknown action %q — use new, add, remove, list or show", verb)
 	}
+	newCmd := &cobra.Command{
+		Use:   "new <name>",
+		Short: "create a pack (creates ipm.toml here if no folder above has one)",
+		Args:  exactArgs(1, "one pack name"),
+		RunE:  inScope(func(s project.Scope, args []string) error { return packNew(sys, s, args[0], description) }),
+	}
+	newCmd.Flags().StringVar(&description, "description", "", "pack description")
+	edit := func(verb, short string) *cobra.Command {
+		return &cobra.Command{
+			Use:   verb + " <pack> <id>...",
+			Short: short,
+			Args:  minArgs(2, "a pack name and at least one item ID"),
+			RunE:  inScope(func(s project.Scope, args []string) error { return packEdit(sys, s, verb, args[0], args[1:]) }),
+		}
+	}
+	cmd.AddCommand(
+		newCmd,
+		edit("add", "add catalog items: skills, agents, file commands, plugins, Copilot plugins"),
+		edit("remove", "remove items"),
+		&cobra.Command{
+			Use:   "list",
+			Short: "every pack in the scope: name, item count, description",
+			Args:  noArgs,
+			RunE:  inScope(func(s project.Scope, _ []string) error { return packList(sys, s) }),
+		},
+		&cobra.Command{
+			Use:   "show <pack>",
+			Short: "a pack's items: type, name, repo, stars and ID",
+			Args:  exactArgs(1, "one pack name"),
+			RunE:  inScope(func(s project.Scope, args []string) error { return packShow(sys, s, args[0]) }),
+		},
+	)
+	return cmd
 }
 
 // currentScope is the project around the working directory, or with global

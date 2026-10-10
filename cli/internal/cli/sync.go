@@ -1,20 +1,26 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
+
+	"github.com/spf13/cobra"
 )
 
-func syncFlags() (*flag.FlagSet, func(System) error) {
+func newSyncCmd(sys System) *cobra.Command {
 	var upgrade bool
-	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
-	fs.BoolVar(&upgrade, "upgrade", false, "move every source to the latest commit of its branch or tag")
-	return fs, func(sys System) error { return runSync(sys, upgrade) }
+	cmd := &cobra.Command{
+		Use:   "sync",
+		Short: "fetch and pin every source with pnpm, then reindex",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return runSync(sys, upgrade) },
+	}
+	cmd.Flags().BoolVar(&upgrade, "upgrade", false, "move every source to the latest commit of its branch or tag")
+	return cmd
 }
 
 // runSync has pnpm fetch and pin every source (never running their

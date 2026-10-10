@@ -1,12 +1,13 @@
 package cli
 
 import (
-	"flag"
 	"fmt"
 	"text/tabwriter"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
+
+	"github.com/spf13/cobra"
 )
 
 const (
@@ -15,9 +16,13 @@ const (
 	bad  = "✗"
 )
 
-func doctorFlags() (*flag.FlagSet, func(System) error) {
-	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
-	return fs, doctor
+func newDoctorCmd(sys System) *cobra.Command {
+	return &cobra.Command{
+		Use:   "doctor",
+		Short: "check home, pnpm, sources, catalog and search — exits 1 on problems",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return doctor(sys) },
+	}
 }
 
 // doctor reports where ipm keeps things and whether each piece is ready.

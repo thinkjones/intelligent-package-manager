@@ -1,18 +1,18 @@
-// Package cli is ipm's command line. Every command is Go code in this
-// package, registered in the commands table; Run picks one from argv.
+// Package cli is ipm's command line, built with Cobra. Every command is Go
+// code in this package; newRootCmd assembles them and Run executes argv.
 //
 // Commands reach the outside world only through System, so tests drive them
 // in-process with a fake: no real git, claude or environment.
 package cli
 
 import (
-	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/spf13/cobra"
 )
 
 // System is everything a command needs from outside the process.
@@ -49,153 +49,143 @@ func (e *UsageError) Error() string { return e.msg }
 
 func usagef(format string, a ...any) error { return &UsageError{fmt.Sprintf(format, a...)} }
 
-type command struct {
-	name    string
-	summary string
-	// args names the positional arguments the command takes, for help; empty
-	// means none. The command reads them from its flag set's Args.
-	args string
-	// flags returns the command's flag set, bound to fresh option values, and
-	// the function that runs the command with them.
-	flags func() (*flag.FlagSet, func(sys System) error)
-}
-
-var commands []command
-
-func init() {
-	commands = []command{
-		{"source", "add, remove, list or import your repos of interest", "<add|remove|list|import> …", sourceFlags},
-		{"sync", "fetch and pin every source with pnpm, then reindex", "", syncFlags},
-		{"doctor", "check home, pnpm, sources, catalog and search — exits 1 on problems", "", doctorFlags},
-		{"index", "rebuild the catalog from your synced sources", "", indexFlags},
-		{"serve", "start the local Typesense search server in Docker (--stop to stop it)", "", serveFlags},
-		{"load", "rebuild the search index from catalog/", "", loadFlags},
-		{"search", "hybrid search over the catalog (needs ipm serve and ipm load)", "<query>", searchFlags},
-		{"show", "an artifact's fields, GitHub stats and neighbours (reads the catalog, no search server)", "<id>", showFlags},
-		{"tree", "an artifact's relationships as a tree (reads the catalog, no search server)", "<id>", treeFlags},
-		{"graph", "an artifact's neighbourhood as Mermaid or Graphviz (reads the catalog, no search server)", "<id>", graphFlags},
-		{"pack", "create and edit packs of catalog items in ipm.toml (-g for your user scope)", "<new|add|remove|list|show> …", packFlags},
-		{"install", "build each pack in ipm.toml into a Claude Code plugin under .ipm/ (-g for your user scope)", "", installFlags},
-		{"stats", "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl", "", statsFlags},
-		{"scan", "report the plugin, skills, hooks and agents folders in your synced sources", "[repo...]", scanFlags},
-		{"version", "print ipm's version", "", versionFlags},
-		{"help", "this text, or `help <command>` for one command's flags", "", nil},
-	}
-}
-
-func lookup(name string) (command, bool) {
-	for _, c := range commands {
-		if c.name == name {
-			return c, true
-		}
-	}
-	return command{}, false
-}
-
 // Run executes the command line args (without the program name).
 func Run(args []string, sys System) error {
-	if len(args) == 0 {
-		printHelp(sys.Stdout)
-		return nil
+	root := newRootCmd(sys)
+	root.SetArgs(args)
+	return root.Execute()
+}
+
+// newRootCmd is ipm's command tree. Every command writes to sys and returns
+// a UsageError for a malformed command line, so ipm exits 2 for those.
+func newRootCmd(sys System) *cobra.Command {
+	root := &cobra.Command{
+		Use:   "ipm",
+		Short: "ipm — intelligent package manager for agent skills, agents, commands and plugins",
+		Long: `ipm — intelligent package manager for agent skills, agents, commands and plugins
+
+Follow repos, search everything in them, and build the skills, agents,
+commands and plugins you pick into Claude Code plugins, pinned to commits.
+
+Config
+  IPM_HOME        sources and the pnpm store (default ~/Library/ipm, ~/.local/share/ipm)
+  IPM_CACHE_DIR   catalog and search data (default ~/Library/Caches/ipm, ~/.cache/ipm)`,
+		Version:       sys.Version,
+		Args:          unknownCommand,
+		SilenceErrors: true,
+		SilenceUsage:  true,
+		RunE:          func(cmd *cobra.Command, _ []string) error { return cmd.Help() },
 	}
-	name, rest := args[0], args[1:]
-	switch name {
-	case "help", "-h", "--help":
-		return runHelp(rest, sys)
-	case "--version":
-		name = "version"
-	}
-	cmd, ok := lookup(name)
-	if !ok {
-		if strings.HasPrefix(name, "-") {
-			return usagef("unknown flag %q. Try `ipm help`.", name)
+	root.SetOut(sys.Stdout)
+	root.SetErr(sys.Stderr)
+	root.SetVersionTemplate("ipm {{.Version}}\n")
+	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		msg := err.Error()
+		// pflag reads -upgrade as -u -p -g …; say what was probably meant.
+		if _, word, found := strings.Cut(msg, " in -"); found && strings.HasPrefix(msg, "unknown shorthand flag") && len(word) > 1 {
+			msg += " (long flags take two dashes: --" + word + ")"
 		}
-		return usagef("unknown command %q. Try `ipm help`.", name)
-	}
-	fs, run := cmd.flags()
-	fs.SetOutput(io.Discard)
-	parse := fs.Parse
-	if cmd.args != "" {
-		parse = func(args []string) error {
-			words, err := interspersed(fs, args)
-			if err != nil {
-				return err
+		return usagef("%s. Try `%s`.", msg, helpFor(cmd))
+	})
+	root.SetHelpCommand(&cobra.Command{
+		Use:   "help [command]",
+		Short: "help for ipm, or for one command",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			target, rest, err := root.Find(args)
+			if err != nil || len(rest) > 0 {
+				return usagef("no command %q. Try `ipm help`.", strings.Join(args, " "))
 			}
-			// Leave exactly the positional words in fs.Args().
-			return fs.Parse(append([]string{"--"}, words...))
-		}
-	}
-	if err := parse(rest); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			printCommandHelp(sys.Stdout, cmd)
-			return nil
-		}
-		return usagef("%s: %v. Try `ipm help %s`.", cmd.name, err, cmd.name)
-	}
-	if fs.NArg() > 0 && cmd.args == "" {
-		return usagef("%s: unexpected argument %q. Try `ipm help %s`.", cmd.name, fs.Arg(0), cmd.name)
-	}
-	return run(sys)
+			return target.Help()
+		},
+	})
+	root.AddCommand(
+		newSourceCmd(sys),
+		newSyncCmd(sys),
+		newDoctorCmd(sys),
+		newIndexCmd(sys),
+		newServeCmd(sys),
+		newLoadCmd(sys),
+		newSearchCmd(sys),
+		newShowCmd(sys),
+		newTreeCmd(sys),
+		newGraphCmd(sys),
+		newPackCmd(sys),
+		newInstallCmd(sys),
+		newStatsCmd(sys),
+		newScanCmd(sys),
+		&cobra.Command{
+			Use:   "version",
+			Short: "print ipm's version",
+			Args:  noArgs,
+			RunE: func(*cobra.Command, []string) error {
+				fmt.Fprintf(sys.Stdout, "ipm %s\n", sys.Version)
+				return nil
+			},
+		},
+	)
+	return root
 }
 
-func runHelp(args []string, sys System) error {
-	switch len(args) {
-	case 0:
-		printHelp(sys.Stdout)
+// helpFor is the help command for cmd: `ipm help sync`, or `ipm help`.
+func helpFor(cmd *cobra.Command) string {
+	return strings.TrimSpace("ipm help " + strings.TrimSpace(strings.TrimPrefix(cmd.CommandPath(), "ipm")))
+}
+
+// unknownCommand rejects words that name no command, suggesting near ones.
+func unknownCommand(cmd *cobra.Command, args []string) error {
+	if len(args) == 0 {
 		return nil
-	case 1:
-		cmd, ok := lookup(args[0])
-		if !ok || cmd.flags == nil {
-			return usagef("no command %q. Try `ipm help`.", args[0])
+	}
+	return usagef("unknown command %q%s. Try `ipm help`.", args[0], didYouMean(cmd, args[0]))
+}
+
+// didYouMean is " — did you mean x?" for the subcommands of cmd near word.
+func didYouMean(cmd *cobra.Command, word string) string {
+	cmd.SuggestionsMinimumDistance = 2
+	if s := cmd.SuggestionsFor(word); len(s) > 0 {
+		return fmt.Sprintf(" — did you mean %s?", strings.Join(s, " or "))
+	}
+	return ""
+}
+
+// noArgs, exactArgs and minArgs check positional arguments, failing with a
+// UsageError that says what the command wants.
+func noArgs(cmd *cobra.Command, args []string) error {
+	if len(args) > 0 {
+		return usagef("%s: unexpected argument %q. Try `%s`.", cmd.CommandPath(), args[0], helpFor(cmd))
+	}
+	return nil
+}
+
+func exactArgs(n int, want string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) != n {
+			return usagef("%s: give %s. Try `%s`.", cmd.CommandPath(), want, helpFor(cmd))
 		}
-		printCommandHelp(sys.Stdout, cmd)
-		return nil
-	}
-	return usagef("help takes at most one command")
-}
-
-func printHelp(w io.Writer) {
-	fmt.Fprintln(w, "ipm — intelligent package manager for agent skills, agents, commands and plugins")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Usage")
-	fmt.Fprintln(w, "  ipm <command> [flags]")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Commands")
-	for _, c := range commands {
-		fmt.Fprintf(w, "  %-15s %s\n", c.name, c.summary)
-	}
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Config")
-	fmt.Fprintln(w, "  IPM_HOME        sources and the pnpm store (default ~/Library/ipm, ~/.local/share/ipm)")
-	fmt.Fprintln(w, "  IPM_CACHE_DIR   catalog and search data (default ~/Library/Caches/ipm, ~/.cache/ipm)")
-}
-
-func printCommandHelp(w io.Writer, cmd command) {
-	fmt.Fprintf(w, "ipm %s — %s\n", cmd.name, cmd.summary)
-	if cmd.args != "" {
-		fmt.Fprintf(w, "\nUsage\n  ipm %s [flags] %s\n", cmd.name, cmd.args)
-	}
-	fs, _ := cmd.flags()
-	any := false
-	fs.VisitAll(func(*flag.Flag) { any = true })
-	if !any {
-		return
-	}
-	fmt.Fprintln(w, "\nFlags")
-	fs.SetOutput(w)
-	fs.PrintDefaults()
-}
-
-func versionFlags() (*flag.FlagSet, func(System) error) {
-	fs := flag.NewFlagSet("version", flag.ContinueOnError)
-	return fs, func(sys System) error {
-		fmt.Fprintf(sys.Stdout, "ipm %s\n", sys.Version)
 		return nil
 	}
 }
 
-// multi is a repeatable string flag.
-type multi []string
+func minArgs(n int, want string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if len(args) < n {
+			return usagef("%s: give %s. Try `%s`.", cmd.CommandPath(), want, helpFor(cmd))
+		}
+		return nil
+	}
+}
 
-func (m *multi) String() string     { return strings.Join(*m, ",") }
-func (m *multi) Set(v string) error { *m = append(*m, v); return nil }
+// verbs is a parent command such as `ipm pack`: run alone, or with a word
+// that names none of its subcommands, it is a usage error listing them.
+func verbs(cmd *cobra.Command, list string) *cobra.Command {
+	cmd.Args = func(c *cobra.Command, args []string) error {
+		if len(args) > 0 {
+			return usagef("%s: unknown action %q%s — use %s. Try `%s`.", c.CommandPath(), args[0], didYouMean(c, args[0]), list, helpFor(c))
+		}
+		return nil
+	}
+	cmd.RunE = func(c *cobra.Command, _ []string) error {
+		return usagef("%s: say %s. Try `%s`.", c.CommandPath(), list, helpFor(c))
+	}
+	return cmd
+}

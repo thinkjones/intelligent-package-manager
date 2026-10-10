@@ -2,7 +2,6 @@ package cli
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,15 +12,22 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/marketplace"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
+
+	"github.com/spf13/cobra"
 )
 
-func installFlags() (*flag.FlagSet, func(System) error) {
+func newInstallCmd(sys System) *cobra.Command {
 	var global, update, noValidate bool
-	fs := flag.NewFlagSet("install", flag.ContinueOnError)
-	fs.BoolVar(&global, "g", false, "build your user scope's packs ($IPM_HOME/global)")
-	fs.BoolVar(&update, "update", false, "re-pin every item to the commit in your current catalog")
-	fs.BoolVar(&noValidate, "no-validate", false, "skip claude plugin validate --strict")
-	return fs, func(sys System) error { return runInstall(sys, global, update, noValidate) }
+	cmd := &cobra.Command{
+		Use:   "install",
+		Short: "build each pack in ipm.toml into a Claude Code plugin under .ipm/ (-g for your user scope)",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return runInstall(sys, global, update, noValidate) },
+	}
+	cmd.Flags().BoolVarP(&global, "global", "g", false, "build your user scope's packs ($IPM_HOME/global)")
+	cmd.Flags().BoolVar(&update, "update", false, "re-pin every item to the commit in your current catalog")
+	cmd.Flags().BoolVar(&noValidate, "no-validate", false, "skip claude plugin validate --strict")
+	return cmd
 }
 
 // pluginJSON is a built pack's manifest, fields in a fixed order.

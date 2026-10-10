@@ -160,7 +160,7 @@ One row each for `home`, `cache`, `pnpm` (the version, and whether it runs throu
 cli/
 ├── cmd/ipm/main.go           process wiring only: argv, real commands, HTTP client, exit codes
 └── internal/
-    ├── cli/                   command table, help, one file per command (packcmd.go, install.go, …); pnpm.go (find pnpm, .pnpmfile.cjs)
+    ├── cli/                   the Cobra command tree (cli.go), one file per command (packcmd.go, install.go, …); pnpm.go (find pnpm, .pnpmfile.cjs)
     ├── paths/                 IPM_HOME, the cache dir, the folders under them
     ├── sources/               sources/package.json, aliases, pnpm-lock.yaml commits; WriteProject for .ipm/package.json
     ├── catalog/               walk, parse, link, build; *.jsonl read and write
@@ -208,7 +208,7 @@ Commands reach the outside world only through `cli.System` (stdout, stderr, envi
 
 ## Extending
 
-- **A command** — add `internal/cli/<name>.go` with a `<name>Flags()` returning its `flag.FlagSet` and run function, and a row in the `commands` table in `cli.go`. Get data folders from `ipmPaths(sys)`.
+- **A command** — add `internal/cli/<name>.go` with a `new<Name>Cmd(sys System) *cobra.Command`, register it in `newRootCmd`, and check its arguments with `noArgs`, `exactArgs`, `minArgs` or `verbs` so a malformed command line exits 2. Get data folders from `ipmPaths(sys)`.
 - **Another artifact type** — add a marker to `internal/catalog/walk.go`, a parser, a type in `catalog.Types` with its file, and fixtures.
 - **A pickable type** — teach `ipm pack add` to accept it (`internal/cli/packcmd.go`) and `internal/assemble` where to place it.
 - **The TUI** — part 4 of [the ipm design](https://github.com/thinkjones/intelligent-package-manager/blob/main/docs/superpowers/specs/2026-10-09-ipm-design.md): a TUI over search and packs.
