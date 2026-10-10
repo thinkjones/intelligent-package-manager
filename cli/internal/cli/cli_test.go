@@ -1405,3 +1405,23 @@ func TestInstallFailureKeepsPreviousBuild(t *testing.T) {
 		t.Error("the lock must only change when the build succeeds")
 	}
 }
+
+func TestSearchShowsAndListsIDs(t *testing.T) {
+	f, _ := searchFake(t, 0)
+	if err := f.run("search", "tdd"); err != nil {
+		t.Fatal(err)
+	}
+	if out := f.out.String(); !strings.Contains(out, "\n       skill:o/r:a\n") || !strings.Contains(out, "\n       skill:o/r:b\n") {
+		t.Errorf("each hit needs its ID beneath it:\n%s", out)
+	}
+	f.out.Reset()
+	if err := f.run("search", "tdd", "--ids"); err != nil {
+		t.Fatal(err)
+	}
+	if f.out.String() != "skill:o/r:a\nskill:o/r:b\n" {
+		t.Errorf("--ids prints only IDs, one per line:\n%q", f.out.String())
+	}
+	if err := f.run("search", "tdd", "--ids", "--json"); err == nil {
+		t.Error("--ids and --json don't combine")
+	}
+}

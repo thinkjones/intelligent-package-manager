@@ -43,7 +43,8 @@ ipm search hooks --tag security
 | `--all` | Every result, fetched 250 at a time. |
 | `--keyword` | Keyword ranking only, without semantic matching. |
 | `--explain` | Add KW (✓ when the keywords matched) and SEM (semantic similarity) columns. |
-| `--json` | One JSON line per hit, with every field including the ID. |
+| `--ids` | Only each hit's ID, one per line. |
+| `--json` | One JSON line per hit, with every field. |
 
 Search is **hybrid**: keyword matches on name, description, tags and plugin names are fused with semantic matches, and ties go to the repo with more stars. `c#` and `c++` are searchable as words.
 
@@ -53,11 +54,20 @@ In hybrid mode `--all` returns the keyword matches plus about 100 nearest semant
 
 ## Get IDs
 
-The results table leaves IDs out to stay readable. Use `--json`:
+Each hit's ID is on the line under it, indented under TYPE and never shortened, so you can copy it into `ipm show`, `ipm tree`, `ipm graph` or `ipm pack add`:
+
+```text
+$ ipm search "c# testing" --limit 1
+SCORE  TYPE   NAME        REPO             ★      PLUGINS        DESCRIPTION
+71     agent  csharp-pro  wshobson/agents  40.3k  jvm-languages  Write modern C# c…
+       agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md
+```
+
+`--ids` prints only the IDs, one per line, for scripts:
 
 ```bash
-ipm search c# --type skill --json | jq -r '.document.id'
-ipm search c# --type skill --json | jq -r '[.document.id, .document.description] | @tsv'
+ipm search c# --type skill --ids
+ipm show "$(ipm search 'c# testing' --limit 1 --ids)"
 ```
 
 ## Inspect an artifact

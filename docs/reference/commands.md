@@ -103,7 +103,7 @@ Rebuilds the search index from the catalog and GitHub stats. Run it after `ipm s
 ipm search [flags] <query>
 ```
 
-Hybrid keyword and semantic search. Needs `ipm serve` and `ipm load`.
+Hybrid keyword and semantic search. Needs `ipm serve` and `ipm load`. Each hit's full ID is printed on the line under it.
 
 | Flag | Does |
 | --- | --- |
@@ -115,6 +115,7 @@ Hybrid keyword and semantic search. Needs `ipm serve` and `ipm load`.
 | `--all` | Every result, fetched 250 at a time. |
 | `--keyword` | Keyword ranking only. |
 | `--explain` | Add KW and SEM columns. |
+| `--ids` | Only each hit's ID, one per line. Doesn't combine with `--json`. |
 | `--json` | One JSON line per hit. |
 
 ### `ipm show`

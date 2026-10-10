@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -13,7 +14,7 @@ import (
 func searchFlags() (*flag.FlagSet, func(System) error) {
 	var q search.Query
 	var types, repos, tags multi
-	var asJSON, all, explain bool
+	var asJSON, all, explain, ids bool
 	fs := flag.NewFlagSet("search", flag.ContinueOnError)
 	fs.Var(&types, "type", "only this artifact type (repeatable): repo, marketplace, plugin, copilot-plugin, skill, agent, command, hook, mcp")
 	fs.Var(&repos, "repo", "only artifacts from this repo (repeatable)")
@@ -24,6 +25,7 @@ func searchFlags() (*flag.FlagSet, func(System) error) {
 	fs.BoolVar(&all, "all", false, "every result, fetched 250 at a time (hybrid: keyword matches plus ~100 semantic neighbours)")
 	fs.BoolVar(&explain, "explain", false, "add KW (keyword match ✓) and SEM (semantic similarity) columns")
 	fs.BoolVar(&asJSON, "json", false, "print each hit as a JSON line")
+	fs.BoolVar(&ids, "ids", false, "print only each hit's ID, one per line")
 	return fs, func(sys System) error {
 		q.Text = strings.TrimSpace(strings.Join(fs.Args(), " "))
 		if q.Text == "" {
@@ -34,11 +36,14 @@ func searchFlags() (*flag.FlagSet, func(System) error) {
 				return usagef("search: filter value %q contains a backtick, which Typesense filters cannot express", v)
 			}
 		}
+		if ids && asJSON {
+			return usagef("search: --ids and --json don't combine")
+		}
 		if all && q.Page > 0 {
 			return usagef("search: --all and --page don't combine")
 		}
 		q.Types, q.Repos, q.Tags = types, repos, tags
-		return runSearch(sys, q, all, asJSON, explain)
+		return runSearch(sys, q, all, asJSON, explain, ids)
 	}
 }
 
@@ -67,7 +72,7 @@ func interspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 // maxPage is Typesense's largest page size.
 const maxPage = 250
 
-func runSearch(sys System, q search.Query, all, asJSON, explain bool) error {
+func runSearch(sys System, q search.Query, all, asJSON, explain, ids bool) error {
 	c, err := tsClient(sys)
 	if err != nil {
 		return err
@@ -90,6 +95,14 @@ func runSearch(sys System, q search.Query, all, asJSON, explain bool) error {
 		}
 		res.Hits = append(res.Hits, more.Hits...)
 		res.SearchTimeMS += more.SearchTimeMS
+	}
+	if ids {
+		for _, h := range res.Hits {
+			if id, _ := h.Document["id"].(string); id != "" {
+				fmt.Fprintln(sys.Stdout, id)
+			}
+		}
+		return nil
 	}
 	if asJSON {
 		enc := json.NewEncoder(sys.Stdout)

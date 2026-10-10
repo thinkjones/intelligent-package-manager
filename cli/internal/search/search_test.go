@@ -153,7 +153,7 @@ func TestTable(t *testing.T) {
 		t.Errorf("table:\n%s", out)
 	}
 	for _, l := range lines {
-		if utf8.RuneCountInString(l) > 120 {
+		if !strings.HasPrefix(l, " ") && utf8.RuneCountInString(l) > 120 { // ID lines are never cut
 			t.Errorf("line longer than 120: %q", l)
 		}
 	}
@@ -232,5 +232,28 @@ func TestTableKeywordScoreAgainstOverallTop(t *testing.T) {
 	Table(&b, typesense.Result{Found: 9, Hits: []typesense.Hit{hit("a", 200, -1, -1)}}, TableOptions{Width: 120, TopTextMatch: 400})
 	if !strings.HasPrefix(strings.Split(b.String(), "\n")[1], "50 ") {
 		t.Errorf("got:\n%s", b.String())
+	}
+}
+
+func TestTableShowsEachHitsID(t *testing.T) {
+	long := "skill:o/r:" + strings.Repeat("deep/", 30) + "tdd"
+	res := typesense.Result{Found: 2, Hits: []typesense.Hit{
+		{Document: map[string]any{"id": long, "type": "skill", "name": "tdd", "repo": "o/r", "stars": float64(1), "description": "Test first"}},
+		{Document: map[string]any{"id": "agent:x/y:agents/rev.md", "type": "agent", "name": "reviewer", "repo": "x/y", "stars": float64(2), "description": "Reviews"}},
+	}}
+	for _, explain := range []bool{false, true} {
+		var b bytes.Buffer
+		Table(&b, res, TableOptions{Width: 120, Explain: explain})
+		lines := strings.Split(b.String(), "\n")
+		typeCol := strings.Index(lines[0], "TYPE")
+		for i, id := range []string{long, "agent:x/y:agents/rev.md"} {
+			row, idLine := lines[1+2*i], lines[2+2*i]
+			if idLine != strings.Repeat(" ", typeCol)+id {
+				t.Errorf("explain=%v: want the full ID under TYPE, got %q", explain, idLine)
+			}
+			if r := []rune(row); len(r) < typeCol || !strings.HasPrefix(string(r[typeCol:]), res.Hits[i].Document["type"].(string)) {
+				t.Errorf("explain=%v: rows lost their alignment:\n%s", explain, b.String())
+			}
+		}
 	}
 }

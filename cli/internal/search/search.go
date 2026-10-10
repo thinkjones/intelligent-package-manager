@@ -12,7 +12,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"text/tabwriter"
 	"unicode/utf8"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
@@ -284,6 +283,7 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 	header = append(header, "TYPE", "NAME", "REPO", "★", "PLUGINS", "DESCRIPTION")
 	caps = append(caps, 14, 32, 30, 6, 24)
 	rows := [][]string{header}
+	ids := []string{""}
 	for _, h := range res.Hits {
 		d := h.Document
 		stars := 0
@@ -306,6 +306,7 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 			row = append(row, kw, sem)
 		}
 		rows = append(rows, append(row, str(d, "type"), str(d, "name"), str(d, "repo"), Stars(stars), plugins, str(d, "description")))
+		ids = append(ids, str(d, "id"))
 	}
 	widths := make([]int, len(caps))
 	for _, r := range rows {
@@ -318,13 +319,26 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 	for _, wd := range widths {
 		used += wd + 2
 	}
-	last := len(header) - 1
-	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	for _, r := range rows {
-		r[last] = cut(r[last], o.Width-used)
-		fmt.Fprintln(tw, strings.Join(r, "\t"))
+	// Each hit's ID goes on its own line under TYPE, never cut, so it can be
+	// copied into ipm show, tree, graph or pack add.
+	last, indent := len(header)-1, 0
+	for i := range len(header) - 6 { // SCORE, and KW and SEM with --explain
+		indent += widths[i] + 2
 	}
-	tw.Flush()
+	for n, r := range rows {
+		r[last] = cut(r[last], o.Width-used)
+		var line strings.Builder
+		for i, cell := range r {
+			line.WriteString(cell)
+			if i < last {
+				line.WriteString(strings.Repeat(" ", widths[i]+2-utf8.RuneCountInString(cell)))
+			}
+		}
+		fmt.Fprintln(w, strings.TrimRight(line.String(), " "))
+		if ids[n] != "" {
+			fmt.Fprintln(w, strings.Repeat(" ", indent)+ids[n])
+		}
+	}
 	var parts []string
 	if o.Page > 0 && o.PerPage > 0 {
 		parts = append(parts, fmt.Sprintf("page %d of %d", o.Page, (res.Found+o.PerPage-1)/o.PerPage))

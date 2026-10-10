@@ -20,7 +20,6 @@ Install `ipm`, follow a couple of repos, search them and build your first plugin
 | [pnpm](https://pnpm.io/installation) 12 or later, **or** [Node.js](https://nodejs.org) | `ipm sync`, `ipm install` | With only Node, `ipm` runs `npx -y pnpm@12.10.1` for you. |
 | [Docker](https://www.docker.com) (or OrbStack) | `ipm serve`, `ipm search` | Runs the local Typesense search server. Everything else works without it. |
 | [GitHub CLI](https://cli.github.com) `gh`, logged in | `ipm stats` | Optional: stars, topics and descriptions. |
-| [jq](https://jqlang.org) | Listing IDs from `ipm search --json` | Optional. |
 | [Claude Code](https://code.claude.com) `claude` | Validating and using the plugins you build | Optional for `ipm install`, which skips validation without it. |
 
 `ipm` is tested on macOS and Linux. Windows paths are defined but untested.
@@ -75,10 +74,9 @@ ipm load            # index the catalog; rerun after each sync
 ipm search tdd
 ```
 
-Each result shows a SCORE, the artifact's type, name, repo, stars, the plugins it belongs to and its description. To refer to an artifact you need its **ID**, for example `skill:obra/superpowers:skills/test-driven-development`. The table doesn't show IDs; `--json` does:
+Each result shows a SCORE, the artifact's type, name, repo, stars, the plugins it belongs to and its description, with its **ID** on the line beneath, for example `skill:obra/superpowers:skills/test-driven-development`. IDs are how you refer to anything in `ipm`:
 
 ```bash
-ipm search tdd --type skill --json | jq -r '.document.id'
 ipm show 'skill:obra/superpowers:skills/test-driven-development'
 ipm tree 'repo:obra/superpowers'
 ```

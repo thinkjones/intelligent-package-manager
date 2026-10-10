@@ -21,7 +21,7 @@ The source code of `ipm`, a Go CLI (`cli/`) that keeps a per-user list of repos 
 | Refresh GitHub stars, topics and descriptions into `github.jsonl` (needs `gh`) | `ipm stats` |
 | Start / stop the local search server (Typesense in Docker) | `ipm serve` / `ipm serve --stop` |
 | Rebuild the search index from the catalog | `ipm load` |
-| Search every artifact (hybrid, with SCORE; `--keyword`, `--type`, `--repo`, `--tag`, `--limit`, `--page N`, `--all`, `--explain`, `--json`) | `ipm search <query>` |
+| Search every artifact (hybrid, with SCORE; `--keyword`, `--type`, `--repo`, `--tag`, `--limit`, `--page N`, `--all`, `--explain`, `--ids`, `--json`; each hit shows its ID) | `ipm search <query>` |
 | Inspect an artifact and its relationships (reads the catalog only) | `ipm show <id>`, `ipm tree <id> [--up]`, `ipm graph <id> --format mermaid\|dot` |
 | Create a pack (creates `ipm.toml` in the working directory if no ancestor has one; `-g` for user scope) | `ipm pack new <name> [--description …]` |
 | Add or remove catalog items in a pack; list packs; show a pack's items | `ipm pack add <pack> <id>…`, `ipm pack remove <pack> <id>…`, `ipm pack list`, `ipm pack show <pack>` |
@@ -46,6 +46,6 @@ The loop: `ipm source add <repo>` → `ipm sync` (installs, then indexes) → `i
 - **Verify upstream facts from the installed sources**, not from memory: `$IPM_HOME/sources/node_modules/<owner--repo>/` is the repo at its pinned commit. Run `ipm sync` first if it is missing.
 - **The search server is container `ipm-typesense` on `127.0.0.1:8108`.** `ipm serve` removes an old `aihs-typesense` container that would hold the port.
 - **Installing plugins changes the user's Claude config.** Test installs with `CLAUDE_CONFIG_DIR` pointing at a temporary directory.
-- **The docs site is `docs/`**, published by GitHub Pages from `main` (`docs/_config.yml`, Just the Docs). Commands, flags, messages and file formats are documented there; update [the commands reference](docs/reference/commands.md), the relevant guide and [troubleshooting](docs/troubleshooting.md) when they change. Verify claims against the code or a live run, not memory: the search table, for instance, shows no IDs, only `--json` does.
+- **The docs site is `docs/`**, published by GitHub Pages from `main` (`docs/_config.yml`, Just the Docs). Commands, flags, messages and file formats are documented there; update [the commands reference](docs/reference/commands.md), the relevant guide and [troubleshooting](docs/troubleshooting.md) when they change. Verify claims against the code or a live run, not memory.
 - **`docs/superpowers/` is history.** Specs and plans describe what was intended at the time; don't edit them to match the code.
 - **`ipm` stays self-contained**: no global config beyond its own home and cache, nothing shared with fsh or Gas City. Commands are Go only, added to the table in `cli/internal/cli/cli.go`.

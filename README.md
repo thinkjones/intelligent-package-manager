@@ -19,9 +19,14 @@ Search every repo you follow, with keyword and semantic matching, on your machin
 $ ipm search "c# testing" --limit 3
 SCORE  TYPE            NAME                       REPO                    ★      PLUGINS
 71     agent           csharp-pro                 wshobson/agents         40.3k  jvm-languages
+       agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md
 65     copilot-plugin  csharp-dotnet-development  github/awesome-copilot  39.9k  —
+       copilot-plugin:github/awesome-copilot:plugins/csharp-dotnet-development
 24     skill           dotnet-backend-patterns    wshobson/agents         40.3k  dotnet-contribution
+       skill:wshobson/agents:plugins/dotnet-contribution/skills/dotnet-backend-patterns
 ```
+
+Each hit's ID, under it, is what `ipm show`, `ipm tree` and `ipm pack add` take.
 
 Pick what you want into a pack, and build it:
 
@@ -77,7 +82,7 @@ ipm doctor
 ipm source add obra/superpowers anthropics/skills
 ipm sync                                  # fetch, pin and catalog
 ipm serve && ipm load                     # start local search and index the catalog
-ipm search tdd --type skill --json | jq -r .document.id
+ipm search tdd --type skill              # each hit shows its ID
 
 # in your project
 ipm pack new my-pack --description "My picks"
@@ -106,7 +111,6 @@ Every flag is in the [commands reference](https://thinkjones.github.io/intellige
 
 - **`ipm` never installs into Claude Code.** It builds a marketplace; adding it is your step.
 - **Hooks and MCP servers come only with their whole plugin.** They (and inline commands) can't be picked on their own.
-- **Search results don't show IDs.** Use `--json`, or `ipm pack show` for items already picked.
 - **Non-GitHub sources may lose files**, because pnpm applies npm's packing rules to them.
 - **No packaged release yet**, and Windows is untested.
 

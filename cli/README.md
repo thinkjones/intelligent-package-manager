@@ -15,7 +15,7 @@ ipm stats                      fetch GitHub stats for every catalog repo into gi
 ipm serve [--stop]             run Typesense in Docker as ipm-typesense on 127.0.0.1:8108
 ipm load                       rebuild the search index from the catalog
 ipm search <query> [flags]     hybrid search with a SCORE column: --type, --repo, --tag (repeatable), --keyword,
-                               --limit, --page N, --all, --explain (KW/SEM columns), --json
+                               --limit, --page N, --all, --explain (KW/SEM columns), --ids, --json
 ipm show <id> [--json]         an artifact's fields, GitHub stats and neighbours
 ipm tree <id> [--up]           relationships as a tree (--depth N, --all)
 ipm graph <id> [--format dot]  the neighbourhood as Mermaid (default) or Graphviz (--depth N, --all, --up)

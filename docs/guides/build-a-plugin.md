@@ -28,10 +28,9 @@ ipm search accessibility --type command
 ipm search stripe --type plugin
 ```
 
-Get the IDs with `--json`, and check one with `ipm show`:
+Each hit's ID is on the line under it. Check one with `ipm show`:
 
 ```bash
-ipm search c# --type skill --type agent --json | jq -r '.document.id'
 ipm show 'agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md'
 ```
 
