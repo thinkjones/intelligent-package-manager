@@ -1998,10 +1998,9 @@ func TestShowUsedBy(t *testing.T) {
 	if err := f.run("show", "repo:x/c"); err != nil {
 		t.Fatal(err)
 	}
-	out := f.out.String()
-	i := strings.Index(out, "used by:")
-	if i < 0 || !strings.Contains(out[i:], "plugin:o/r#e") {
-		t.Errorf("show:\n%s", out)
+	// x/c is only a placeholder (not a source), so nothing references it.
+	if strings.Contains(f.out.String(), "used by:") {
+		t.Errorf("a repo that isn't a source has no used-by:\n%s", f.out.String())
 	}
 }
 
@@ -2052,8 +2051,8 @@ func TestTuiCatalogNodeReferences(t *testing.T) {
 	}
 	c := tuiCatalog{g}
 	e, _ := c.Node("plugin:o/r#e")
-	if e.External == nil || e.External.ID != "repo:x/c" {
-		t.Errorf("external target %+v", e.External)
+	if e.External != nil || e.Unresolved != "x/c" {
+		t.Errorf("x/c isn't a source: External %+v Unresolved %q", e.External, e.Unresolved)
 	}
 	m, _ := c.Node("marketplace:o/r:.")
 	var ext bool
@@ -2066,7 +2065,7 @@ func TestTuiCatalogNodeReferences(t *testing.T) {
 		t.Error("the marketplace's child ref should be marked external")
 	}
 	x, _ := c.Node("repo:x/c")
-	if len(x.UsedBy) != 1 || x.UsedBy[0].ID != "plugin:o/r#e" || x.UsedBy[0].Repo != "o/r" || x.UsedByRepos != 1 || len(x.Parents) != 0 {
+	if len(x.UsedBy) != 0 || x.UsedByRepos != 0 || len(x.Parents) != 0 {
 		t.Errorf("repo:x/c %+v", x)
 	}
 }
@@ -2089,5 +2088,31 @@ func TestShowUsedByCountsAnythingInARepo(t *testing.T) {
 	}
 	if out := f.out.String(); !strings.Contains(out, "used by:") || !strings.Contains(out[strings.Index(out, "used by:"):], "plugin:a/m#cf") {
 		t.Errorf("a repo's used-by includes references to its plugins:\n%s", out)
+	}
+}
+
+func TestShowSourceHintOnlyWhenUnresolved(t *testing.T) {
+	root := checkout(t)
+	dir := filepath.Join(cacheOf(root), "catalog")
+	files := map[string]string{
+		"repos.jsonl": `{"id":"repo:a/m","type":"repo","name":"a/m","repo":"a/m","followed":true}` + "\n" +
+			`{"id":"repo:b/s","type":"repo","name":"b/s","repo":"b/s","followed":true}` + "\n" +
+			`{"id":"repo:c/x","type":"repo","name":"c/x","repo":"c/x","followed":false}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:a/m#cf","type":"plugin","name":"cf","repo":"a/m","source_repo":"b/s","entry":{"name":"cf","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:a/m#other","type":"plugin","name":"other","repo":"a/m","source_repo":"c/x","entry":{"name":"other","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:b/s:.","type":"plugin","name":"cf","repo":"b/s","path":"."}` + "\n",
+	}
+	for _, typ := range catalog.Types {
+		write(t, filepath.Join(dir, catalog.Files[typ]), files[catalog.Files[typ]])
+	}
+	f := newFake(root)
+	f.run("show", "plugin:a/m#cf")
+	if strings.Contains(f.out.String(), "ipm source add") {
+		t.Errorf("b/s is already a source:\n%s", f.out.String())
+	}
+	f.out.Reset()
+	f.run("show", "plugin:a/m#other")
+	if !strings.Contains(f.out.String(), "ipm source add plugin:a/m#other") {
+		t.Errorf("c/x isn't a source:\n%s", f.out.String())
 	}
 }

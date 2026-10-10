@@ -20,7 +20,7 @@ func fixture(t *testing.T) string {
 	dir := t.TempDir()
 	files := map[string]string{
 		"repos.jsonl": `{"id":"repo:o/r","type":"repo","name":"o/r","repo":"o/r","followed":true}` + "\n" +
-			`{"id":"repo:x/c","type":"repo","name":"x/c","repo":"x/c","followed":false}` + "\n",
+			`{"id":"repo:x/c","type":"repo","name":"x/c","repo":"x/c","followed":true}` + "\n",
 		"plugins.jsonl": `{"id":"plugin:o/r#c","type":"plugin","name":"c","repo":"o/r","source_repo":"x/c","description":"ext"}` + "\n" +
 			`{"id":"plugin:o/r:p","type":"plugin","name":"tools","repo":"o/r","path":"p","commit":"c1"}` + "\n",
 		"skills.jsonl": `{"id":"skill:o/r:p/skills/s","type":"skill","name":"s","description":"Test first","tags":["testing"],"repo":"o/r","path":"p/skills/s","commit":"c1","plugins":["plugin:o/r:p"]}` + "\n",

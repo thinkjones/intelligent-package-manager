@@ -1129,3 +1129,31 @@ func TestExternalModalSingular(t *testing.T) {
 		t.Errorf("one repo, singular:\n%s", view(m))
 	}
 }
+
+func TestExternalModalEmptyKeys(t *testing.T) {
+	m, f := newTestWith(t, withExternal)
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+	typeText(t, m, "cf")
+	press(t, m, "down", "e", "down", "enter")
+	if m.cursor != "plugin:b/s:cf" {
+		t.Errorf("enter in an empty modal does nothing: cursor %q", m.cursor)
+	}
+}
+
+func TestExternalModalScrolls(t *testing.T) {
+	m, f := newTestWith(t, withRefs)
+	b := f.c.details["repo:b/s"]
+	b.UsedBy = nil
+	for i := range 30 {
+		b.UsedBy = append(b.UsedBy, Ref{ID: fmt.Sprintf("plugin:r%02d/m#x", i), Type: "plugin", Name: fmt.Sprintf("entry-%02d", i), Repo: fmt.Sprintf("r%02d/m", i), External: true})
+	}
+	f.c.details["repo:b/s"] = b
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	for range 25 {
+		press(t, m, "down")
+	}
+	if v := view(m); !strings.Contains(v, "▶ r25/m") || !strings.Contains(v, "enter jump · esc close") {
+		t.Errorf("the selected reference and the hint must stay visible:\n%s", v)
+	}
+}

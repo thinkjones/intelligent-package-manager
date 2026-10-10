@@ -99,3 +99,13 @@ func TestUsedByDistinctRepos(t *testing.T) {
 		t.Errorf("used by %v", r.UsedBy["b/s"])
 	}
 }
+
+func TestRefsPlaceholderRepoIsNotATarget(t *testing.T) {
+	// catalog.Build writes a followed:false record for every external
+	// source repo; that is not a source, so the entry is unresolved.
+	r := BuildRefs(records(t, repoAM, `{"id":"repo:42c/plugins","type":"repo","repo":"42c/plugins","followed":false}`,
+		entry("plugin:a/m#x", "x", "42c/plugins", `{"source":"url","url":"u"}`)))
+	if _, ok := r.Target["plugin:a/m#x"]; ok || len(r.UsedBy) != 0 || !r.External["plugin:a/m#x"] {
+		t.Errorf("a placeholder repo is not a target: %+v", r)
+	}
+}

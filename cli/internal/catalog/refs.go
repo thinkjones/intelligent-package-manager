@@ -31,6 +31,11 @@ func BuildRefs(records map[string][]map[string]any) Refs {
 	refs := Refs{External: map[string]bool{}, Target: map[string]string{}, By: map[string][]string{}, UsedBy: map[string][]string{}}
 	repos := map[string]string{} // normalized repo → repo record ID
 	for _, r := range records[TypeRepo] {
+		// catalog.Build writes a followed:false record for each external
+		// source repo; it isn't a source, so it can't be a target.
+		if f, ok := r["followed"].(bool); ok && !f {
+			continue
+		}
 		repos[NormRepo(str(r, "repo"))] = str(r, "id")
 	}
 	plugins := map[string][]map[string]any{} // normalized repo → its plugins

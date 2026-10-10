@@ -93,6 +93,6 @@ ipm graph 'repo:obra/superpowers'                    # Mermaid
 ipm graph 'repo:obra/superpowers' --format dot | dot -Tsvg > superpowers.svg
 ```
 
-Repos contain marketplaces, marketplaces list plugins, and plugins own skills, agents, commands, hooks and MCP servers. An external plugin points at the repo it lives in, so `--up` from a skill also shows the other marketplaces that list its repo.
+Repos contain marketplaces, marketplaces list plugins, and plugins own skills, agents, commands, hooks and MCP servers. A repo is the root of everything in it, so `--up` from a skill stops at its repo. Which other repos' marketplaces list it shows under `used by:` in `ipm show`, and under `e` in the TUI.
 
 `show`, `tree` and `graph` read the catalog directly. They don't need the search server.

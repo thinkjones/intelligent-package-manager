@@ -18,6 +18,7 @@ type extModal struct {
 	repos int
 	rows  []extRow
 	sel   int
+	off   int // first row shown
 }
 
 // openExternal lists every external reference to the cursor's repo, grouped
@@ -63,11 +64,11 @@ func (m *Model) extKey(k string) {
 	case "esc", "e":
 		m.ext = nil
 	case "down", "j":
-		em.sel = min(len(em.rows)-1, em.sel+1)
+		em.sel = max(0, min(len(em.rows)-1, em.sel+1))
 	case "up", "k":
 		em.sel = max(0, em.sel-1)
 	case "enter":
-		if em.sel < len(em.rows) {
+		if em.sel >= 0 && em.sel < len(em.rows) {
 			m.backStack = append(m.backStack, m.cursor)
 			if len(m.backStack) > maxBack {
 				m.backStack = m.backStack[len(m.backStack)-maxBack:]
@@ -90,7 +91,18 @@ func (m *Model) extLines(w, rows int) []string {
 			noun = "repo"
 		}
 		lines = append(lines, stTitle.Render(fmt.Sprintf("External references to %s — used by %d %s", em.repo, em.repos, noun)), "")
+		// Scroll so the selection stays in view between the header and hint.
+		room := max(1, rows-4)
+		if em.sel < em.off {
+			em.off = em.sel
+		}
+		if em.sel >= em.off+room {
+			em.off = em.sel - room + 1
+		}
 		for i, r := range em.rows {
+			if i < em.off || i >= em.off+room {
+				continue
+			}
 			star := ""
 			if r.stars > 0 {
 				star = "★" + stars(r.stars)

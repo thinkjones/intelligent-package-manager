@@ -23,7 +23,7 @@ func fixture(t *testing.T) string {
 	}
 	files := map[string]string{
 		"repos.jsonl": `{"id":"repo:o/r","type":"repo","name":"o/r","repo":"o/r","followed":true}
-{"id":"repo:x/c","type":"repo","name":"x/c","repo":"x/c","followed":false}
+{"id":"repo:x/c","type":"repo","name":"x/c","repo":"x/c","followed":true}
 `,
 		"marketplaces.jsonl": `{"id":"marketplace:o/r:.","type":"marketplace","name":"m","repo":"o/r","plugins":["plugin:o/r:p","plugin:o/r#e"]}
 `,

@@ -110,7 +110,7 @@ func runShow(sys System, id string, asJSON bool) error {
 			fmt.Fprintf(sys.Stdout, "  %s  in %s  (%s)\n", g.Label(r), n["repo"], r)
 		}
 	}
-	if s("type") == catalog.TypePlugin && s("source_repo") != "" {
+	if _, resolved := g.RefTarget(id); g.External(id) && !resolved {
 		fmt.Fprintf(sys.Stdout, "\nadd its source: ipm source add %s\n", id)
 	}
 	return nil
