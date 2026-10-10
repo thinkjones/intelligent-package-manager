@@ -107,11 +107,33 @@ func (m *Model) installLines(w, rows int) []string {
 	return out
 }
 
-// helpLines is the ? overlay in place of the body.
+// helpLines is the ? overlay in place of the body: the two modes' keys side
+// by side when there is room, one after the other otherwise.
 func (m *Model) helpLines(w, rows int) []string {
-	lines := []string{stTitle.Render("Keys"), ""}
-	for _, kh := range keyHelp {
-		lines = append(lines, stAmber.Render(fit(kh[0], 12))+stText.Render(kh[1]))
+	table := func(title string, keys [][2]string, cw int) []string {
+		out := []string{fit(stTitle.Render(title), cw), spaces(cw)}
+		for _, kh := range keys {
+			out = append(out, fit(stAmber.Render(fit(kh[0], 14))+stText.Render(kh[1]), cw))
+		}
+		return out
+	}
+	var lines []string
+	if w >= 100 {
+		half := w / 2
+		left, right := table("Search mode", searchKeys, half-2), table("Tree mode", treeKeys, w-half)
+		for i := range max(len(left), len(right)) {
+			l, r := spaces(half-2), ""
+			if i < len(left) {
+				l = left[i]
+			}
+			if i < len(right) {
+				r = right[i]
+			}
+			lines = append(lines, l+"  "+r)
+		}
+	} else {
+		lines = append(table("Search mode", searchKeys, w), "")
+		lines = append(lines, table("Tree mode", treeKeys, w)...)
 	}
 	lines = append(lines, "", stMuted.Render("esc or ? closes this"))
 	out := make([]string, 0, rows)

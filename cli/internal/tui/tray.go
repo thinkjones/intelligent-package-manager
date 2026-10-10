@@ -49,6 +49,10 @@ func (m *Model) inPack(id string) bool {
 // tray item.
 func (m *Model) selectedID() string {
 	switch m.focus {
+	case focusTree:
+		if rows := m.tree.selectable(); m.treeSel >= 0 && m.treeSel < len(rows) {
+			return rows[m.treeSel].ID
+		}
 	case focusTray:
 		if p := m.activePack(); p != nil && m.traySel < len(p.Items) {
 			return p.Items[m.traySel]

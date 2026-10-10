@@ -15,6 +15,7 @@ type focus int
 const (
 	focusSearch focus = iota
 	focusResults
+	focusTree
 	focusTray
 )
 
@@ -43,9 +44,10 @@ type Model struct {
 	height   int
 	debounce time.Duration
 
-	cursor string            // the tree's centre node
-	chosen map[string]string // the parent picked for a node in tree mode
-	tree   treeView
+	cursor  string            // the tree's centre node
+	chosen  map[string]string // the parent picked for a node in tree mode
+	tree    treeView
+	treeSel int // the selected row among tree.selectable() in tree mode
 
 	packs    []Pack
 	active   string // the active pack's name
@@ -79,7 +81,7 @@ func New(d Deps) *Model {
 	in.Prompt = ""
 	in.Placeholder = "type to search"
 	in.Focus()
-	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond}
+	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
 	m.input.SetWidth(m.width - 30)
 	m.reloadPacks()
 	return m
@@ -174,12 +176,22 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		case "p":
 			m.openPicker(false)
 			return nil
-		case "i":
+		case "i", "b":
 			return m.startInstall()
+		case "t":
+			m.setFocus(focusTray)
+			return nil
 		case "?":
 			m.help = true
 			return nil
 		}
+	}
+	if m.focus == focusTree {
+		if k == "q" {
+			return tea.Quit
+		}
+		m.treeKey(k)
+		return nil
 	}
 	if m.focus == focusTray {
 		m.trayKey(k)
@@ -214,10 +226,71 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.move(1)
 	case "up", "k":
 		m.move(-1)
-	case "tab":
-		m.setFocus(focusTray)
+	case "left", "h":
+		m.treeUp()
+	case "right", "l":
+		m.treeDown()
+	case "tab", "enter":
+		if m.cursor != "" {
+			m.setFocus(focusTree)
+			m.treeSel = m.tree.Cursor
+		}
 	}
 	return nil
+}
+
+// treeKey handles keys in tree mode.
+func (m *Model) treeKey(k string) {
+	switch k {
+	case "down", "j":
+		m.treeMove(1)
+	case "up", "k":
+		m.treeMove(-1)
+	case "left", "h":
+		m.treeUp()
+	case "right", "l":
+		m.treeDown()
+	case "enter":
+		if i := m.treeSel - m.tree.Cursor - 1; i >= 0 && i < len(m.tree.AlsoIn) {
+			m.chosen[m.cursor] = m.tree.AlsoIn[i].ID
+			m.setCursor(m.cursor)
+		}
+	case "esc", "tab":
+		m.setFocus(focusResults)
+		m.followSelection()
+	}
+}
+
+// treeUp moves the tree's cursor to its parent.
+func (m *Model) treeUp() {
+	if n := len(m.tree.Path); n > 0 {
+		m.setCursor(m.tree.Path[n-1].ID)
+	}
+}
+
+// treeDown moves the tree's cursor to its first child.
+func (m *Model) treeDown() {
+	if len(m.tree.Children) > 0 {
+		child := m.tree.Children[0].ID
+		m.chosen[child] = m.cursor
+		m.setCursor(child)
+	}
+}
+
+// treeMove steps through the siblings and the 'also in' rows; a sibling
+// becomes the cursor, under the same parent.
+func (m *Model) treeMove(by int) {
+	rows := m.tree.selectable()
+	sel := max(0, min(len(rows)-1, m.treeSel+by))
+	also := sel > m.tree.Cursor && sel <= m.tree.Cursor+len(m.tree.AlsoIn)
+	if also || sel == m.treeSel {
+		m.treeSel = sel
+		return
+	}
+	if n := len(m.tree.Path); n > 0 {
+		m.chosen[rows[sel].ID] = m.tree.Path[n-1].ID
+	}
+	m.setCursor(rows[sel].ID)
 }
 
 // trayKey handles keys while the tray has focus.
@@ -290,6 +363,9 @@ func (m *Model) View() tea.View {
 		mode = stMuted.Render("○ local")
 	}
 	head := stTitle.Render("ipm") + stMuted.Render(" ─ search: ") + m.input.View()
+	if crumb := m.breadcrumb(w / 2); crumb != "" {
+		head = stTitle.Render("ipm") + "  " + crumb + stMuted.Render("  ─ search: ") + m.input.View()
+	}
 	b.WriteString(fit(head, w-lipglossWidth(mode)-1) + " " + mode + "\n")
 	if n := m.d.Searcher.Notice(); n != "" {
 		b.WriteString(fit(stAmber.Render(n), w) + "\n")
@@ -343,11 +419,18 @@ func (m *Model) countLine() string {
 // bodyLines is the results and the tree side by side, or the results alone
 // in a narrow terminal.
 func (m *Model) bodyLines(w, rows int) []string {
+	sel := -1
+	if m.focus == focusTree {
+		sel = m.treeSel
+	}
 	if !m.wide() {
+		if m.focus == focusTree {
+			return m.tree.lines(w, rows, sel, true)
+		}
 		return m.resultLines(w, rows)
 	}
 	left := w * 45 / 100
-	res, det := m.resultLines(left, rows), m.tree.lines(w-left-3, rows, -1, false)
+	res, det := m.resultLines(left, rows), m.tree.lines(w-left-3, rows, sel, m.focus == focusTree)
 	out := make([]string, rows)
 	for i := range out {
 		out[i] = res[i] + stRule.Render(" │ ") + det[i]
@@ -370,5 +453,23 @@ func (m *Model) setCursor(id string) {
 	if err != nil {
 		m.status = err.Error()
 	}
-	m.cursor, m.tree = id, tv
+	m.cursor, m.tree, m.treeSel = id, tv, tv.Cursor
+}
+
+// breadcrumb is the cursor's path, "repo › … › node", cut from the left to w.
+func (m *Model) breadcrumb(w int) string {
+	if m.cursor == "" {
+		return ""
+	}
+	refs := append(append([]Ref(nil), m.tree.Path...), refOf(m.tree.Node))
+	sep := stMuted.Render(" › ")
+	parts := make([]string, len(refs))
+	for i, r := range refs {
+		parts[i] = typeStyle(r.Type).Render(r.Name)
+	}
+	for len(parts) > 1 && lipglossWidth(strings.Join(parts, sep)) > w {
+		parts = parts[1:]
+		parts[0] = stMuted.Render("…")
+	}
+	return strings.Join(parts, sep)
 }

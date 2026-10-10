@@ -457,9 +457,9 @@ func TestRemove(t *testing.T) {
 	if f.p.calls[0] != "remove a "+tddID {
 		t.Fatalf("calls %v", f.p.calls)
 	}
-	press(t, m, "tab")
+	press(t, m, "t")
 	if m.focus != focusTray {
-		t.Fatalf("tab from results should focus the tray")
+		t.Fatalf("t should focus the tray")
 	}
 	press(t, m, "d")
 	if f.p.calls[1] != "remove a agent:o/r:agents/x.md" {
@@ -577,7 +577,7 @@ func TestHelpOverlay(t *testing.T) {
 	m, _ := newTest(t)
 	press(t, m, "down", "?")
 	v := view(m)
-	for _, kh := range keyHelp {
+	for _, kh := range append(append([][2]string{}, searchKeys...), treeKeys...) {
 		if !strings.Contains(v, kh[0]) || !strings.Contains(v, kh[1]) {
 			t.Errorf("help lacks %q %q", kh[0], kh[1])
 		}
@@ -624,7 +624,7 @@ func TestTraySelectionStaysVisible(t *testing.T) {
 		items = append(items, fmt.Sprintf("skill:o/r:skills/item-number-%c-with-a-long-name", 'a'+i))
 	}
 	m, _ := newTestWith(t, withPacks(Pack{Name: "a", Items: items}))
-	press(t, m, "tab", "tab")
+	press(t, m, "down", "t")
 	if m.focus != focusTray {
 		t.Fatalf("focus %v", m.focus)
 	}
@@ -651,5 +651,129 @@ func TestInstallLongLineDoesNotHang(t *testing.T) {
 	}
 	if !m.inst.done {
 		t.Error("install should be done")
+	}
+}
+
+// treeTest is a model whose "tdd" results sit in the withDetails tree, with
+// the results focused.
+func treeTest(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	m, f := newTestWith(t, func(f fakes) {
+		withDetails(f)
+		f.p.packs = []Pack{{Name: "a"}}
+	})
+	typeText(t, m, "tdd")
+	press(t, m, "down")
+	return m, f
+}
+
+func TestSearchModeArrowsMoveTree(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "right")
+	if m.cursor != "agent:o/r:agents/helper.md" || m.sel != 0 || m.focus != focusResults {
+		t.Fatalf("right: cursor %q sel %d focus %v", m.cursor, m.sel, m.focus)
+	}
+	press(t, m, "left", "left")
+	if m.cursor != "plugin:o/r:p" {
+		t.Errorf("left twice: cursor %q", m.cursor)
+	}
+	press(t, m, "down")
+	if m.cursor != "skill:o/r:skills/tdd-guard" {
+		t.Errorf("moving the result should reset the tree: %q", m.cursor)
+	}
+}
+
+func TestLeftAtRootRightAtLeaf(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "left", "left", "left")
+	if m.cursor != "repo:o/r" {
+		t.Errorf("left at the root: %q", m.cursor)
+	}
+	m, _ = treeTest(t)
+	press(t, m, "right", "right")
+	if m.cursor != "agent:o/r:agents/helper.md" {
+		t.Errorf("right at a leaf: %q", m.cursor)
+	}
+}
+
+func TestTreeModeSiblings(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "tab")
+	if m.focus != focusTree {
+		t.Fatalf("tab from results should enter tree mode")
+	}
+	press(t, m, "down")
+	if m.cursor != "skill:o/r:skills/tdd-guard" {
+		t.Errorf("down: %q", m.cursor)
+	}
+	press(t, m, "k")
+	if m.cursor != "skill:o/r:skills/tdd" {
+		t.Errorf("k: %q", m.cursor)
+	}
+	press(t, m, "j")
+	if m.cursor != "skill:o/r:skills/tdd-guard" || m.sel != 0 {
+		t.Errorf("j: %q, result selection %d", m.cursor, m.sel)
+	}
+}
+
+func TestTreeModeAlsoIn(t *testing.T) {
+	m, f := treeTest(t)
+	tdd := f.c.details["skill:o/r:skills/tdd"]
+	tdd.Parents = append(tdd.Parents, Ref{ID: "plugin:o/r:p2", Type: "plugin", Name: "p2"})
+	f.c.details["skill:o/r:skills/tdd"] = tdd
+	f.c.details["plugin:o/r:p2"] = Node{ID: "plugin:o/r:p2", Type: "plugin", Name: "p2",
+		Children: []Ref{{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd"}}}
+	m.followSelection()
+	press(t, m, "tab", "down")
+	if m.cursor != "skill:o/r:skills/tdd" || !strings.Contains(view(m), "also in: plugin p2") {
+		t.Fatalf("down onto also-in should not move the cursor: %q\n%s", m.cursor, view(m))
+	}
+	press(t, m, "enter")
+	if m.chosen["skill:o/r:skills/tdd"] != "plugin:o/r:p2" || len(m.tree.Path) == 0 || m.tree.Path[len(m.tree.Path)-1].ID != "plugin:o/r:p2" {
+		t.Errorf("enter should follow p2: chosen %v path %v", m.chosen, m.tree.Path)
+	}
+}
+
+func TestTreeModeExit(t *testing.T) {
+	for _, k := range []string{"esc", "tab"} {
+		m, _ := treeTest(t)
+		press(t, m, "tab", "down", k)
+		if m.focus != focusResults || m.cursor != "skill:o/r:skills/tdd" {
+			t.Errorf("%s: focus %v cursor %q", k, m.focus, m.cursor)
+		}
+	}
+}
+
+func TestTreeModeAdd(t *testing.T) {
+	m, f := treeTest(t)
+	press(t, m, "left", "tab", "a")
+	if strings.Join(f.p.calls, ";") != "add a plugin:o/r:p" {
+		t.Errorf("calls %v", f.p.calls)
+	}
+}
+
+func TestEnterFromResultsOpensTreeMode(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "enter")
+	if m.focus != focusTree {
+		t.Errorf("focus %v", m.focus)
+	}
+}
+
+func TestHelpListsBothModes(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "?")
+	v := view(m)
+	for _, kh := range append(append([][2]string{}, searchKeys...), treeKeys...) {
+		if !strings.Contains(v, kh[1]) {
+			t.Errorf("help lacks %q", kh[1])
+		}
+	}
+}
+
+func TestBreadcrumb(t *testing.T) {
+	m, _ := treeTest(t)
+	if !strings.Contains(view(m), "o/r › p › tdd") {
+		t.Errorf("breadcrumb:\n%s", view(m))
 	}
 }
