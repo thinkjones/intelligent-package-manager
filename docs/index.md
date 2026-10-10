@@ -5,8 +5,7 @@ description: ipm finds agent skills, agents, commands and plugins across many re
 permalink: /
 ---
 
-# ipm
-{: .fs-9 }
+![ipm, the intelligent package manager for Claude Code: four items picked from two GitHub repos, each pinned to a commit, built by ipm install into one validated Claude Code plugin.](assets/brand/hero.svg)
 
 The intelligent package manager for agent artifacts. Find skills, agents, commands, hooks, MCP servers and plugins across every repo you follow, then pick the ones you want into your own Claude Code plugin, pinned to the commits you picked from.
 {: .fs-6 .fw-300 }
@@ -21,6 +20,8 @@ The intelligent package manager for agent artifacts. Find skills, agents, comman
 Good agent artifacts are scattered across hundreds of repos and marketplaces. Installing a whole plugin to get one skill drags in agents, hooks and MCP servers you didn't want, under names you don't control, at whatever commit happens to be current.
 
 ## What ipm does
+
+![How ipm works: source add, sync, search, pack add, install.](assets/brand/workflow.svg)
 
 1. **Follow repos.** `ipm source add obra/superpowers` adds a repo of interest. `ipm sync` has [pnpm](https://pnpm.io) fetch every repo and pin it to a commit.
 2. **Catalog them.** `ipm sync` also builds a catalog of everything those repos hold: one record per repo, marketplace, plugin, skill, agent, command, hook and MCP server, linked to what owns it.

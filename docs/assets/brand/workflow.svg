@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">How ipm works</title>
+  <desc id="desc">Five steps: ipm source add records the repos you follow; ipm sync has pnpm fetch each repo, pin it to a commit and catalog it; ipm search finds artifacts with local hybrid search; ipm pack add picks items into a pack; ipm install builds each pack into a Claude Code plugin and marketplace, which you add to Claude Code yourself.</desc>
+
+  <rect width="1200" height="320" rx="24" fill="#11151C"/>
+  <rect x="0.75" y="0.75" width="1198.5" height="318.5" rx="23.25" fill="none" stroke="#263040" stroke-width="1.5"/>
+
+  <text x="64" y="72" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="2" fill="#8B95A3">HOW IT WORKS</text>
+  <line x1="64" y1="132" x2="1136" y2="132" stroke="#2C3747" stroke-width="1.5"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <g transform="translate(64 0)">
+      <circle cx="9" cy="132" r="9" fill="#11151C" stroke="#F3EFE6" stroke-width="2"/>
+      <text x="0" y="112" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#F3EFE6">source add</text>
+      <text x="0" y="180" font-size="20" fill="#C9D1D9">List the repos</text>
+      <text x="0" y="206" font-size="20" fill="#C9D1D9">you follow</text>
+    </g>
+    <g transform="translate(278 0)">
+      <circle cx="9" cy="132" r="9" fill="#11151C" stroke="#F3EFE6" stroke-width="2"/>
+      <text x="0" y="112" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#F3EFE6">sync</text>
+      <text x="0" y="180" font-size="20" fill="#C9D1D9">pnpm fetches and</text>
+      <text x="0" y="206" font-size="20" fill="#C9D1D9">pins each repo;</text>
+      <text x="0" y="232" font-size="20" fill="#C9D1D9">ipm catalogs it</text>
+      <g transform="translate(0 252)">
+        <rect width="104" height="30" rx="8" fill="none" stroke="#F0A847" stroke-width="1.5"/>
+        <text x="52" y="21" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#F0A847">@46891e7</text>
+      </g>
+    </g>
+    <g transform="translate(492 0)">
+      <circle cx="9" cy="132" r="9" fill="#11151C" stroke="#F3EFE6" stroke-width="2"/>
+      <text x="0" y="112" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#F3EFE6">search</text>
+      <text x="0" y="180" font-size="20" fill="#C9D1D9">Keyword + semantic,</text>
+      <text x="0" y="206" font-size="20" fill="#C9D1D9">on your machine</text>
+    </g>
+    <g transform="translate(706 0)">
+      <circle cx="9" cy="132" r="9" fill="#11151C" stroke="#F3EFE6" stroke-width="2"/>
+      <text x="0" y="112" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#F3EFE6">pack add</text>
+      <text x="0" y="180" font-size="20" fill="#C9D1D9">Pick skills, agents,</text>
+      <text x="0" y="206" font-size="20" fill="#C9D1D9">commands, plugins</text>
+    </g>
+    <g transform="translate(920 0)">
+      <circle cx="9" cy="132" r="9" fill="#F0A847"/>
+      <text x="0" y="112" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700" fill="#F0A847">install</text>
+      <text x="0" y="180" font-size="20" fill="#C9D1D9">One plugin per pack,</text>
+      <text x="0" y="206" font-size="20" fill="#C9D1D9">validated</text>
+      <text x="0" y="244" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#5CC8A8">✓ <tspan fill="#8B95A3">&lt;pack&gt;:&lt;item&gt;</tspan></text>
+    </g>
+  </g>
+</svg>

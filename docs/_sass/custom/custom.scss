@@ -1,0 +1,52 @@
+// The commit-pin motif: inline code reads like the pin chips in the hero.
+:not(pre, figure) > code {
+  border: 1px solid $ipm-border;
+  border-radius: 6px;
+  color: $ipm-fg;
+}
+
+// Code blocks sit on the hero's panel surface.
+div.highlighter-rouge,
+pre.highlight,
+figure.highlight {
+  border: 1px solid $ipm-border;
+  border-radius: 10px;
+}
+
+// Headings use the hero's tight, heavy title style.
+h1,
+.text-alpha {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+// The ✓ in tables and text keeps the "verified" colour.
+.ipm-ok {
+  color: $ipm-teal;
+}
+
+// Brand images keep their own rounded frame.
+img[src*="assets/brand/"] {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 1.5rem 0;
+}
+
+.site-logo {
+  background-position: left center;
+}
+
+// Sidebar: warm white links, amber only for where you are.
+.site-nav .nav-list .nav-list-item .nav-list-link {
+  color: $ipm-text;
+
+  &.active,
+  &:hover {
+    color: $ipm-amber;
+  }
+}
+
+.site-nav .nav-list .nav-list-item .nav-list-expander {
+  color: $ipm-muted;
+}

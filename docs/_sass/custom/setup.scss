@@ -1,0 +1,14 @@
+// The same font stacks as the brand SVGs.
+$body-font-family: -apple-system, blinkmacsystemfont, "Segoe UI", system-ui, roboto, "Helvetica Neue", arial, sans-serif;
+$mono-font-family: ui-monospace, "SFMono-Regular", menlo, consolas, monospace;
+
+// ipm's palette, shared with docs/assets/brand/*.svg and color_schemes/ipm.scss.
+$ipm-bg: #11151c;
+$ipm-surface: #161c25;
+$ipm-raised: #1d2430;
+$ipm-border: #2c3747;
+$ipm-fg: #f3efe6;
+$ipm-text: #c9d1d9;
+$ipm-muted: #8b95a3;
+$ipm-amber: #f0a847;
+$ipm-teal: #5cc8a8;

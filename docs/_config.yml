@@ -15,7 +15,16 @@ relative_links:
 
 search_enabled: true
 heading_anchors: true
-color_scheme: light
+color_scheme: ipm
+logo: /assets/brand/logo.svg
+callouts_level: loud
+callouts:
+  note:
+    title: Note
+    color: yellow
+  warning:
+    title: Warning
+    color: red
 mermaid:
   version: "11.4.1"
 

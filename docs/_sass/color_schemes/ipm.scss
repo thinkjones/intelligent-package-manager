@@ -1,0 +1,19 @@
+// ipm's palette, shared with docs/assets/brand/*.svg: a dark terminal surface,
+// warm white text, amber for pins and primary actions, teal for "verified".
+@import "./color_schemes/dark";
+
+// The palette ($ipm-*) is in custom/setup.scss, which every stylesheet imports.
+$body-background-color: $ipm-bg;
+$body-heading-color: $ipm-fg;
+$body-text-color: $ipm-text;
+$link-color: $ipm-amber;
+$nav-child-link-color: $ipm-muted;
+$sidebar-color: #0d1117;
+$base-button-color: $ipm-raised;
+$btn-primary-color: #b9741c;
+$code-background-color: $ipm-surface;
+$feedback-color: #0b0e13;
+$table-background-color: $ipm-surface;
+$search-background-color: $ipm-surface;
+$search-result-preview-color: $ipm-muted;
+$border-color: $ipm-border;

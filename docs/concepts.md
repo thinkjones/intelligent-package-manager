@@ -9,6 +9,8 @@ nav_order: 3
 The handful of ideas `ipm` is built on.
 {: .fs-6 .fw-300 }
 
+![How ipm works: source add lists the repos you follow; sync has pnpm fetch and pin each repo and ipm catalogs it; search finds artifacts on your machine; pack add picks items; install builds one validated plugin per pack.](assets/brand/workflow.svg)
+
 1. TOC
 {:toc}
 
