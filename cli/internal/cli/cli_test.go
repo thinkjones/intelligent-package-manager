@@ -19,6 +19,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
@@ -28,6 +29,7 @@ import (
 // fake is a System with no real environment, git or claude. Output answers
 // from canned results keyed by the program name and its first arguments.
 type fake struct {
+	width   int // the terminal width TermWidth reports; 0 is not a terminal
 	env     map[string]string
 	out     bytes.Buffer
 	errOut  bytes.Buffer
@@ -61,9 +63,10 @@ func newFake(root string) *fake {
 
 func (f *fake) system() System {
 	return System{
-		Stdout: &f.out,
-		Stderr: &f.errOut,
-		Getenv: func(k string) string { return f.env[k] },
+		Stdout:    &f.out,
+		Stderr:    &f.errOut,
+		Getenv:    func(k string) string { return f.env[k] },
+		TermWidth: func() int { return f.width },
 		LookPath: func(p string) (string, error) {
 			if f.onPath[p] {
 				return "/bin/" + p, nil
@@ -1423,5 +1426,35 @@ func TestSearchShowsAndListsIDs(t *testing.T) {
 	}
 	if err := f.run("search", "tdd", "--ids", "--json"); err == nil {
 		t.Error("--ids and --json don't combine")
+	}
+}
+
+func TestSearchUsesTheTerminalWidth(t *testing.T) {
+	longest := func(out string) int {
+		n := 0
+		for _, l := range strings.Split(out, "\n") {
+			if !strings.HasPrefix(l, " ") {
+				n = max(n, utf8.RuneCountInString(l))
+			}
+		}
+		return n
+	}
+	f, _ := searchFake(t, 0)
+	f.width = 50
+	f.run("search", "tdd")
+	if n := longest(f.out.String()); n > 50 {
+		t.Errorf("a 50-column terminal got a %d-column line:\n%s", n, f.out.String())
+	}
+	f.out.Reset()
+	f.width, f.env["COLUMNS"] = 0, "60"
+	f.run("search", "tdd")
+	if n := longest(f.out.String()); n > 60 {
+		t.Errorf("COLUMNS=60 got a %d-column line:\n%s", n, f.out.String())
+	}
+	f.out.Reset()
+	delete(f.env, "COLUMNS")
+	f.run("search", "tdd")
+	if strings.Contains(f.out.String(), "…") {
+		t.Errorf("piped output (no terminal, no COLUMNS) must not be cut:\n%s", f.out.String())
 	}
 }

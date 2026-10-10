@@ -103,7 +103,7 @@ Rebuilds the search index from the catalog and GitHub stats. Run it after `ipm s
 ipm search [flags] <query>
 ```
 
-Hybrid keyword and semantic search. Needs `ipm serve` and `ipm load`. Each hit's full ID is printed on the line under it.
+Hybrid keyword and semantic search. Needs `ipm serve` and `ipm load`. Each hit's full ID is printed on the line under it. The table fits the terminal width (or `COLUMNS`), dropping DESCRIPTION, then PLUGINS, then REPO when narrow; piped output isn't cut.
 
 | Flag | Does |
 | --- | --- |
@@ -229,6 +229,7 @@ ipm help [command]
 | --- | --- |
 | `IPM_HOME` | Where your sources, the pnpm store and user-scope packs live. Must be absolute. |
 | `IPM_CACHE_DIR` | Where the catalog and search data live. Must be absolute. |
+| `COLUMNS` | The width `ipm search` fits its table to when stdout isn't a terminal. |
 | `XDG_DATA_HOME`, `XDG_CACHE_HOME` | Honoured on every OS when the variables above are unset. |
 
 Defaults are in [Files and paths](files.md).

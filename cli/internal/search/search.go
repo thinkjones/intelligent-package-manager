@@ -263,8 +263,10 @@ func score(h typesense.Hit, top int64) string {
 	return "—"
 }
 
-// Table writes hits as columns, best first, every line within the width,
-// then a summary of matches per type and the search time.
+// Table writes hits as columns, best first, each with its ID on the line
+// beneath, then a summary of matches per type and the search time. Rows fit
+// o.Width (IDs are never cut); 0 means no limit, for output that isn't a
+// terminal.
 func Table(w io.Writer, res typesense.Result, o TableOptions) {
 	if len(res.Hits) == 0 {
 		fmt.Fprintln(w, "no matches")
@@ -308,35 +310,74 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 		rows = append(rows, append(row, str(d, "type"), str(d, "name"), str(d, "repo"), Stars(stars), plugins, str(d, "description")))
 		ids = append(ids, str(d, "id"))
 	}
-	widths := make([]int, len(caps))
+	// Fit the terminal: columns keep their caps, the description takes what
+	// is left, and when even that doesn't fit, DESCRIPTION, PLUGINS and then
+	// REPO (also inside the ID) are dropped. Width 0 cuts nothing.
+	n := len(header)
+	desc, plugins, repo, name := n-1, n-2, n-4, n-5
+	widths := make([]int, n)
 	for _, r := range rows {
-		for i := range caps {
-			r[i] = cut(r[i], caps[i])
+		for i := range n - 1 {
+			if o.Width > 0 {
+				r[i] = cut(r[i], caps[i])
+			}
 			widths[i] = max(widths[i], utf8.RuneCountInString(r[i]))
 		}
 	}
-	used := 0
-	for _, wd := range widths {
-		used += wd + 2
+	keep := make([]bool, n)
+	for i := range keep {
+		keep[i] = true
+	}
+	// others is the line length of every kept column but the description,
+	// with the two-space gap after each.
+	others := func() int {
+		total := 0
+		for i := range n - 1 {
+			if keep[i] {
+				total += widths[i] + 2
+			}
+		}
+		return total
+	}
+	const minDesc = 20
+	if o.Width > 0 {
+		if others()+minDesc > o.Width {
+			keep[desc] = false
+		}
+		for _, i := range []int{plugins, repo} {
+			if !keep[desc] && others()-2 > o.Width {
+				keep[i] = false
+			}
+		}
+		if over := others() - 2 - o.Width; !keep[desc] && over > 0 {
+			widths[name] = max(12, widths[name]-over)
+		}
+	}
+	indent := 0
+	for i := range n - 6 { // SCORE, and KW and SEM with --explain
+		indent += widths[i] + 2
 	}
 	// Each hit's ID goes on its own line under TYPE, never cut, so it can be
 	// copied into ipm show, tree, graph or pack add.
-	last, indent := len(header)-1, 0
-	for i := range len(header) - 6 { // SCORE, and KW and SEM with --explain
-		indent += widths[i] + 2
-	}
-	for n, r := range rows {
-		r[last] = cut(r[last], o.Width-used)
+	for row, r := range rows {
 		var line strings.Builder
 		for i, cell := range r {
-			line.WriteString(cell)
-			if i < last {
-				line.WriteString(strings.Repeat(" ", widths[i]+2-utf8.RuneCountInString(cell)))
+			if !keep[i] {
+				continue
 			}
+			if i == desc {
+				if o.Width > 0 {
+					cell = cut(cell, o.Width-others())
+				}
+				line.WriteString(cell)
+				continue
+			}
+			cell = cut(cell, widths[i])
+			line.WriteString(cell + strings.Repeat(" ", widths[i]+2-utf8.RuneCountInString(cell)))
 		}
 		fmt.Fprintln(w, strings.TrimRight(line.String(), " "))
-		if ids[n] != "" {
-			fmt.Fprintln(w, strings.Repeat(" ", indent)+ids[n])
+		if ids[row] != "" {
+			fmt.Fprintln(w, strings.Repeat(" ", indent)+ids[row])
 		}
 	}
 	var parts []string
@@ -348,5 +389,15 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 		parts = append(parts, fmt.Sprintf("%s %d", f.Value, f.Count))
 	}
 	parts = append(parts, fmt.Sprintf("%d ms", res.SearchTimeMS))
-	fmt.Fprintln(w, strings.Join(parts, " · "))
+	// Wrap the summary at its separators when it is wider than the terminal.
+	line := parts[0]
+	for _, p := range parts[1:] {
+		if o.Width > 0 && utf8.RuneCountInString(line+" · "+p) > o.Width {
+			fmt.Fprintln(w, line)
+			line = p
+			continue
+		}
+		line += " · " + p
+	}
+	fmt.Fprintln(w, line)
 }

@@ -20,6 +20,9 @@ type System struct {
 	Stdout io.Writer
 	Stderr io.Writer
 	Getenv func(string) string
+	// TermWidth is stdout's terminal width in columns, 0 when stdout is not
+	// a terminal; nil is 0.
+	TermWidth func() int
 	// LookPath reports whether a program is on PATH.
 	LookPath func(string) (string, error)
 	// Output runs name with args in dir and returns its combined output.

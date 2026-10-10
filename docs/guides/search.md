@@ -46,6 +46,8 @@ ipm search hooks --tag security
 | `--ids` | Only each hit's ID, one per line. |
 | `--json` | One JSON line per hit, with every field. |
 
+The table fits your terminal. When it is too narrow, DESCRIPTION goes first, then PLUGINS, then REPO (the repo is also in the ID); IDs are never cut. Output piped to a file or another command isn't cut at all. Set `COLUMNS` to choose a width yourself.
+
 Search is **hybrid**: keyword matches on name, description, tags and plugin names are fused with semantic matches, and ties go to the repo with more stars. `c#` and `c++` are searchable as words.
 
 **SCORE** shows how each hit ranks against the best hit in the same query (100). It is not comparable between queries. SEM, with `--explain`, is comparable: it is the semantic similarity between your query and the artifact, from 0 to 1.

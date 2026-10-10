@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/cli"
+	"golang.org/x/term"
 )
 
 const version = "0.2.0"
@@ -32,9 +33,15 @@ func main() {
 
 func run() int {
 	err := cli.Run(os.Args[1:], cli.System{
-		Stdout:   os.Stdout,
-		Stderr:   os.Stderr,
-		Getenv:   os.Getenv,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+		Getenv: os.Getenv,
+		TermWidth: func() int {
+			if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil {
+				return w
+			}
+			return 0
+		},
 		LookPath: exec.LookPath,
 		Output: func(dir, name string, args ...string) (string, error) {
 			cmd := exec.Command(name, args...)

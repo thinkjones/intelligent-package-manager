@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -255,5 +256,58 @@ func TestTableShowsEachHitsID(t *testing.T) {
 				t.Errorf("explain=%v: rows lost their alignment:\n%s", explain, b.String())
 			}
 		}
+	}
+}
+
+func wideHits() typesense.Result {
+	return typesense.Result{Found: 100, SearchTimeMS: 18, Facets: map[string][]typesense.FacetCount{"type": {
+		{Value: "skill", Count: 44}, {Value: "agent", Count: 33}, {Value: "plugin", Count: 11}, {Value: "command", Count: 8}, {Value: "copilot-plugin", Count: 3}, {Value: "repo", Count: 1}}},
+		Hits: []typesense.Hit{{Document: map[string]any{
+			"id": "copilot-plugin:github/awesome-copilot:plugins/csharp-dotnet-development", "type": "copilot-plugin",
+			"name": "csharp-dotnet-development", "repo": "github/awesome-copilot", "stars": float64(39900),
+			"plugin_names": []any{"dotnet-contribution"}, "description": strings.Repeat("Essential prompts and skills. ", 8)}}}}
+}
+
+func TestTableFitsTheWidth(t *testing.T) {
+	for _, tc := range []struct {
+		width int
+		gone  []string
+	}{
+		{160, nil},
+		{110, []string{"DESCRIPTION"}},
+		{90, []string{"DESCRIPTION", "PLUGINS"}},
+		{70, []string{"DESCRIPTION", "PLUGINS", "REPO"}},
+	} {
+		var b bytes.Buffer
+		Table(&b, wideHits(), TableOptions{Width: tc.width})
+		lines := strings.Split(strings.TrimRight(b.String(), "\n"), "\n")
+		for _, col := range []string{"DESCRIPTION", "PLUGINS", "REPO"} {
+			if strings.Contains(lines[0], col) == slices.Contains(tc.gone, col) {
+				t.Errorf("width %d: %s shown=%v, want dropped=%v\n%s", tc.width, col, strings.Contains(lines[0], col), slices.Contains(tc.gone, col), b.String())
+			}
+		}
+		for _, l := range lines {
+			if !strings.HasPrefix(l, " ") && utf8.RuneCountInString(l) > tc.width {
+				t.Errorf("width %d: line of %d: %q", tc.width, utf8.RuneCountInString(l), l)
+			}
+		}
+		if !strings.Contains(b.String(), "\n       copilot-plugin:github/awesome-copilot:plugins/csharp-dotnet-development\n") {
+			t.Errorf("width %d: the ID must stay whole:\n%s", tc.width, b.String())
+		}
+	}
+}
+
+func TestTableWiderShowsMoreAndZeroCutsNothing(t *testing.T) {
+	desc := func(width int) string {
+		var b bytes.Buffer
+		Table(&b, wideHits(), TableOptions{Width: width})
+		row := strings.Split(b.String(), "\n")[1]
+		return row[strings.Index(row, "Essential"):]
+	}
+	if len(desc(200)) <= len(desc(130)) {
+		t.Error("a wider terminal should show more of the description")
+	}
+	if full := desc(0); strings.Contains(full, "…") || !strings.HasSuffix(full, "skills.") {
+		t.Errorf("width 0 (not a terminal) must not cut: %q", full)
 	}
 }

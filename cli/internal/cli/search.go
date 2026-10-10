@@ -69,6 +69,20 @@ func interspersed(fs *flag.FlagSet, args []string) ([]string, error) {
 	return append(words, tail...), nil
 }
 
+// outputWidth is the width to fit tables to: the terminal's, else $COLUMNS,
+// else 0 (not a terminal: cut nothing).
+func outputWidth(sys System) int {
+	if sys.TermWidth != nil {
+		if w := sys.TermWidth(); w > 0 {
+			return w
+		}
+	}
+	if w, err := strconv.Atoi(sys.Getenv("COLUMNS")); err == nil && w > 0 {
+		return w
+	}
+	return 0
+}
+
 // maxPage is Typesense's largest page size.
 const maxPage = 250
 
@@ -114,7 +128,7 @@ func runSearch(sys System, q search.Query, all, asJSON, explain, ids bool) error
 		}
 		return nil
 	}
-	o := search.TableOptions{Width: 120, Explain: explain}
+	o := search.TableOptions{Width: outputWidth(sys), Explain: explain}
 	if q.Keyword && q.Page > 1 {
 		first := q
 		first.Page, first.Limit = 1, 1
