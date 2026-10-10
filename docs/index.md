@@ -48,7 +48,7 @@ claude plugin marketplace add ./.ipm
 - **No upstream code runs.** pnpm always runs with `--ignore-scripts`, and repos' own npm dependencies are never installed. Sources are content, not code.
 - **Your namespace.** Picked items load under your pack's name, not a dozen upstream plugin names.
 - **Built on pnpm.** Fetching, pinning, a content-addressable store and cheap linking come from pnpm; `ipm` doesn't reinvent them.
-- **You stay in control.** `ipm` writes a marketplace; it never changes your Claude Code configuration. You add the marketplace yourself.
+- **You stay in control.** Building never touches your Claude Code configuration; `ipm deploy` installs a pack, at the scope you choose, only when you ask.
 
 ## Where next
 

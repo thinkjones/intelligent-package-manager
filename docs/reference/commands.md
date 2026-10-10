@@ -204,11 +204,27 @@ Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, 
 ipm tui [-g]
 ```
 
-Search, judge, collect into packs and build, in one screen. Uses the search server when it is running and indexed, and keyword search over the catalog otherwise. Needs a terminal and a catalog. See [Use the TUI](../guides/tui.md) for the keys.
+Search, see each artifact in its tree, collect into packs, build and deploy, in one screen. Uses the search server when it is running and indexed, and keyword search over the catalog otherwise. Needs a terminal and a catalog. See [Use the TUI](../guides/tui.md) for the keys.
 
 | Flag | Does |
 | --- | --- |
 | `-g`, `--global` | Use your user scope's packs (`$IPM_HOME/global`). |
+
+### `ipm deploy`
+
+```text
+ipm deploy [pack] [--scope user|project|local] [--path DIR] [-g]
+```
+
+Builds the scope's packs (as `ipm install`), then installs `pack` into Claude Code. `pack` may be left out when the scope has only one. It prints each command before running it and needs no confirmation: typing the command is the decision.
+
+| Flag | Does |
+| --- | --- |
+| `--scope S` | `user` (every project, just you), `project` (a folder, shared through its `.claude/settings.json`) or `local` (a folder, just you). Default `project`; `user` with `-g`. |
+| `--path DIR` | The folder for project or local scope. Default: the pack's project. `~` and relative paths work. |
+| `-g`, `--global` | Deploy a pack from your user scope. |
+
+The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (always — Claude Code accepts a repeat), `claude plugin marketplace update <name>` when Claude Code already knows the marketplace, then `claude plugin install <pack>@<name> --scope S`, or `claude plugin update …` when the pack is already installed there. Needs `claude` on your `PATH`.
 
 ## Other
 

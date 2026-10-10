@@ -92,4 +92,4 @@ Because the lock and pnpm's pins are committed, anyone with `ipm` can rebuild th
 
 - **Run upstream code.** pnpm runs with `--ignore-scripts`, and sources' npm dependencies are never installed.
 - **Modify upstream repos.** Picked files are hard-linked (or copied) from pnpm's fetched copy.
-- **Install into Claude Code.** It builds a marketplace; adding it is your step.
+- **Install into Claude Code on its own.** Building writes only `.ipm/`; `ipm deploy` (or `D` in the TUI) installs a pack, at the scope you choose, only when you ask.

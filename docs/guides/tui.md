@@ -7,7 +7,7 @@ nav_order: 3
 # Use the TUI
 {: .no_toc }
 
-Search, judge, collect into a pack and build it, all in one screen.
+Search, see where each artifact lives, collect it into a pack, build the pack and deploy it to Claude Code, all in one screen.
 {: .fs-6 .fw-300 }
 
 1. TOC
@@ -27,60 +27,87 @@ ipm tui -g         # your user-scope packs
 ## The screen
 
 ```text
-ipm ─ search: c# testing                                            ● hybrid
-─────────────────────────────────────────────────────────────────────────────
-▶71   agent          ✓ csharp-pro             │ agent  csharp-pro
- 65   copilot-plugin   csharp-dotnet-develop… │ wshobson/agents ★ 40.3k
- 24   skill          ✓ dotnet-backend-patter… │ agent:wshobson/agents:plugins/…
- 15   agent            backend-development-… │ Write modern C# code with …
-                                              │
-                                              │ ▶up    plugin   jvm-languages
-─ csharp-tui (2) • not built · project /work ─────────────────────────────────
-agent csharp-pro · skill dotnet-backend-patterns
+ipm  wshobson/agents › claude-code-workflows › jvm-languages › csharp-pro          ● hybrid
+╭─ search: c# testing ──────────────────────────────────────────────────────────────────╮
+│ ▶71   agent  ✓ csharp-pro                    wshobson/agents          ★40.3k           │
+│  65   copilt   csharp-dotnet-development     github/awesome-copilot   ★39.9k           │
+│  24   skill  ✓ dotnet-backend-patterns       wshobson/agents          ★40.3k           │
+╰────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ tree ── agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md ─────────────╮
+│ repo    wshobson/agents                                                                │
+│ └ market  claude-code-workflows        Production-ready workflow orchestration with…   │
+│   └ plugin  jvm-languages              JVM language development including Java, Sca…   │
+│     ├ agent  ▶csharp-pro ────────────▶ Write modern C# code with advanced features      │
+│                                        like records, pattern matching, and async/…      │
+│     ├ agent   java-pro                 Master Java 21+ with modern features like vir…   │
+│     └ agent   scala-pro                Master enterprise-grade Scala development wit…   │
+╰────────────────────────────────────────────────────────────────────────────────────────╯
+─ csharp-sdlc (4) · project /work
+skill dotnet-backend-patterns · agent csharp-pro · command accessibility-audit · plugin stripe
 50 of 100
-/ search  a add  d remove  p packs  i install  f type  ? help  q quit
+↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  b build  D deploy  ? help  q quit
 ```
 
-- **Header:** your query, and `● hybrid` (the search server) or `○ local` (keyword search over the catalog).
-- **Results, left:** SCORE, type, `✓` when the item is already in the active pack, and name.
-- **Detail, right:** the selected artifact's type, name, repo, stars, ID, the start of its description, and its relationships: what contains it (up) and what it contains (down).
-- **Tray, bottom:** the active pack, its item count, `• not built` once you've changed it since the last install, and its items.
-- **Status line:** how many results, or what just happened.
+- **Header:** a breadcrumb of where the tree is (repo › marketplace › plugin › artifact), and `● hybrid` (the search server) or `○ local` (keyword search over the catalog).
+- **Results panel, top:** score, type, `✓` when the item is already in the active pack, name, repo and stars. Under 100 columns, repo and stars drop out.
+- **Tree panel, bottom:** the artifact in context — the path from its repo down to its parent, its siblings, and its children. Every node shows a one-line description, lined up in one column; the current node has an arrow to its description, which runs to three lines. When an artifact belongs to more than one plugin, `also in:` lists the others. Long lists scroll, with `↑ N more` / `↓ N more` rows.
+- **Tray:** the active pack, its item count, `• not built` once you've changed it since the last build, and its items.
+- **Colour:** each type has its own colour everywhere (repo blue, marketplace purple, plugin amber, skill teal, agent pink, command green, hook and MCP server grey); the panel with focus has an amber border. Set `NO_COLOR` to turn colour off.
 
-Below 100 columns the detail pane hides, and `enter` shows it full-width. Below 60×15 the TUI asks you to enlarge the terminal.
+Below 60×15 the TUI asks you to enlarge the terminal; in a short terminal the tree leaves out children.
 
-## Keys
+## Search mode
 
 | Key | Does |
 | --- | --- |
 | typing | search; results refresh as you type |
+| `↓`, `tab` (search box) | focus the results |
 | `/` | focus the search box |
-| `↓`, `tab` from search | focus the results |
-| `↑` `↓`, `j` `k` | move through results |
-| `→`, `l` | focus the detail pane's relationships |
-| `enter` (detail) | open the selected relationship; `backspace` goes back |
-| `enter` (results, narrow terminal) | show the detail full-width; `esc` returns |
-| `a` | add the selected result or relationship to the active pack |
-| `d` | remove the selected item from the active pack |
-| `tab` (results) | focus the tray; `tab` again returns to search |
-| `p` | switch pack, or `n` for a new one (name, then description) |
-| `i` | build every pack (`ipm install`), with live output |
+| `↑` `↓`, `j` `k` | move through results; the tree follows |
+| `←` `→`, `h` `l` | move the tree to the parent / first child, without changing the result |
+| `tab`, `enter` | tree mode |
+| `a` / `d` | add / remove the selected result |
+| `t` | the pack tray (`←` `→` items, `d` removes, `esc` back) |
 | `f` | cycle the type filter: all, skill, agent, command, plugin |
+| `p` | switch pack, or `n` for a new one |
+| `b` (or `i`) | build every pack (`ipm install`) |
+| `D` | deploy the active pack to Claude Code |
 | `ctrl+r` | check the search server again |
 | `?` | every key |
 | `q`, `ctrl+c` | quit |
 
-In the search box every letter is part of the query, so `a`, `d`, `p`, `i`, `f`, `?` and `q` work once you've moved to the results (`↓` or `tab`).
+In the search box every letter is part of the query, so the other keys work once you've moved to the results (`↓` or `tab`).
 
-## Build a pack
+## Tree mode
 
-1. Type what you're after, for example `c# testing`.
-2. `↓` to the results. Move with `j`/`k`; the detail pane follows. `→` to walk into its plugin or repo and see what else is there; `backspace` to come back.
-3. `p`, then `n`, to create a pack: type a name, `enter`, a description, `enter`. It becomes the active pack.
-4. `a` on everything you want. Hooks and MCP servers can't be added on their own; the status line names the plugin to add instead.
-5. `i` to build. The output streams in, ending in `✓ installed` and the `/plugin install` commands. `esc` closes it.
+| Key | Does |
+| --- | --- |
+| `↑` `↓`, `k` `j` | move between siblings, and onto `also in` rows |
+| `←` `→`, `h` `l` | parent / first child |
+| `enter` | on an `also in` row: follow that plugin instead |
+| `a` / `d` | add / remove the node — for example a whole plugin |
+| `tab`, `esc` | back to search mode; the tree returns to the selected result |
 
-Everything the TUI does goes through the same code as `ipm pack` and `ipm install`, and writes the same `ipm.toml`, so you can switch between the TUI and the CLI at any time.
+## Build and deploy
+
+1. **Collect.** Search, look at the tree, and `a` what you want. `p`, then `n`, creates a pack.
+2. **Build.** `b` runs `ipm install`; its output streams in and ends with `✓ installed`.
+3. **Deploy.** `D` installs the active pack into Claude Code:
+   1. Pick where: **user** (every project, just you), **project** (a folder, shared through its `.claude/settings.json`) or **local** (a folder, just you). The default is project scope in the pack's own project.
+   2. For project and local scope, confirm or type the folder (`~` works).
+   3. Read the exact commands it will run, then `y` to deploy:
+      ```text
+      Deploy csharp-sdlc to Claude Code — project scope in /work
+        ipm install
+        claude plugin marketplace add /work/.ipm --scope project
+        claude plugin install csharp-sdlc@work-ipm --scope project
+      y deploy · esc cancel
+      ```
+   4. The output streams in and ends with `✓ deployed csharp-sdlc (project /work)`.
+
+Deploy always builds first, so Claude Code gets the current pack. Deploying again updates the marketplace and the plugin instead of adding them. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
+
+The same works from the command line with [`ipm deploy`](../reference/commands.md#ipm-deploy).
 
 ## Without the search server
 

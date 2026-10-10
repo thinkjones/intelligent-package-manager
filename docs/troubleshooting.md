@@ -80,7 +80,19 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `search index empty — run ipm load` (banner) | The server is running with an empty index. Run `ipm load`, then `ctrl+r`. |
 | `ipm needs at least 60×15 — enlarge the terminal` | Make the terminal bigger, or use the CLI commands. |
 | Letters go into the search box instead of acting | Keys like `a`, `p` and `i` act outside the search box: press `↓` or `tab` first. |
-| `install is running — wait for it to finish` | Install can't be stopped halfway; the modal closes with `esc` when it's done. |
+| `install is running — wait for it to finish`, `deploy is running — …` | Build and deploy can't be stopped halfway; the modal closes with `esc` when it's done. |
+| `no pack to deploy — press p to create one` | Create a pack (`p`, then `n`) and add to it first. |
+
+## Deploy
+
+| Message | Cause and fix |
+| --- | --- |
+| `ipm deploy needs claude (Claude Code) on PATH` | Install Claude Code, or put `claude` on your `PATH`. |
+| `… is not a folder` | The project or local folder doesn't exist. Check the path; `~` and relative paths work. |
+| `deploy: name a pack — this scope has N` | Give the pack: `ipm deploy <pack>`. `ipm pack list` shows them. |
+| `can't read the output of claude plugin list --json` | Your `claude` prints a format `ipm` doesn't know. Update Claude Code, or install by hand with the commands from `ipm install`. |
+| `` `claude plugin …` failed `` | Claude Code's own output is shown above it. Fix what it says and deploy again; nothing is retried. |
+| A rebuilt pack doesn't change in Claude Code | Claude Code reads it from `.ipm/plugins/`; start a new session or run `/reload-plugins`. |
 
 ## Claude Code
 

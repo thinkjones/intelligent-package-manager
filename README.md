@@ -65,7 +65,7 @@ In Claude Code the skill, agent and command load as `csharp-sdlc:<name>`, and th
 2. **`ipm sync`** has pnpm fetch each repo and pin it to a commit, then catalogs every repo, marketplace, plugin, skill, agent, command, hook and MCP server in them.
 3. **`ipm search`** runs hybrid keyword and semantic search over the catalog on a local Typesense server.
 4. **`ipm pack add`** picks skills, agents, commands and whole plugins into a pack in your project's `ipm.toml`.
-5. **`ipm install`** builds each pack into a Claude Code plugin and marketplace under `.ipm/`, and validates it. You add the marketplace to Claude Code yourself.
+5. **`ipm install`** builds each pack into a Claude Code plugin and marketplace under `.ipm/`, and validates it. **`ipm deploy`** installs it into Claude Code at user, project or local scope, when you ask.
 
 ## Install
 
@@ -88,7 +88,7 @@ ipm search tdd --type skill              # each hit shows its ID
 ipm pack new my-pack --description "My picks"
 ipm pack add my-pack 'skill:obra/superpowers:skills/test-driven-development'
 ipm install
-claude plugin marketplace add ./.ipm      # then /plugin install my-pack@<project folder>-ipm
+ipm deploy my-pack                        # into Claude Code, for this project
 ```
 
 The [build your own plugin](https://thinkjones.github.io/intelligent-package-manager/guides/build-a-plugin.html) guide walks through a pack built from several repos. Prefer keys to IDs? [`ipm tui`](https://thinkjones.github.io/intelligent-package-manager/guides/tui.html) does the same search, collect and build in one screen.
@@ -103,14 +103,15 @@ The [build your own plugin](https://thinkjones.github.io/intelligent-package-man
 | `ipm show`, `ipm tree`, `ipm graph` | Inspect an artifact and its relationships |
 | `ipm pack new\|add\|remove\|list\|show` | Edit packs in `ipm.toml` (`-g` for your user scope) |
 | `ipm install [--update]` | Build every pack into a plugin and validate it |
-| `ipm tui [-g]` | Search, judge, collect into packs and build, in one screen |
+| `ipm deploy [pack] [--scope] [--path]` | Build, then install a pack into Claude Code |
+| `ipm tui [-g]` | Search, see the tree, collect, build and deploy, in one screen |
 | `ipm doctor` | Check everything `ipm` depends on |
 
 Every flag is in the [commands reference](https://thinkjones.github.io/intelligent-package-manager/reference/commands.html).
 
 ## Limits
 
-- **`ipm` never installs into Claude Code.** It builds a marketplace; adding it is your step.
+- **`ipm` installs into Claude Code only when you deploy.** Building never touches your Claude Code configuration.
 - **Hooks and MCP servers come only with their whole plugin.** They (and inline commands) can't be picked on their own.
 - **Non-GitHub sources may lose files**, because pnpm applies npm's packing rules to them.
 - **No packaged release yet**, and Windows is untested.

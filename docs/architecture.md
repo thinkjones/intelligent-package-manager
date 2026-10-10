@@ -11,7 +11,7 @@ How `ipm` turns a list of repos into a searchable catalog of agent artifacts, bu
 
 `ipm` lets a person find agent artifacts — skills, agents, commands, hooks, MCP servers, plugins, Copilot plugins and marketplaces — across many upstream repos. It owns four things: the user's **sources** (a pnpm project listing repos of interest), the **catalog** built from them, a local **search index** over the catalog, and **packs** — named sets of picked items in a project's `ipm.toml` — which `ipm install` builds into Claude Code plugins and a marketplace under `.ipm/`.
 
-It deliberately does not own fetching (pnpm does that), upstream content (read in place, never modified or executed), or installation into Claude Code: `ipm install` writes a marketplace you add to Claude Code yourself.
+It deliberately does not own fetching (pnpm does that) or upstream content (read in place, never modified or executed). It installs into Claude Code only when asked: `ipm deploy` (or `D` in the TUI) runs `claude plugin` commands that the user sees first.
 
 ## System overview
 
@@ -152,16 +152,21 @@ Two runs give byte-identical output, and items removed from a pack leave no file
 
 ## `ipm tui`
 
-`internal/tui` is a [Bubble Tea](https://github.com/charmbracelet/bubbletea) model for the curation loop: results on the left, the selected artifact's detail and relationships on the right, the active pack as a tray along the bottom, and modals for the pack picker, install output and help. It depends only on four interfaces in `deps.go`; `internal/cli/tui.go` implements them:
+`internal/tui` is a [Bubble Tea](https://github.com/charmbracelet/bubbletea) model for the curation loop, in two modes: **search mode** (results in the top panel, 40% of the height, with the tree below following the selected result) and **tree mode** (focus in the tree, walking siblings and levels). The active pack is a tray along the bottom; modals cover the pack picker, build and deploy output, the deploy steps and help. It depends only on five interfaces in `deps.go`; `internal/cli/tui.go` implements them:
 
 | Interface | Implementation |
 | --- | --- |
 | `Searcher` | Typesense (the same `search.Query` as `ipm search`, 50 hits) when the server answers and its index has documents; otherwise keyword matching over the catalog: 4 per query word in the name, 1 in the description and in tags, ties by stars. `ctrl+r` checks again. |
-| `Catalog` | `catgraph`: a node's fields, its stars, and `Children` up and down. |
+| `Catalog` | `catgraph`: `Node(id)` with its fields, stars, and parents and children with their descriptions. |
 | `Packs` | `createPack`, `addToPack`, `removeFromPack`: the functions behind `ipm pack`, so the same pick rules apply. |
 | `Installer` | `runInstall` with its output piped into the modal line by line. |
+| `Deployer` | `deployDefaults`, `cleanTarget`, `planDeploy` and `runDeploy`: the code behind `ipm deploy`. |
 
-Searches run 150 ms after the last keystroke and carry a sequence number, so a slow result for an old query is dropped. Pack edits write `ipm.toml` at once; `.ipm/` changes only on install. Below 100 columns the detail pane hides; below 60×15 the TUI asks for a bigger terminal.
+**The tree** (`tree.go`) is a pure function, `buildTree(catalog, id, chosen)`: the path from the node's root to its parent (following the first parent, or the one chosen in tree mode), its siblings, its children and its other parents ("also in"). The renderer cuts names to 24 cells and type labels to 6, so descriptions start in one column; the cursor's description wraps to three lines; long lists scroll around the cursor. Searches run 150 ms after the last keystroke and carry a sequence number, so a slow result for an old query is dropped. Pack edits write `ipm.toml` at once; `.ipm/` changes only on build. `NO_COLOR` strips colour from the finished screen.
+
+## `ipm deploy`
+
+`ipm deploy` (and the TUI's `D`) builds, then plans and runs `claude` commands through `System.Output`: `claude plugin marketplace add <project>/.ipm --scope S` always (Claude Code accepts a repeat, and the marketplace must be declared at the target scope), `claude plugin marketplace update <name>` when `claude plugin marketplace list --json` already lists it, then `claude plugin install <pack>@<name> --scope S`, or `claude plugin update` when `claude plugin list --json` shows it installed at that scope and folder. Project and local scope run in the chosen folder. The marketplace name comes from `marketName` (the same function `ipm install` uses), so the TUI can show the commands before the first build. Claude Code reads a deployed ipm pack in place from `.ipm/plugins/<pack>`; a rebuild takes effect at its next session.
 
 ## `ipm doctor`
 
@@ -187,7 +192,7 @@ cli/
     ├── pack/                  naming rules; reading an aihs-era manifest.toml for source import
     ├── copilot/               the skills a Copilot plugin.json lists
     ├── marketplace/           marketplace.json entries (ipm's own or upstream entry maps) and atomic Write
-    └── tui/                   the Bubble Tea model behind ipm tui, over four interfaces (deps.go)
+    └── tui/                   the Bubble Tea model behind ipm tui (tree.go, deploy.go), over five interfaces (deps.go)
 ```
 
 Commands reach the outside world only through `cli.System` (stdout, stderr, environment, `LookPath`, an `Output` runner for pnpm, docker, gh and claude, an HTTP client and a clock). `go install …/cli/cmd/ipm` builds the same binary. In a clone, `bin/ipm` at the root is a shell shim: it rebuilds `cli/bin/ipm` when a Go source changes and execs it; `.envrc` puts `bin/` on PATH.
@@ -206,7 +211,7 @@ Commands reach the outside world only through `cli.System` (stdout, stderr, envi
 | Packs are built per project in `.ipm/`, committed except `plugins/` and `node_modules/` | A team shares the pack definition and its pins; anyone rebuilds the same plugin with `ipm install`, without the author's catalog. |
 | Picked files are hard-linked, not copied or symlinked | No extra disk and no new dependency; Claude Code loads them like any plugin files. Copy is the fallback across volumes. |
 | Whole plugins are marketplace dependencies, not copies | They keep their own namespace, hooks and MCP servers, and stay pinned to an upstream commit. |
-| `ipm` writes a marketplace but never installs it | Installing changes the user's Claude config; that stays the user's step. |
+| `ipm` installs into Claude Code only on `ipm deploy` | Installing changes the user's Claude config, so it is an explicit command (or a confirmed TUI step showing the exact `claude` commands), never a side effect of building. |
 | All commands in Go, one test suite | One language, and every command is testable in-process through `cli.System`. |
 
 ## Testing
