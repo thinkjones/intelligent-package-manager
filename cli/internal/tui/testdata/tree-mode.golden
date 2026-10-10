@@ -1,7 +1,7 @@
 ipm  o/r › p                                                                                                    ● hybrid
 ╭─ search: tdd             ────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ›50   skill  ✓ tdd                              o/r                                                                  │
-│  50   skill    tdd-guard                        o/r                                                                  │
+│ ▶ 50   skill  ✓ tdd                              o/r                                                                 │
+│   50   skill    tdd-guard                        o/r                                                                 │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -10,10 +10,10 @@ ipm  o/r › p                                                                  
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ tree ── plugin:o/r:p ───────────────────────────────────────────────────────────────────────────────────────────────╮
-│ repo    o/r                            The repo                                                                      │
-│ └ plugin ▶p ─────────────────────────▶ The p plugin                                                                  │
-│   ├ skill   tdd                        Test first.                                                                   │
-│   └ skill   tdd-guard                                                                                                │
+│   repo    o/r                            The repo                                                                    │
+│ ▶ └ plugin  p                            The p plugin                                                                │
+│     ├ skill   tdd                        Test first.                                                                 │
+│     └ skill   tdd-guard                                                                                              │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │

@@ -31,7 +31,30 @@ var (
 	stError    = lipgloss.NewStyle().Foreground(colRed)
 	stSelected = lipgloss.NewStyle().Foreground(colAmber).Bold(true)
 	stRule     = lipgloss.NewStyle().Foreground(colBorder)
+
+	// The selected row of the panel you're not in: a grey caret on a
+	// background, so it reads as "selected there", not "you are here".
+	colSelBg        = lipgloss.Color("#263142")
+	stInactive      = lipgloss.NewStyle().Background(colSelBg).Foreground(colSoft)
+	stInactiveCaret = lipgloss.NewStyle().Background(colSelBg).Foreground(colMuted)
 )
+
+// caretWidth is the selection column on the far left of every list.
+const caretWidth = 2
+
+// selectedRow draws a list row with the caret column: an orange caret when
+// its panel is active (the row keeps its colours; its name is drawn orange
+// by the caller), a grey caret on a background when not. w includes the
+// caret column.
+func selectedRow(row string, w int, active bool) string {
+	if active {
+		return stAmber.Render("▶ ") + fit(row, w-caretWidth)
+	}
+	return stInactiveCaret.Render("▶ ") + stInactive.Render(fit(ansi.Strip(row), w-caretWidth))
+}
+
+// plainRow is an unselected list row, with an empty caret column.
+func plainRow(row string, w int) string { return spaces(caretWidth) + fit(row, w-caretWidth) }
 
 // fit cuts s to width w with "…" and pads it to exactly w cells.
 func fit(s string, w int) string {

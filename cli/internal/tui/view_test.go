@@ -250,3 +250,80 @@ func TestResultsUsedByCell(t *testing.T) {
 		t.Errorf("results:\n%s", res)
 	}
 }
+
+const bgCode = "48;2;" // any background colour
+
+// caretLine is the line of a panel holding its ▶ caret.
+func caretLine(t *testing.T, lines []string) string {
+	t.Helper()
+	for _, l := range lines {
+		if strings.Contains(ansi.Strip(l), "▶") {
+			return l
+		}
+	}
+	t.Fatalf("no caret in:\n%s", ansi.Strip(strings.Join(lines, "\n")))
+	return ""
+}
+
+func TestCaretActiveAndInactive(t *testing.T) {
+	m, _ := treeTest(t)
+	check := func(active, inactive string, where string) {
+		t.Helper()
+		if !strings.Contains(active, amberCode) || strings.Contains(active, bgCode) {
+			t.Errorf("%s: the active panel's caret row is orange, without a background:\n%q", where, active)
+		}
+		if strings.Contains(inactive, amberCode) || !strings.Contains(inactive, bgCode) {
+			t.Errorf("%s: the inactive panel's caret row is grey on a background:\n%q", where, inactive)
+		}
+	}
+	ps := panels(m.View().Content)
+	check(caretLine(t, ps[0][1:len(ps[0])-1]), caretLine(t, ps[1][1:len(ps[1])-1]), "search mode")
+	press(t, m, "tab")
+	ps = panels(m.View().Content)
+	check(caretLine(t, ps[1][1:len(ps[1])-1]), caretLine(t, ps[0][1:len(ps[0])-1]), "tree mode")
+}
+
+func TestCaretOnTheFarLeft(t *testing.T) {
+	m, _ := treeTest(t)
+	for _, p := range panels(view(m)) {
+		for _, l := range p[1 : len(p)-1] {
+			plain := strings.TrimPrefix(l, "│ ")
+			if i := strings.Index(plain, "▶"); i > 0 {
+				t.Errorf("the caret belongs in the first column: %q", l)
+			}
+		}
+	}
+	if v := view(m); strings.Contains(v, "─▶") || strings.Contains(v, "▶tdd") {
+		t.Errorf("no inline arrows in the tree:\n%s", v)
+	}
+}
+
+func TestUpDownNeverChangesTreeLevel(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "tab")
+	depth := len(m.tree.Path)
+	press(t, m, "down", "up", "down")
+	if len(m.tree.Path) != depth {
+		t.Errorf("↑↓ moved between levels: depth %d → %d", depth, len(m.tree.Path))
+	}
+	press(t, m, "esc")
+	sel := m.sel
+	press(t, m, "right", "left", "left")
+	if m.sel != sel || m.focus != focusResults {
+		t.Errorf("←→ moved the result selection or focus: sel %d focus %v", m.sel, m.focus)
+	}
+}
+
+func TestResultsDescriptionColumn(t *testing.T) {
+	m, f := newTest(t)
+	f.s.results["d"] = Results{Hits: []Hit{{ID: "skill:o/r:x", Type: "skill", Name: "x", Repo: "o/r", Description: "Test first, always", Score: "9"}}, Found: 1}
+	m.Update(tea.WindowSizeMsg{Width: 140, Height: 30})
+	typeText(t, m, "d")
+	if !strings.Contains(strings.Join(panels(view(m))[0], "\n"), "Test first, always") {
+		t.Errorf("wide results show the description:\n%s", view(m))
+	}
+	m.Update(tea.WindowSizeMsg{Width: 90, Height: 30})
+	if strings.Contains(strings.Join(panels(view(m))[0], "\n"), "Test first") {
+		t.Errorf("narrow results drop the description first:\n%s", view(m))
+	}
+}
