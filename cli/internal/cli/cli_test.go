@@ -2,9 +2,12 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catgraph"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/tui"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +16,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1540,5 +1544,172 @@ func TestPackOperationsWithoutOutput(t *testing.T) {
 	}
 	if f.out.Len() != 0 {
 		t.Errorf("pack operations must not print: %q", f.out.String())
+	}
+}
+
+func rec(id, name, desc string, tags ...string) map[string]any {
+	typ, _, _ := strings.Cut(id, ":")
+	var tl []any
+	for _, t := range tags {
+		tl = append(tl, t)
+	}
+	return map[string]any{"id": id, "type": typ, "name": name, "description": desc, "repo": "o/r", "tags": tl}
+}
+
+func TestLocalSearchRanking(t *testing.T) {
+	records := []map[string]any{
+		rec("skill:o/r:pdf", "pdf", "tdd notes"),
+		rec("skill:o/r:tdd-guard", "tdd-guard", "test-driven"),
+		rec("skill:o/r:tdd", "tdd", "Test first"),
+		rec("skill:o/r:other", "other", "nothing", "misc"),
+	}
+	stars := func(id string) func(string) (int, bool) {
+		return func(string) (int, bool) { return 0, false }
+	}
+	res := localSearch(records, stars(""), "tdd", tui.Filter{})
+	var names []string
+	for _, h := range res.Hits {
+		names = append(names, h.Name)
+	}
+	if strings.Join(names, ",") != "tdd,tdd-guard,pdf" || res.Found != 3 {
+		t.Errorf("ranking %v found %d", names, res.Found)
+	}
+	byStars := func(repo string) (int, bool) { return 0, true }
+	records[1]["repo"], records[2]["repo"] = "big/one", "small/one"
+	byStars = func(repo string) (int, bool) {
+		if repo == "big/one" {
+			return 900, true
+		}
+		return 1, true
+	}
+	if res := localSearch(records, byStars, "tdd", tui.Filter{}); res.Hits[0].Name != "tdd-guard" {
+		t.Errorf("equal scores should rank by stars: %v", res.Hits[0].Name)
+	}
+	if res := localSearch(records, stars(""), "tdd", tui.Filter{Type: "agent"}); len(res.Hits) != 0 {
+		t.Errorf("type filter: %v", res.Hits)
+	}
+	var many []map[string]any
+	for i := range 60 {
+		many = append(many, rec(fmt.Sprintf("skill:o/r:s%02d", i), fmt.Sprintf("tdd %d", i), ""))
+	}
+	if res := localSearch(many, stars(""), "tdd", tui.Filter{}); len(res.Hits) != 50 || res.Found != 60 {
+		t.Errorf("cap: %d hits, found %d", len(res.Hits), res.Found)
+	}
+}
+
+func TestTuiSearcherFallsBack(t *testing.T) {
+	f := newFake(checkout(t))
+	s := newTuiSearcher(f.system(), nil, "")
+	if s.Mode() != "local" || !strings.Contains(s.Notice(), "server off") {
+		t.Errorf("no server: mode %q notice %q", s.Mode(), s.Notice())
+	}
+	docs := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/health":
+			fmt.Fprint(w, `{"ok":true}`)
+		case "/collections/artifacts":
+			fmt.Fprintf(w, `{"num_documents":%d}`, docs)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	root := checkout(t)
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
+	f = newFake(root)
+	typesenseAt(f, srv)
+	s = newTuiSearcher(f.system(), nil, "")
+	if s.Mode() != "local" || s.Notice() != "search index empty — run `ipm load`" {
+		t.Errorf("empty index: mode %q notice %q", s.Mode(), s.Notice())
+	}
+	docs = 3
+	s.Recheck()
+	if s.Mode() != "hybrid" || s.Notice() != "" {
+		t.Errorf("ready: mode %q notice %q", s.Mode(), s.Notice())
+	}
+}
+
+func TestTuiHybridSearch(t *testing.T) {
+	f, last := searchFake(t, 0)
+	s := &tuiSearcher{sys: f.system()}
+	c, _ := tsClient(f.system())
+	s.client, s.mode = c, "hybrid"
+	res, err := s.Search(context.Background(), "tdd", tui.Filter{Type: "skill"})
+	if err != nil || len(res.Hits) != 2 || res.Found != 2 || res.Hits[0].ID != "skill:o/r:a" || res.Hits[0].Stars != 12 {
+		t.Fatalf("hits %+v %v", res, err)
+	}
+	if !strings.Contains(last.Get("filter_by"), "type:=[`skill`]") || last.Get("per_page") != "50" {
+		t.Errorf("query %v", *last)
+	}
+}
+
+func TestTuiPacks(t *testing.T) {
+	f, root := packFake(t)
+	p := tuiPacks{sys: f.system(), scope: project.Scope{Root: root}}
+	if p.Scope() != "project "+root {
+		t.Errorf("scope %q", p.Scope())
+	}
+	if err := p.Create("kit", "My kit"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Add("kit", "skill:o/r:p/skills/s1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := p.Add("kit", "hook:o/r:p/hooks/hooks.json"); err == nil || !strings.Contains(err.Error(), "comes only with its plugin") {
+		t.Errorf("hook: %v", err)
+	}
+	packs, err := p.List()
+	if err != nil || len(packs) != 1 || packs[0].Description != "My kit" || !reflect.DeepEqual(packs[0].Items, []string{"skill:o/r:p/skills/s1"}) {
+		t.Errorf("list %+v %v", packs, err)
+	}
+	if err := p.Remove("kit", "skill:o/r:p/skills/s1"); err != nil {
+		t.Fatal(err)
+	}
+	if (tuiPacks{global: true}).Scope() != "global" {
+		t.Error("global scope")
+	}
+}
+
+func TestTuiCatalogDetail(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	g, err := catgraph.Load(filepath.Join(cacheOf(root), "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	d, err := tuiCatalog{g}.Detail("skill:o/r:p/skills/s1")
+	if err != nil || d.Name != "s1" || d.Repo != "o/r" || d.Description != "Test first" {
+		t.Fatalf("%+v %v", d, err)
+	}
+	var up []string
+	for _, n := range d.Up {
+		up = append(up, n.ID+"="+n.Type)
+	}
+	if !slices.Contains(up, "plugin:o/r:p=plugin") {
+		t.Errorf("up %v", up)
+	}
+	if _, err := (tuiCatalog{g}).Detail("skill:gone"); err == nil {
+		t.Error("an unknown ID is an error")
+	}
+}
+
+func TestTuiInstallerStreams(t *testing.T) {
+	f, _ := installFake(t)
+	var out bytes.Buffer
+	if err := (tuiInstaller{sys: f.system()}).Install(context.Background(), &out); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if !strings.Contains(out.String(), "✓ kit:") || strings.Contains(f.out.String(), "✓ kit:") {
+		t.Errorf("install output must go to the writer, not stdout:\n%s", out.String())
+	}
+}
+
+func TestTuiNeedsTerminal(t *testing.T) {
+	f := newFake(checkout(t))
+	if err := f.run("tui"); err == nil || err.Error() != "ipm tui needs a terminal" {
+		t.Errorf("no terminal: %v", err)
+	}
+	f.width = 120
+	if err := f.run("tui"); err == nil || err.Error() != "no catalog — run `ipm sync`" {
+		t.Errorf("no catalog: %v", err)
 	}
 }

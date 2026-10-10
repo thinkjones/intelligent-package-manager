@@ -1,0 +1,300 @@
+package cli
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"sort"
+	"strings"
+
+	tea "charm.land/bubbletea/v2"
+	"github.com/spf13/cobra"
+
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/catgraph"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/tui"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/typesense"
+)
+
+func newTuiCmd(sys System) *cobra.Command {
+	var global bool
+	cmd := &cobra.Command{
+		Use:   "tui",
+		Short: "search, judge, collect into packs and build, in one screen (-g for your user scope)",
+		Args:  noArgs,
+		RunE:  func(*cobra.Command, []string) error { return runTui(sys, global) },
+	}
+	cmd.Flags().BoolVarP(&global, "global", "g", false, "edit and build your user scope's packs ($IPM_HOME/global)")
+	return cmd
+}
+
+func runTui(sys System, global bool) error {
+	if sys.TermWidth == nil || sys.TermWidth() == 0 {
+		return errors.New("ipm tui needs a terminal")
+	}
+	p, err := ipmPaths(sys)
+	if err != nil {
+		return err
+	}
+	g, err := catgraph.Load(p.Catalog())
+	if err != nil {
+		return errors.New("no catalog — run `ipm sync`")
+	}
+	scope, err := currentScope(sys, global)
+	if err != nil {
+		return err
+	}
+	m := tui.New(tui.Deps{
+		Searcher:  newTuiSearcher(sys, g, p.Catalog()),
+		Catalog:   tuiCatalog{g},
+		Packs:     tuiPacks{sys: sys, scope: scope, global: global},
+		Installer: tuiInstaller{sys: sys, global: global},
+	})
+	_, err = tea.NewProgram(m).Run()
+	return err
+}
+
+const (
+	noticeServerOff  = "server off: keyword search only — run `ipm serve` and `ipm load` for semantic search"
+	noticeIndexEmpty = "search index empty — run `ipm load`"
+	tuiLimit         = 50
+)
+
+// tuiSearcher searches with Typesense when it is up and indexed, and
+// otherwise with keywords over the catalog.
+type tuiSearcher struct {
+	sys        System
+	g          *catgraph.Graph
+	catalogDir string
+	client     *typesense.Client
+	mode       string
+	notice     string
+	records    []map[string]any
+}
+
+func newTuiSearcher(sys System, g *catgraph.Graph, catalogDir string) *tuiSearcher {
+	s := &tuiSearcher{sys: sys, g: g, catalogDir: catalogDir}
+	s.Recheck()
+	return s
+}
+
+func (s *tuiSearcher) Mode() string   { return s.mode }
+func (s *tuiSearcher) Notice() string { return s.notice }
+
+// Recheck picks hybrid mode when the server answers and its index has
+// documents, local mode otherwise.
+func (s *tuiSearcher) Recheck() {
+	s.client, s.mode, s.notice = nil, "local", noticeServerOff
+	c, err := tsClient(s.sys)
+	if err != nil || c.Health() != nil {
+		return
+	}
+	n, err := c.NumDocuments(search.Collection)
+	if err != nil {
+		return
+	}
+	if n == 0 {
+		s.notice = noticeIndexEmpty
+		return
+	}
+	s.client, s.mode, s.notice = c, "hybrid", ""
+}
+
+func (s *tuiSearcher) Search(_ context.Context, q string, f tui.Filter) (tui.Results, error) {
+	if s.mode != "hybrid" {
+		return s.local(q, f)
+	}
+	query := search.Query{Text: q, Limit: tuiLimit}
+	if f.Type != "" {
+		query.Types = []string{f.Type}
+	}
+	res, err := s.client.Search(search.Collection, query.Params())
+	if err != nil {
+		return tui.Results{}, tsError(err)
+	}
+	var top int64
+	for _, h := range res.Hits {
+		top = max(top, h.TextMatch)
+	}
+	out := tui.Results{Found: res.Found}
+	for _, h := range res.Hits {
+		d := h.Document
+		hit := tui.Hit{ID: str(d, "id"), Type: str(d, "type"), Name: str(d, "name"), Repo: str(d, "repo"),
+			Description: str(d, "description"), Plugins: strList(d["plugin_names"]), Score: search.Score(h, top)}
+		if n, ok := d["stars"].(float64); ok {
+			hit.Stars = int(n)
+		}
+		out.Hits = append(out.Hits, hit)
+	}
+	return out, nil
+}
+
+func (s *tuiSearcher) local(q string, f tui.Filter) (tui.Results, error) {
+	if s.records == nil {
+		for _, typ := range catalog.Types {
+			recs, err := catalog.Load(s.catalogDir, typ)
+			if err != nil {
+				return tui.Results{}, err
+			}
+			s.records = append(s.records, recs...)
+		}
+	}
+	stars := func(string) (int, bool) { return 0, false }
+	if s.g != nil {
+		stars = s.g.Stars
+	}
+	return localSearch(s.records, stars, q, f), nil
+}
+
+// localSearch ranks catalog records by the query's words: 4 for each word in
+// the name, 1 for each in the description and in the tags, ignoring case;
+// ties go to more stars, then to the ID. It returns the best 50.
+func localSearch(records []map[string]any, stars func(repo string) (int, bool), q string, f tui.Filter) tui.Results {
+	terms := strings.Fields(strings.ToLower(q))
+	type scored struct {
+		hit   tui.Hit
+		score int
+	}
+	var all []scored
+	for _, r := range records {
+		if f.Type != "" && str(r, "type") != f.Type {
+			continue
+		}
+		name, desc := strings.ToLower(str(r, "name")), strings.ToLower(str(r, "description"))
+		tags := strings.ToLower(strings.Join(strList(r["tags"]), " "))
+		score := 0
+		for _, t := range terms {
+			if strings.Contains(name, t) {
+				score += 4
+			}
+			if strings.Contains(desc, t) {
+				score++
+			}
+			if strings.Contains(tags, t) {
+				score++
+			}
+		}
+		if score == 0 {
+			continue
+		}
+		hit := tui.Hit{ID: str(r, "id"), Type: str(r, "type"), Name: str(r, "name"), Repo: str(r, "repo"), Description: str(r, "description")}
+		hit.Stars, _ = stars(hit.Repo)
+		all = append(all, scored{hit, score})
+	}
+	sort.Slice(all, func(i, j int) bool {
+		a, b := all[i], all[j]
+		if a.score != b.score {
+			return a.score > b.score
+		}
+		if a.hit.Stars != b.hit.Stars {
+			return a.hit.Stars > b.hit.Stars
+		}
+		return a.hit.ID < b.hit.ID
+	})
+	out := tui.Results{Found: len(all)}
+	for i := range min(tuiLimit, len(all)) {
+		out.Hits = append(out.Hits, all[i].hit)
+	}
+	return out
+}
+
+// tuiCatalog describes artifacts from the catalog graph.
+type tuiCatalog struct{ g *catgraph.Graph }
+
+func (c tuiCatalog) Detail(id string) (tui.Detail, error) {
+	n, ok := c.g.Node(id)
+	if !ok {
+		return tui.Detail{}, fmt.Errorf("no artifact %s in the catalog", id)
+	}
+	d := tui.Detail{ID: id, Type: str(n, "type"), Name: str(n, "name"), Repo: str(n, "repo"), Path: str(n, "path"),
+		Commit: str(n, "commit"), Description: str(n, "description")}
+	d.Stars, _ = c.g.Stars(d.Repo)
+	d.Up, d.Down = c.neighbours(id, true), c.neighbours(id, false)
+	return d, nil
+}
+
+func (c tuiCatalog) neighbours(id string, up bool) []tui.Neighbour {
+	var out []tui.Neighbour
+	for _, nid := range c.g.Children(id, up) {
+		n, _ := c.g.Node(nid)
+		out = append(out, tui.Neighbour{ID: nid, Type: str(n, "type"), Name: str(n, "name")})
+	}
+	return out
+}
+
+// tuiPacks edits the scope's packs with the functions ipm pack uses.
+type tuiPacks struct {
+	sys    System
+	scope  project.Scope
+	global bool
+}
+
+func (p tuiPacks) Scope() string {
+	if p.global {
+		return "global"
+	}
+	return "project " + p.scope.Root
+}
+
+func (p tuiPacks) List() ([]tui.Pack, error) {
+	packs, err := project.LoadPacks(p.scope.Root)
+	if err != nil {
+		return nil, err
+	}
+	var out []tui.Pack
+	for _, pk := range packs {
+		out = append(out, tui.Pack{Name: pk.Name, Description: pk.Description, Items: pk.Items})
+	}
+	return out, nil
+}
+
+func (p tuiPacks) Create(name, description string) error {
+	return createPack(p.scope, name, description)
+}
+
+func (p tuiPacks) Add(pack string, ids ...string) error {
+	_, err := addToPack(p.sys, p.scope, pack, ids)
+	return err
+}
+
+func (p tuiPacks) Remove(pack string, ids ...string) error {
+	_, err := removeFromPack(p.scope, pack, ids)
+	return err
+}
+
+// tuiInstaller runs ipm install with its output going to the TUI.
+type tuiInstaller struct {
+	sys    System
+	global bool
+}
+
+func (in tuiInstaller) Install(_ context.Context, out io.Writer) error {
+	sys := in.sys
+	sys.Stdout = out
+	err := runInstall(sys, in.global, false, false)
+	var exit *ExitError
+	if errors.As(err, &exit) {
+		return errors.New("install failed — see the output above")
+	}
+	return err
+}
+
+func str(m map[string]any, k string) string {
+	s, _ := m[k].(string)
+	return s
+}
+
+func strList(v any) []string {
+	var out []string
+	if l, ok := v.([]any); ok {
+		for _, x := range l {
+			if s, ok := x.(string); ok {
+				out = append(out, s)
+			}
+		}
+	}
+	return out
+}
