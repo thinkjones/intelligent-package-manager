@@ -264,15 +264,31 @@ func (c tuiCatalog) Node(id string) (tui.Node, error) {
 	out := tui.Node{ID: id, Type: str(n, "type"), Name: str(n, "name"), Repo: str(n, "repo"), Path: str(n, "path"),
 		Description: str(n, "description")}
 	out.Stars, _ = c.g.Stars(out.Repo)
-	out.Parents, out.Children = c.refs(id, true), c.refs(id, false)
+	out.Parents, out.Children = c.refs(c.g.Children(id, true)), c.refs(c.g.Children(id, false))
+	if target, ok := c.g.RefTarget(id); ok {
+		r := c.refs([]string{target})[0]
+		out.External = &r
+	} else if c.g.External(id) {
+		out.Unresolved = str(n, "source_repo")
+	}
+	out.UsedBy = c.refs(c.g.RefsTo(id))
+	out.UsedByRepos = len(c.g.UsedBy(out.Repo))
 	return out, nil
 }
 
-func (c tuiCatalog) refs(id string, up bool) []tui.Ref {
+// refs describes ids as tree rows: name, description, repo, whether each is
+// an external entry, and how many repos reference it directly.
+func (c tuiCatalog) refs(ids []string) []tui.Ref {
 	var out []tui.Ref
-	for _, nid := range c.g.Children(id, up) {
+	for _, nid := range ids {
 		n, _ := c.g.Node(nid)
-		out = append(out, tui.Ref{ID: nid, Type: str(n, "type"), Name: str(n, "name"), Description: str(n, "description")})
+		repos := map[string]bool{}
+		for _, e := range c.g.RefsTo(nid) {
+			en, _ := c.g.Node(e)
+			repos[str(en, "repo")] = true
+		}
+		out = append(out, tui.Ref{ID: nid, Type: str(n, "type"), Name: str(n, "name"), Description: str(n, "description"),
+			Repo: str(n, "repo"), External: c.g.External(nid), UsedBy: len(repos)})
 	}
 	return out
 }

@@ -2042,3 +2042,31 @@ func TestLocalSearchNameBoost(t *testing.T) {
 		t.Errorf("equal scores go to the more-used repo: %+v", res.Hits)
 	}
 }
+
+func TestTuiCatalogNodeReferences(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	g, err := catgraph.Load(filepath.Join(cacheOf(root), "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := tuiCatalog{g}
+	e, _ := c.Node("plugin:o/r#e")
+	if e.External == nil || e.External.ID != "repo:x/c" {
+		t.Errorf("external target %+v", e.External)
+	}
+	m, _ := c.Node("marketplace:o/r:.")
+	var ext bool
+	for _, ch := range m.Children {
+		if ch.ID == "plugin:o/r#e" {
+			ext = ch.External
+		}
+	}
+	if !ext {
+		t.Error("the marketplace's child ref should be marked external")
+	}
+	x, _ := c.Node("repo:x/c")
+	if len(x.UsedBy) != 1 || x.UsedBy[0].ID != "plugin:o/r#e" || x.UsedBy[0].Repo != "o/r" || x.UsedByRepos != 1 || len(x.Parents) != 0 {
+		t.Errorf("repo:x/c %+v", x)
+	}
+}

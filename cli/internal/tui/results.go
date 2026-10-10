@@ -21,7 +21,7 @@ func (m *Model) resultLines(w, rows int) []string {
 	wideRows := w >= wideWidth-4
 	nameW := max(10, w-6-labelWidth-4)
 	if wideRows {
-		nameW = max(10, min(32, w-6-labelWidth-4-34))
+		nameW = max(10, min(32, w-6-labelWidth-4-39))
 	}
 	for i := m.offset; i < len(m.res.Hits) && len(lines) < rows; i++ {
 		h := m.res.Hits[i]
@@ -30,7 +30,11 @@ func (m *Model) resultLines(w, rows int) []string {
 			mark = stTeal.Render("✓")
 		}
 		row := fit(h.Score, 4) + " " + typeStyle(h.Type).Render(fit(typeLabel(h.Type), labelWidth)) + " " + mark + " "
-		name := fit(h.Name, nameW)
+		label := h.Name
+		if h.External {
+			label = "↗" + label
+		}
+		name := fit(label, nameW)
 		switch {
 		case i == m.sel && m.focus == focusResults:
 			name = stSelected.Render(name)
@@ -48,7 +52,11 @@ func (m *Model) resultLines(w, rows int) []string {
 			if h.Stars > 0 {
 				star = "★" + stars(h.Stars)
 			}
-			row += " " + stMuted.Render(fit(h.Repo, 26)) + " " + starStyle(h.Stars).Render(fit(star, 7))
+			used := ""
+			if h.UsedBy > 0 {
+				used = "↗" + strconv.Itoa(h.UsedBy)
+			}
+			row += " " + stMuted.Render(fit(h.Repo, 26)) + " " + stAmber.Render(fit(used, 4)) + " " + starStyle(h.Stars).Render(fit(star, 7))
 		}
 		lines = append(lines, fit(row, w))
 	}

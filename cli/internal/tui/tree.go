@@ -91,7 +91,22 @@ func pickParent(n Node, chosen map[string]string) string {
 	return ""
 }
 
-func refOf(n Node) Ref { return Ref{ID: n.ID, Type: n.Type, Name: n.Name, Description: n.Description} }
+func refOf(n Node) Ref {
+	return Ref{ID: n.ID, Type: n.Type, Name: n.Name, Description: n.Description, Repo: n.Repo,
+		External: n.External != nil || n.Unresolved != ""}
+}
+
+// cursorText is the cursor's description, led by where an external entry
+// points, or why it points nowhere.
+func (tv treeView) cursorText(desc string) string {
+	switch {
+	case tv.Node.External != nil:
+		return "↗ " + tv.Node.External.Repo + " — " + desc
+	case tv.Node.Unresolved != "":
+		return "↗ " + tv.Node.Unresolved + " (not a source — ipm source add " + tv.Node.ID + ") — " + desc
+	}
+	return desc
+}
 
 // Row kinds.
 const (
@@ -192,7 +207,15 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 		if desc == "" {
 			desc = s.Description
 		}
-		wrapped := wrapDesc(desc, descW)
+		wrapped := wrapDesc(tv.cursorText(desc), descW)
+		if n := tv.Node.UsedByRepos; n > 0 {
+			suffix := fmt.Sprintf("↗ used by %d", n)
+			if last := len(wrapped) - 1; last >= 0 && lipgloss.Width(wrapped[last])+2+lipgloss.Width(suffix) <= descW {
+				wrapped[last] += "  " + suffix
+			} else {
+				wrapped = append(wrapped, suffix)
+			}
+		}
 		if keep := max(1, budget-len(tv.AlsoIn)); len(wrapped) > keep {
 			wrapped = append(wrapped[:keep-1], ansi.Truncate(wrapped[keep-1], max(1, descW-1), "")+"…")
 		}
@@ -285,7 +308,11 @@ func (tv treeView) render(r treeRow, col, descW, sel int, focused bool) string {
 		}
 		return guide + spaces(labelWidth+2) + text
 	}
-	name := ansi.Truncate(r.ref.Name, nameWidth, "…")
+	name := r.ref.Name
+	if r.ref.External {
+		name = "↗" + name
+	}
+	name = ansi.Truncate(name, nameWidth, "…")
 	label := typeStyle(r.ref.Type).Render(fit(typeLabel(r.ref.Type), labelWidth))
 	prefix := guide + label + " "
 	lead := lipgloss.Width(r.guide) + labelWidth + 2 + lipgloss.Width(name)
@@ -301,9 +328,17 @@ func (tv treeView) render(r treeRow, col, descW, sel int, focused bool) string {
 		}
 		return line
 	}
-	line := prefix + " " + stText.Render(name) + spaces(max(1, col-lead))
+	nameStyle := stText
+	if r.ref.External {
+		nameStyle = stMuted
+	}
+	line := prefix + " " + nameStyle.Render(name) + spaces(max(1, col-lead))
 	if descW > 0 {
-		line += stMuted.Render(ansi.Truncate(firstLine(r.ref.Description), descW, "…"))
+		suffix := ""
+		if r.ref.UsedBy > 0 {
+			suffix = fmt.Sprintf("  ↗ used by %d", r.ref.UsedBy)
+		}
+		line += stMuted.Render(ansi.Truncate(firstLine(r.ref.Description), max(0, descW-lipgloss.Width(suffix)), "…")) + stMuted.Render(suffix)
 	}
 	return line
 }

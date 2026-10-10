@@ -231,3 +231,16 @@ func TestNoColor(t *testing.T) {
 		t.Errorf("NO_COLOR should only remove colour")
 	}
 }
+
+func TestResultsUsedByCell(t *testing.T) {
+	m, f := newTest(t)
+	f.s.results["cf"] = Results{Hits: []Hit{
+		{ID: "skill:b/s:x", Type: "skill", Name: "agents-sdk", Repo: "b/s", UsedBy: 3, Score: "90"},
+		{ID: "plugin:a/m#cf", Type: "plugin", Name: "cloudflare", Repo: "a/m", External: true, Score: "80"},
+	}, Found: 2}
+	typeText(t, m, "cf")
+	res := strings.Join(panels(view(m))[0], "\n")
+	if !strings.Contains(res, "↗3") || !strings.Contains(res, "↗cloudflare") {
+		t.Errorf("results:\n%s", res)
+	}
+}

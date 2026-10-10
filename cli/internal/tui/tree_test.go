@@ -253,3 +253,63 @@ func TestTreeKeepsSiblingsAroundBigCursor(t *testing.T) {
 		}
 	}
 }
+
+// external builds a marketplace in a/m listing a local plugin and an external
+// entry for cloudflare/skills.
+func external() mapCatalog {
+	c := mapCatalog{}
+	c.add("repo:a/m", "repo", "a/m", "A marketplace repo")
+	c.add("marketplace:a/m:.", "marketplace", "m", "Plugins")
+	c.add("plugin:a/m:local", "plugin", "local", "A local plugin")
+	c.add("plugin:a/m#cloudflare", "plugin", "cloudflare", "Skills for Cloudflare")
+	c.link("repo:a/m", "marketplace:a/m:.")
+	c.link("marketplace:a/m:.", "plugin:a/m:local")
+	c.link("marketplace:a/m:.", "plugin:a/m#cloudflare")
+	p := c["marketplace:a/m:."]
+	p.Children[1].External = true
+	c["marketplace:a/m:."] = p
+	e := c["plugin:a/m#cloudflare"]
+	e.External = &Ref{ID: "plugin:cloudflare/skills:.", Type: "plugin", Name: "cloudflare", Repo: "cloudflare/skills"}
+	c["plugin:a/m#cloudflare"] = e
+	return c
+}
+
+func TestTreeExternalRow(t *testing.T) {
+	tv, _ := buildTree(external(), "plugin:a/m#cloudflare", nil)
+	text := ansi.Strip(strings.Join(tv.lines(110, 12, -1, false), "\n"))
+	if !strings.Contains(text, "▶↗cloudflare") || !strings.Contains(text, "↗ cloudflare/skills — Skills for Cloudflare") {
+		t.Errorf("cursor external row:\n%s", text)
+	}
+	tv, _ = buildTree(external(), "plugin:a/m:local", nil)
+	text = ansi.Strip(strings.Join(tv.lines(110, 12, -1, false), "\n"))
+	if !strings.Contains(text, " ↗cloudflare") {
+		t.Errorf("sibling external row:\n%s", text)
+	}
+}
+
+func TestTreeUnresolvedExternal(t *testing.T) {
+	c := external()
+	e := c["plugin:a/m#cloudflare"]
+	e.External, e.Unresolved = nil, "c/missing"
+	c["plugin:a/m#cloudflare"] = e
+	tv, _ := buildTree(c, "plugin:a/m#cloudflare", nil)
+	text := ansi.Strip(strings.Join(tv.lines(140, 12, -1, false), "\n"))
+	if !strings.Contains(text, "↗ c/missing (not a source — ipm source add plugin:a/m#cloudflare)") {
+		t.Errorf("unresolved:\n%s", text)
+	}
+}
+
+func TestTreeUsedBySuffix(t *testing.T) {
+	c := sample()
+	b := c["skill:o/r:b"]
+	b.UsedByRepos, b.Description = 3, "Skill b"
+	c["skill:o/r:b"] = b
+	p := c["plugin:o/r:p"]
+	p.Children[0].UsedBy = 2
+	c["plugin:o/r:p"] = p
+	tv, _ := buildTree(c, "skill:o/r:b", nil)
+	text := ansi.Strip(strings.Join(tv.lines(120, 12, -1, false), "\n"))
+	if !strings.Contains(text, "↗ used by 3") || !strings.Contains(text, "↗ used by 2") {
+		t.Errorf("used-by suffixes:\n%s", text)
+	}
+}
