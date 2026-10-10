@@ -1,7 +1,7 @@
 ---
 title: Share packs with a team
 parent: Guides
-nav_order: 4
+nav_order: 5
 ---
 
 # Share packs with a team

@@ -70,6 +70,18 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `… is not installed in …/.ipm/node_modules` | pnpm didn't fetch a repo. Rerun `ipm install` and read pnpm's output. |
 | `claude plugin validate --strict failed` | Claude Code's output is shown above it. Rerun with `--no-validate` to inspect `.ipm/` yourself. |
 
+## TUI
+
+| Message | Cause and fix |
+| --- | --- |
+| `ipm tui needs a terminal` | Its output is piped or redirected. Run it directly in a terminal. |
+| `no catalog — run ipm sync` | Run `ipm sync` to build the catalog first. |
+| `server off: keyword search only …` (banner) | The search server isn't running. Results still come from the catalog by keyword; for semantic search run `ipm serve` and `ipm load`, then `ctrl+r`. |
+| `search index empty — run ipm load` (banner) | The server is running with an empty index. Run `ipm load`, then `ctrl+r`. |
+| `ipm needs at least 60×15 — enlarge the terminal` | Make the terminal bigger, or use the CLI commands. |
+| Letters go into the search box instead of acting | Keys like `a`, `p` and `i` act outside the search box: press `↓` or `tab` first. |
+| `install is running — wait for it to finish` | Install can't be stopped halfway; the modal closes with `esc` when it's done. |
+
 ## Claude Code
 
 | Symptom | Cause and fix |

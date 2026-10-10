@@ -198,6 +198,18 @@ Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, 
 | `--update` | Re-pin every item to the commit in your current catalog, instead of keeping the pins in `.ipm/ipm.lock`. |
 | `--no-validate` | Skip `claude plugin validate --strict`. |
 
+### `ipm tui`
+
+```text
+ipm tui [-g]
+```
+
+Search, judge, collect into packs and build, in one screen. Uses the search server when it is running and indexed, and keyword search over the catalog otherwise. Needs a terminal and a catalog. See [Use the TUI](../guides/tui.md) for the keys.
+
+| Flag | Does |
+| --- | --- |
+| `-g`, `--global` | Use your user scope's packs (`$IPM_HOME/global`). |
+
 ## Other
 
 ### `ipm doctor`

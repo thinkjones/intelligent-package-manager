@@ -5,7 +5,7 @@ nav_order: 7
 
 # Architecture
 
-How `ipm` turns a list of repos into a searchable catalog of agent artifacts, builds packs of picked items into Claude Code plugins, and why it is built this way. For day-to-day use see the [guides](guides/index.md); for the sources files see the [sources reference](reference/sources.md). The full design, including the TUI (part 4, not built yet), is [the ipm design](https://github.com/thinkjones/intelligent-package-manager/blob/main/docs/superpowers/specs/2026-10-09-ipm-design.md).
+How `ipm` turns a list of repos into a searchable catalog of agent artifacts, builds packs of picked items into Claude Code plugins, and why it is built this way. For day-to-day use see the [guides](guides/index.md); for the sources files see the [sources reference](reference/sources.md). The full design is [the ipm design](https://github.com/thinkjones/intelligent-package-manager/blob/main/docs/superpowers/specs/2026-10-09-ipm-design.md).
 
 ## Purpose and boundaries
 
@@ -150,6 +150,19 @@ Items are catalog IDs and carry no commit. `ipm pack add` checks each against th
 
 Two runs give byte-identical output, and items removed from a pack leave no files. `ipm.toml` and `.ipm/ipm.lock` are committed by other people, so they are untrusted input: pack names must be valid names, lock paths must be local to their repo, commits must be full SHAs, and a malformed lock entry is an error naming the item. Because the lock and pins are committed, a teammate can run `ipm install` from `ipm.toml` and `.ipm/ipm.lock` without a catalog. In Claude Code, picked items load under the pack's name (`<pack>:<item>`; commands show as skills); whole plugins keep their own names and are installed as dependencies.
 
+## `ipm tui`
+
+`internal/tui` is a [Bubble Tea](https://github.com/charmbracelet/bubbletea) model for the curation loop: results on the left, the selected artifact's detail and relationships on the right, the active pack as a tray along the bottom, and modals for the pack picker, install output and help. It depends only on four interfaces in `deps.go`; `internal/cli/tui.go` implements them:
+
+| Interface | Implementation |
+| --- | --- |
+| `Searcher` | Typesense (the same `search.Query` as `ipm search`, 50 hits) when the server answers and its index has documents; otherwise keyword matching over the catalog: 4 per query word in the name, 1 in the description and in tags, ties by stars. `ctrl+r` checks again. |
+| `Catalog` | `catgraph`: a node's fields, its stars, and `Children` up and down. |
+| `Packs` | `createPack`, `addToPack`, `removeFromPack`: the functions behind `ipm pack`, so the same pick rules apply. |
+| `Installer` | `runInstall` with its output piped into the modal line by line. |
+
+Searches run 150 ms after the last keystroke and carry a sequence number, so a slow result for an old query is dropped. Pack edits write `ipm.toml` at once; `.ipm/` changes only on install. Below 100 columns the detail pane hides; below 60×15 the TUI asks for a bigger terminal.
+
 ## `ipm doctor`
 
 One row each for `home`, `cache`, `pnpm` (the version, and whether it runs through `npx`), `sources` (count; a warning if not all are synced), `catalog` (record count; a warning if not built), `docker`, `typesense` and `claude` (a warning if not on PATH). A missing home or pnpm is a problem and exits 1; warnings do not.
@@ -173,7 +186,8 @@ cli/
     ├── assemble/              resolve picks, plan each pack, place files by hard link
     ├── pack/                  naming rules; reading an aihs-era manifest.toml for source import
     ├── copilot/               the skills a Copilot plugin.json lists
-    └── marketplace/           marketplace.json entries (ipm's own or upstream entry maps) and atomic Write
+    ├── marketplace/           marketplace.json entries (ipm's own or upstream entry maps) and atomic Write
+    └── tui/                   the Bubble Tea model behind ipm tui, over four interfaces (deps.go)
 ```
 
 Commands reach the outside world only through `cli.System` (stdout, stderr, environment, `LookPath`, an `Output` runner for pnpm, docker, gh and claude, an HTTP client and a clock). `go install …/cli/cmd/ipm` builds the same binary. In a clone, `bin/ipm` at the root is a shell shim: it rebuilds `cli/bin/ipm` when a Go source changes and execs it; `.envrc` puts `bin/` on PATH.
@@ -211,4 +225,4 @@ Commands reach the outside world only through `cli.System` (stdout, stderr, envi
 - **A command** — add `internal/cli/<name>.go` with a `new<Name>Cmd(sys System) *cobra.Command`, register it in `newRootCmd`, and check its arguments with `noArgs`, `exactArgs`, `minArgs` or `verbs` so a malformed command line exits 2. Get data folders from `ipmPaths(sys)`.
 - **Another artifact type** — add a marker to `internal/catalog/walk.go`, a parser, a type in `catalog.Types` with its file, and fixtures.
 - **A pickable type** — teach `ipm pack add` to accept it (`internal/cli/packcmd.go`) and `internal/assemble` where to place it.
-- **The TUI** — part 4 of [the ipm design](https://github.com/thinkjones/intelligent-package-manager/blob/main/docs/superpowers/specs/2026-10-09-ipm-design.md): a TUI over search and packs.
+- **A TUI feature** — add state and keys to the model in `internal/tui` (tested against the fakes in `model_test.go`); if it needs something new from ipm, add a method to one of the four interfaces in `deps.go` and implement it in `internal/cli/tui.go` over existing CLI code.

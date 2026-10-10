@@ -2,7 +2,7 @@
 
 Guidance for Claude Code in this repository. [`AGENTS.md`](AGENTS.md) is the router (where things are, conventions); this file adds commands and the sharp edges.
 
-`ipm` was called `aihs`. Parts 1–3 of [the ipm design](docs/superpowers/specs/2026-10-09-ipm-design.md) are built (rename, sources on pnpm, packs and `ipm install`); part 4 (a TUI over search and packs) is next.
+`ipm` was called `aihs`. Parts 1–4 of [the ipm design](docs/superpowers/specs/2026-10-09-ipm-design.md) are built: rename, sources on pnpm, packs and `ipm install`, and `ipm tui` ([TUI design](docs/superpowers/specs/2026-10-09-ipm-tui-design.md)).
 
 ## What this repo is
 
@@ -26,6 +26,7 @@ The source code of `ipm`, a Go CLI (`cli/`) that keeps a per-user list of repos 
 | Create a pack (creates `ipm.toml` in the working directory if no ancestor has one; `-g` for user scope) | `ipm pack new <name> [--description …]` |
 | Add or remove catalog items in a pack; list packs; show a pack's items | `ipm pack add <pack> <id>…`, `ipm pack remove <pack> <id>…`, `ipm pack list`, `ipm pack show <pack>` |
 | Build every pack into a plugin and marketplace under `.ipm/`, then validate | `ipm install [-g] [--update] [--no-validate]` |
+| Search, collect into packs and build in one screen (Bubble Tea) | `ipm tui [-g]` |
 | Report the plugin, skills, hooks and agents folders in synced sources | `ipm scan [--paths] [owner/repo...]` |
 | Check home, cache, pnpm, sources, catalog, docker, typesense, claude | `ipm doctor` |
 | Test changes to `cli/` (the gate) | `mise run cli:test` |
@@ -47,5 +48,6 @@ The loop: `ipm source add <repo>` → `ipm sync` (installs, then indexes) → `i
 - **The search server is container `ipm-typesense` on `127.0.0.1:8108`.** `ipm serve` removes an old `aihs-typesense` container that would hold the port.
 - **Installing plugins changes the user's Claude config.** Test installs with `CLAUDE_CONFIG_DIR` pointing at a temporary directory.
 - **The docs site is `docs/`**, published by GitHub Pages from `main` (`docs/_config.yml`, Just the Docs). Commands, flags, messages and file formats are documented there; update [the commands reference](docs/reference/commands.md), the relevant guide and [troubleshooting](docs/troubleshooting.md) when they change. Verify claims against the code or a live run, not memory.
+- **`internal/tui` depends only on its four interfaces** (`Searcher`, `Catalog`, `Packs`, `Installer`); never import ipm packages or `System` there. The adapters in `internal/cli/tui.go` reuse the CLI's functions (`addToPack`, `runInstall`, `search.Query`), so the TUI adds no behaviour of its own. Screen changes update `internal/tui/testdata/*.golden` with `go test ./internal/tui -run Golden -update`; read the diff before committing.
 - **`docs/superpowers/` is history.** Specs and plans describe what was intended at the time; don't edit them to match the code.
 - **`ipm` stays self-contained**: no global config beyond its own home and cache, nothing shared with fsh or Gas City. Commands are Go only, built with Cobra: a `new<Name>Cmd(sys System)` in `cli/internal/cli`, registered in `newRootCmd` in `cli.go`. Malformed command lines return a `UsageError` (exit 2); use `noArgs`, `exactArgs`, `minArgs` and `verbs` from `cli.go` rather than Cobra's own argument checks, which return plain errors.

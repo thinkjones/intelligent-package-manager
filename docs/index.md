@@ -27,7 +27,8 @@ Good agent artifacts are scattered across hundreds of repos and marketplaces. In
 2. **Catalog them.** `ipm sync` also builds a catalog of everything those repos hold: one record per repo, marketplace, plugin, skill, agent, command, hook and MCP server, linked to what owns it.
 3. **Search.** `ipm search "c# testing"` runs hybrid keyword and semantic search over the catalog, on a local Typesense server. `ipm tree` and `ipm graph` show where anything comes from.
 4. **Pick into packs.** `ipm pack add my-pack <id>…` collects skills, agents, commands and whole plugins from any of your repos into a named pack in your project's `ipm.toml`.
-5. **Build plugins.** `ipm install` builds each pack into a Claude Code plugin and a local marketplace under `.ipm/`. Your picks load as `my-pack:<item>`; whole plugins come along as pinned dependencies.
+5. **Or do it all in one screen.** `ipm tui` searches, shows relationships, collects into packs and builds, with keys instead of IDs.
+6. **Build plugins.** `ipm install` builds each pack into a Claude Code plugin and a local marketplace under `.ipm/`. Your picks load as `my-pack:<item>`; whole plugins come along as pinned dependencies.
 
 ```bash
 ipm source add obra/superpowers wshobson/agents

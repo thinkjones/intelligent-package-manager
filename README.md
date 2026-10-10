@@ -91,7 +91,7 @@ ipm install
 claude plugin marketplace add ./.ipm      # then /plugin install my-pack@<project folder>-ipm
 ```
 
-The [build your own plugin](https://thinkjones.github.io/intelligent-package-manager/guides/build-a-plugin.html) guide walks through a pack built from several repos.
+The [build your own plugin](https://thinkjones.github.io/intelligent-package-manager/guides/build-a-plugin.html) guide walks through a pack built from several repos. Prefer keys to IDs? [`ipm tui`](https://thinkjones.github.io/intelligent-package-manager/guides/tui.html) does the same search, collect and build in one screen.
 
 ## Commands
 
@@ -103,6 +103,7 @@ The [build your own plugin](https://thinkjones.github.io/intelligent-package-man
 | `ipm show`, `ipm tree`, `ipm graph` | Inspect an artifact and its relationships |
 | `ipm pack new\|add\|remove\|list\|show` | Edit packs in `ipm.toml` (`-g` for your user scope) |
 | `ipm install [--update]` | Build every pack into a plugin and validate it |
+| `ipm tui [-g]` | Search, judge, collect into packs and build, in one screen |
 | `ipm doctor` | Check everything `ipm` depends on |
 
 Every flag is in the [commands reference](https://thinkjones.github.io/intelligent-package-manager/reference/commands.html).

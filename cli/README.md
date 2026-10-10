@@ -24,6 +24,7 @@ ipm pack add <pack> <id>… [-g]                add catalog items: skills, agent
 ipm pack remove <pack> <id>… [-g]             remove items
 ipm pack list [-g]                            PACK, ITEMS, DESCRIPTION
 ipm pack show <pack> [-g]                     TYPE, NAME, REPO, ★, ID of each item
+ipm tui [-g]                                  search, judge, collect into packs and build, in one screen
 ipm install [-g] [--update] [--no-validate]   build each pack into .ipm/plugins/<pack>/ and .ipm/.claude-plugin/marketplace.json,
                                then claude plugin validate --strict; --update re-pins to the current catalog
 ipm scan [--paths] [repo...]   report the plugin, skills, hooks and agents folders in synced sources
@@ -66,6 +67,7 @@ internal/assemble/         resolve picks (lock, then catalog), plan each pack's 
 internal/pack/             naming rules, and reading an aihs-era manifest.toml for source import
 internal/copilot/          which skills a Copilot plugin.json lists
 internal/marketplace/      marketplace.json entries (including upstream entry maps) and atomic Write
+internal/tui/              the Bubble Tea model behind ipm tui: search, detail, tray, picker, install modal; depends only on its four interfaces (deps.go)
 ```
 
 Commands reach the outside world only through `cli.System` — stdout, stderr, environment, `LookPath`, an `Output` runner used for pnpm, docker, gh and claude, an HTTP client for Typesense, and a clock — so tests drive them in-process with a fake.
@@ -84,5 +86,6 @@ mise run cli:build     # cli/bin/ipm (bin/ipm also does this on demand)
 - `internal/paths` and `internal/sources` test path resolution on every OS, aliases, the `package.json` round trip, collisions and reading commits from a fixture `pnpm-lock.yaml`.
 - `internal/project` and `internal/assemble` test the scope walk, the `ipm.toml` and lock round trips, resolving from lock then catalog, name clashes, Copilot plugins expanded to skills, whole-plugin dependencies, hard link falling back to copy, and stale files removed.
 - `internal/catalog`, `internal/catgraph`, `internal/search` and `internal/typesense` test the catalog, the graph and search against fixtures and a fake server.
+- `internal/tui` drives the model with key presses against fake interfaces, and compares rendered screens with `testdata/*.golden` (`go test ./internal/tui -run Golden -update` rewrites them).
 - `internal/cli` drives every command in-process with a fake `System`, `IPM_HOME` and `IPM_CACHE_DIR` in temp dirs; no real pnpm, docker or claude.
 - `cmd/ipm` builds the real binary and checks exit codes; with pnpm installed it also runs `source add`, `sync` and `index` against a local git repo over `file://`.
