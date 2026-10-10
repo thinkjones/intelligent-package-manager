@@ -1,30 +1,30 @@
-ipm ─ search: tdd                                                                                                ○ local
+ipm  o/r › p › tdd                                                                                               ○ local
 server off: keyword search only — run `ipm serve` and `ipm load` for semantic search                                    
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-›50   skill          ✓ tdd                             │ skill  tdd                                                     
- 50   skill            tdd-guard                       │ o/r ★ 31.2k                                                    
-                                                       │ skill:o/r:skills/tdd                                           
-                                                       │ Test first.                                                    
-                                                       │                                                                
-                                                       │  up    plugin         p                                        
-                                                       │  up    repo           o/r                                      
-                                                       │  down  agent          helper                                   
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
-                                                       │                                                                
+╭─ search: tdd             ────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ›50   skill  ✓ tdd                              o/r                                                                  │
+│  50   skill    tdd-guard                        o/r                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ tree ── skill:o/r:skills/tdd ───────────────────────────────────────────────────────────────────────────────────────╮
+│ repo    o/r                              The repo                                                                    │
+│ └ plugin  p                              The p plugin                                                                │
+│   ├ skill  ▶tdd ───────────────────────▶ Test first.                                                                 │
+│   │ └ agent   helper                     Helps                                                                       │
+│   └ skill   tdd-guard                                                                                                │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
 2 of 100                                                                                                                
-/ search  a add  d remove  p packs  i install  f type  ? help  q quit                                                   
+type to search  ↓ results  ctrl+c quit                                                                                  

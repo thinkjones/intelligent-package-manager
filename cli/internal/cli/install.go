@@ -52,6 +52,12 @@ var unsafeName = regexp.MustCompile(`[^a-z0-9._-]+`)
 // .ipm/plugins and writes .ipm's marketplace. Nothing is written until every
 // item resolves.
 func runInstall(sys System, global, update, noValidate bool) error {
+	return build(sys, global, update, noValidate, true)
+}
+
+// build is ipm install; hints adds the commands to install the result in
+// Claude Code, which deploy runs itself instead.
+func build(sys System, global, update, noValidate, hints bool) error {
 	scope, err := currentScope(sys, global)
 	if err != nil {
 		return err
@@ -155,10 +161,7 @@ func runInstall(sys System, global, update, noValidate bool) error {
 	if err := os.Rename(staging, plugins); err != nil {
 		return err
 	}
-	name := "ipm-global"
-	if !scope.Global {
-		name = strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(scope.Root)), "-"), "-.") + "-ipm"
-	}
+	name := marketName(scope)
 	m := marketplace.Build(entries, names, marketplace.Options{Name: name, Owner: owner, Description: "ipm packs: " + strings.Join(names, ", ")})
 	if err := marketplace.Write(filepath.Join(dir, ".claude-plugin", "marketplace.json"), m); err != nil {
 		return err
@@ -178,6 +181,9 @@ func runInstall(sys System, global, update, noValidate bool) error {
 	} else {
 		fmt.Fprintln(sys.Stdout, "validate: ok")
 	}
+	if !hints {
+		return nil
+	}
 	fmt.Fprintf(sys.Stdout, "\nInstall in Claude Code:\n  claude plugin marketplace add %s\n", dir)
 	for _, n := range names {
 		fmt.Fprintf(sys.Stdout, "  /plugin install %s@%s\n", n, name)
@@ -194,4 +200,13 @@ func writeJSON(path string, v any) error {
 		return err
 	}
 	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+// marketName is the name of the marketplace ipm install builds for scope:
+// <project folder>-ipm, or ipm-global for the user scope.
+func marketName(scope project.Scope) string {
+	if scope.Global {
+		return "ipm-global"
+	}
+	return strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(scope.Root)), "-"), "-.") + "-ipm"
 }

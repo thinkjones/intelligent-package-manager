@@ -3,11 +3,13 @@ package tui
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type focus int
@@ -15,7 +17,7 @@ type focus int
 const (
 	focusSearch focus = iota
 	focusResults
-	focusDetail
+	focusTree
 	focusTray
 )
 
@@ -44,11 +46,11 @@ type Model struct {
 	height   int
 	debounce time.Duration
 
-	detail Detail
-	nbSel  int      // selected neighbour in the detail pane
-	nbOff  int      // first neighbour shown
-	back   []string // detail IDs to return to with backspace
-	full   bool     // narrow terminal: the detail is shown full-width
+	cursor    string            // the tree's centre node
+	chosen    map[string]string // the parent picked for a node in tree mode
+	tree      treeView
+	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
+	backStack []string // external entries jumped from, newest last
 
 	packs    []Pack
 	active   string // the active pack's name
@@ -57,8 +59,11 @@ type Model struct {
 	picker   *picker
 	statusOK bool // status is a note, not an error
 
-	inst *install // the install modal, while open
-	help bool     // the ? overlay
+	inst   *install     // the install or deploy output modal, while open
+	deploy *deployModal // the deploy modal before it runs
+	ext    *extModal    // the e modal: external references
+	help   bool         // the ? overlay
+	plain  bool         // NO_COLOR: draw without colour
 }
 
 type keyMsg = tea.KeyPressMsg
@@ -82,8 +87,9 @@ func New(d Deps) *Model {
 	in.Prompt = ""
 	in.Placeholder = "type to search"
 	in.Focus()
-	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond}
+	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
 	m.input.SetWidth(m.width - 30)
+	m.plain = os.Getenv("NO_COLOR") != ""
 	m.reloadPacks()
 	return m
 }
@@ -162,6 +168,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	}
+	if m.deploy != nil {
+		return m.deployKey(msg)
+	}
+	if m.ext != nil {
+		m.extKey(k)
+		return nil
+	}
 	if m.picker != nil {
 		m.pickerKey(msg)
 		return nil
@@ -177,18 +190,27 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		case "p":
 			m.openPicker(false)
 			return nil
-		case "i":
+		case "i", "b":
 			return m.startInstall()
+		case "D":
+			m.openDeploy()
+			return nil
+		case "e":
+			m.openExternal()
+			return nil
+		case "t":
+			m.setFocus(focusTray)
+			return nil
 		case "?":
 			m.help = true
 			return nil
 		}
 	}
-	if m.focus == focusDetail {
+	if m.focus == focusTree {
 		if k == "q" {
 			return tea.Quit
 		}
-		m.detailKey(k)
+		m.treeKey(k)
 		return nil
 	}
 	if m.focus == focusTray {
@@ -224,20 +246,99 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.move(1)
 	case "up", "k":
 		m.move(-1)
+	case "left", "h":
+		m.treeUp()
 	case "right", "l":
-		if m.detail.ID != "" {
-			m.full = !m.wide()
-			m.setFocus(focusDetail)
+		m.treeDown()
+	case "tab", "enter":
+		if m.cursor != "" {
+			m.setFocus(focusTree)
+			m.treeSel = m.tree.Cursor
 		}
-	case "enter":
-		if !m.wide() && m.detail.ID != "" {
-			m.full = true
-			m.setFocus(focusDetail)
-		}
-	case "tab":
-		m.setFocus(focusTray)
 	}
 	return nil
+}
+
+// treeKey handles keys in tree mode.
+func (m *Model) treeKey(k string) {
+	switch k {
+	case "down", "j":
+		m.treeMove(1)
+	case "up", "k":
+		m.treeMove(-1)
+	case "left", "h":
+		m.treeUp()
+	case "right", "l":
+		if m.treeSel == backRow {
+			m.back()
+			return
+		}
+		m.treeDown()
+	case "enter":
+		if m.treeSel == backRow {
+			m.back()
+			return
+		}
+		if i := m.treeSel - m.tree.Cursor - 1; i >= 0 && i < len(m.tree.AlsoIn) {
+			m.chosen[m.cursor] = m.tree.AlsoIn[i].ID
+			m.setCursor(m.cursor)
+		}
+	case "esc", "tab":
+		m.setFocus(focusResults)
+		m.followSelection()
+	}
+}
+
+// treeUp moves the tree's cursor to its parent.
+func (m *Model) treeUp() {
+	if n := len(m.tree.Path); n > 0 {
+		m.setCursor(m.tree.Path[n-1].ID)
+	}
+}
+
+// treeDown moves the tree's cursor to its first child, or, on an external
+// entry, into the repo it points at.
+func (m *Model) treeDown() {
+	switch {
+	case m.tree.Node.External != nil:
+		m.jump()
+		return
+	case m.tree.Node.Unresolved != "":
+		m.status = m.tree.Node.Unresolved + " isn't one of your sources — ipm source add " + m.cursor
+		return
+	}
+	if len(m.tree.Children) > 0 {
+		child := m.tree.Children[0].ID
+		m.chosen[child] = m.cursor
+		m.setCursor(child)
+	}
+}
+
+// treeMove steps through the siblings and the 'also in' rows; a sibling
+// becomes the cursor, under the same parent. Above the first sibling is the
+// back root, when there is one.
+func (m *Model) treeMove(by int) {
+	switch {
+	case m.treeSel == backRow && by > 0:
+		m.treeSel = m.tree.Cursor
+		return
+	case m.treeSel == backRow:
+		return
+	case m.treeSel == 0 && by < 0 && m.tree.Back != nil:
+		m.treeSel = backRow
+		return
+	}
+	rows := m.tree.selectable()
+	sel := max(0, min(len(rows)-1, m.treeSel+by))
+	also := sel > m.tree.Cursor && sel <= m.tree.Cursor+len(m.tree.AlsoIn)
+	if also || sel == m.treeSel {
+		m.treeSel = sel
+		return
+	}
+	if n := len(m.tree.Path); n > 0 {
+		m.chosen[rows[sel].ID] = m.tree.Path[n-1].ID
+	}
+	m.setCursor(rows[sel].ID)
 }
 
 // trayKey handles keys while the tray has focus.
@@ -296,46 +397,69 @@ func (m *Model) searchCmd(seq int) tea.Cmd {
 	}
 }
 
-// View draws the screen.
+// View draws the screen: a header with the cursor's breadcrumb, the results
+// and tree panels (or a modal), the pack tray, the status line and the keys
+// for the current mode.
 func (m *Model) View() tea.View {
-	if m.tooSmall() {
-		v := tea.NewView(fmt.Sprintf("ipm needs at least %d×%d — enlarge the terminal (q quits)", minWidth, minHeight))
-		v.AltScreen = true
-		return v
+	content := m.render()
+	if m.plain {
+		content = ansi.Strip(content)
 	}
-	var b strings.Builder
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
+}
+
+func (m *Model) render() string {
+	if m.tooSmall() {
+		return fmt.Sprintf("ipm needs at least %d×%d — enlarge the terminal (q quits)", minWidth, minHeight)
+	}
 	w := m.width
+	var top []string
 	mode := stTeal.Render("● hybrid")
 	if m.d.Searcher.Mode() != "hybrid" {
 		mode = stMuted.Render("○ local")
 	}
-	head := stTitle.Render("ipm") + stMuted.Render(" ─ search: ") + m.input.View()
-	b.WriteString(fit(head, w-lipglossWidth(mode)-1) + " " + mode + "\n")
+	head := stTitle.Render("ipm") + "  " + m.breadcrumb(w-lipglossWidth(mode)-8)
+	top = append(top, fit(head, w-lipglossWidth(mode)-1)+" "+mode)
 	if n := m.d.Searcher.Notice(); n != "" {
-		b.WriteString(fit(stAmber.Render(n), w) + "\n")
+		top = append(top, fit(stAmber.Render(n), w))
 	}
-	if f := typeFilters[m.filter]; f != "" {
-		b.WriteString(fit(stMuted.Render("type: ")+stAmber.Render(f), w) + "\n")
-	}
-	b.WriteString(stRule.Render(strings.Repeat("─", w)) + "\n")
-	rows := max(1, m.height-strings.Count(b.String(), "\n")-4)
-	var body []string
+	tray := m.trayLines(w)
+	body := max(6, m.height-len(top)-len(tray)-2)
+
+	var mid []string
 	switch {
 	case m.inst != nil:
-		body = m.installLines(w, rows)
+		mid = panel(stTitle.Render(m.inst.title), m.installLines(w-4, body-2), w, true)
+	case m.deploy != nil:
+		mid = panel(stTitle.Render("deploy"), m.deployLines(w-4, body-2), w, true)
+	case m.ext != nil:
+		mid = panel(stTitle.Render("external references"), m.extLines(w-4, body-2), w, true)
 	case m.help:
-		body = m.helpLines(w, rows)
+		mid = panel(stTitle.Render("keys"), m.helpLines(w-4, body-2), w, true)
 	case m.picker != nil:
-		body = m.pickerLines(w, rows)
+		mid = panel(stTitle.Render("packs"), m.pickerLines(w-4, body-2), w, true)
 	default:
-		body = m.bodyLines(w, rows)
+		resH := max(5, body*40/100)
+		m.input.SetWidth(min(w-24, max(lipglossWidth(m.input.Placeholder), lipglossWidth(m.input.Value())+1)))
+		search := stMuted.Render("search: ") + m.input.View()
+		if f := typeFilters[m.filter]; f != "" {
+			search += stMuted.Render("  type: ") + stAmber.Render(f)
+		}
+		resultsFocused := m.focus == focusSearch || m.focus == focusResults
+		mid = panel(search, m.resultLines(w-4, resH-2), w, resultsFocused)
+		sel := -1
+		if m.focus == focusTree {
+			sel = m.treeSel
+		}
+		title := stMuted.Render("tree")
+		if m.cursor != "" {
+			title += stMuted.Render(" ── ") + stText.Render(m.cursor)
+		}
+		mid = append(mid, panel(title, m.tree.lines(w-4, body-resH-2, sel, m.focus == focusTree), w, m.focus == focusTree)...)
 	}
-	for _, line := range body {
-		b.WriteString(line + "\n")
-	}
-	for _, line := range m.trayLines(w) {
-		b.WriteString(line + "\n")
-	}
+
 	status := stMuted.Render(m.countLine())
 	switch {
 	case m.status != "" && m.statusOK:
@@ -343,11 +467,33 @@ func (m *Model) View() tea.View {
 	case m.status != "":
 		status = stError.Render(m.status)
 	}
-	b.WriteString(fit(status, w) + "\n")
-	b.WriteString(fit(stMuted.Render("/ search  a add  d remove  p packs  i install  f type  ? help  q quit"), w))
-	v := tea.NewView(b.String())
-	v.AltScreen = true
-	return v
+	lines := append(append(append(top, mid...), tray...), fit(status, w), fit(stMuted.Render(m.hints()), w))
+	return strings.Join(lines, "\n")
+}
+
+// hints is the footer: the keys that matter where the focus is.
+func (m *Model) hints() string {
+	switch {
+	case m.inst != nil:
+		return "esc close (when finished)"
+	case m.deploy != nil && m.deploy.step == stepConfirm:
+		return "y deploy  esc cancel"
+	case m.deploy != nil:
+		return "enter next  esc cancel"
+	case m.ext != nil:
+		return "↑↓ move  enter jump  esc close"
+	case m.help:
+		return "esc or ? close"
+	case m.picker != nil:
+		return "enter choose  n new pack  esc cancel"
+	case m.focus == focusSearch:
+		return "type to search  ↓ results  ctrl+c quit"
+	case m.focus == focusTree:
+		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help"
+	case m.focus == focusTray:
+		return "←→ items  d remove  esc back"
+	}
+	return "↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  b build  D deploy  ? help  q quit"
 }
 
 func (m *Model) countLine() string {
@@ -360,20 +506,70 @@ func (m *Model) countLine() string {
 	return fmt.Sprintf("%d of %d", len(m.res.Hits), m.res.Found)
 }
 
-// bodyLines is the results and detail panes side by side, or one of them in
-// a narrow terminal.
-func (m *Model) bodyLines(w, rows int) []string {
-	switch {
-	case m.full:
-		return m.detailLines(w, rows)
-	case !m.wide():
-		return m.resultLines(w, rows)
+// followSelection centres the tree on the selected result, forgetting jumps.
+func (m *Model) followSelection() {
+	m.backStack = nil
+	if m.sel < len(m.res.Hits) {
+		m.setCursor(m.res.Hits[m.sel].ID)
+		return
 	}
-	left := w * 45 / 100
-	res, det := m.resultLines(left, rows), m.detailLines(w-left-3, rows)
-	out := make([]string, rows)
-	for i := range out {
-		out[i] = res[i] + stRule.Render(" │ ") + det[i]
+	m.cursor, m.tree = "", treeView{}
+}
+
+// setCursor centres the tree on id.
+func (m *Model) setCursor(id string) {
+	tv, err := buildTree(m.d.Catalog, id, m.chosen)
+	if err != nil {
+		m.status = err.Error()
 	}
-	return out
+	if n := len(m.backStack); n > 0 {
+		if e, err := m.d.Catalog.Node(m.backStack[n-1]); err == nil {
+			back := refOf(e)
+			tv.Back = &back
+		}
+	}
+	m.cursor, m.tree, m.treeSel = id, tv, tv.Cursor
+}
+
+// maxBack is how many jumps the back stack remembers.
+const maxBack = 20
+
+// jump moves from an external entry to what it references, in its own repo,
+// remembering the entry so back can return.
+func (m *Model) jump() {
+	target := m.tree.Node.External.ID
+	m.backStack = append(m.backStack, m.cursor)
+	if len(m.backStack) > maxBack {
+		m.backStack = m.backStack[len(m.backStack)-maxBack:]
+	}
+	m.setCursor(target)
+}
+
+// back returns to the external entry the last jump left.
+func (m *Model) back() {
+	n := len(m.backStack)
+	if n == 0 {
+		return
+	}
+	entry := m.backStack[n-1]
+	m.backStack = m.backStack[:n-1]
+	m.setCursor(entry)
+}
+
+// breadcrumb is the cursor's path, "repo › … › node", cut from the left to w.
+func (m *Model) breadcrumb(w int) string {
+	if m.cursor == "" {
+		return ""
+	}
+	refs := append(append([]Ref(nil), m.tree.Path...), refOf(m.tree.Node))
+	sep := stMuted.Render(" › ")
+	parts := make([]string, len(refs))
+	for i, r := range refs {
+		parts[i] = typeStyle(r.Type).Render(r.Name)
+	}
+	for len(parts) > 1 && lipglossWidth(strings.Join(parts, sep)) > w {
+		parts = parts[1:]
+		parts[0] = stMuted.Render("…")
+	}
+	return strings.Join(parts, sep)
 }

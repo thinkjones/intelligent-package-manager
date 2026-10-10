@@ -1,6 +1,6 @@
 # ipm
 
-The Go CLI. Every command is Go code in this module; it keeps its data in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), never installs into Claude Code, and is separate from fsh and Gas City. For using it see [the documentation](https://thinkjones.github.io/intelligent-package-manager/) (source in [`docs/`](../docs/)); for the design see [how it works](../docs/architecture.md).
+The Go CLI. Every command is Go code in this module; it keeps its data in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), installs into Claude Code only on `ipm deploy`, and is separate from fsh and Gas City. For using it see [the documentation](https://thinkjones.github.io/intelligent-package-manager/) (source in [`docs/`](../docs/)); for the design see [how it works](../docs/architecture.md).
 
 ## Usage
 
@@ -24,7 +24,8 @@ ipm pack add <pack> <id>… [-g]                add catalog items: skills, agent
 ipm pack remove <pack> <id>… [-g]             remove items
 ipm pack list [-g]                            PACK, ITEMS, DESCRIPTION
 ipm pack show <pack> [-g]                     TYPE, NAME, REPO, ★, ID of each item
-ipm tui [-g]                                  search, judge, collect into packs and build, in one screen
+ipm tui [-g]                                  search, see the tree, collect, build and deploy, in one screen
+ipm deploy [pack] [--scope user|project|local] [--path DIR] [-g]   build, then install a pack into Claude Code
 ipm install [-g] [--update] [--no-validate]   build each pack into .ipm/plugins/<pack>/ and .ipm/.claude-plugin/marketplace.json,
                                then claude plugin validate --strict; --update re-pins to the current catalog
 ipm scan [--paths] [repo...]   report the plugin, skills, hooks and agents folders in synced sources

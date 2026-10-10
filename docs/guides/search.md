@@ -48,7 +48,9 @@ ipm search hooks --tag security
 
 The table fits your terminal. When it is too narrow, DESCRIPTION goes first, then PLUGINS, then REPO (the repo is also in the ID); IDs are never cut. Output piped to a file or another command isn't cut at all. Set `COLUMNS` to choose a width yourself.
 
-Search is **hybrid**: keyword matches on name, description, tags and plugin names are fused with semantic matches, and ties go to the repo with more stars. `c#` and `c++` are searchable as words.
+Search is **hybrid**: keyword matches are fused with semantic matches. Names count most, then repo names and the names of owning plugins, then descriptions and tags, so `cloudflare` puts `cloudflare/skills`' artifacts first. Results that are otherwise equal go to the repo more other repos use (the `↗` column), then to more stars. Names split on `/`, `-` and `_`, so `tdd` finds `tdd-guard`; `c#` and `c++` are searchable as words.
+
+After upgrading `ipm`, run `ipm load` once: the index gains the fields this ranking uses.
 
 **SCORE** shows how each hit ranks against the best hit in the same query (100). It is not comparable between queries. SEM, with `--explain`, is comparable: it is the semantic similarity between your query and the artifact, from 0 to 1.
 
@@ -91,6 +93,6 @@ ipm graph 'repo:obra/superpowers'                    # Mermaid
 ipm graph 'repo:obra/superpowers' --format dot | dot -Tsvg > superpowers.svg
 ```
 
-Repos contain marketplaces, marketplaces list plugins, and plugins own skills, agents, commands, hooks and MCP servers. An external plugin points at the repo it lives in, so `--up` from a skill also shows the other marketplaces that list its repo.
+Repos contain marketplaces, marketplaces list plugins, and plugins own skills, agents, commands, hooks and MCP servers. A repo is the root of everything in it, so `--up` from a skill stops at its repo. Which other repos' marketplaces list it shows under `used by:` in `ipm show`, and under `e` in the TUI.
 
 `show`, `tree` and `graph` read the catalog directly. They don't need the search server.

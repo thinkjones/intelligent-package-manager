@@ -101,7 +101,7 @@ ipm install
 claude plugin marketplace add ./.ipm
 ```
 
-Then, in Claude Code, run `/plugin install my-pack@<project folder>-ipm`. The skill is available as `my-pack:test-driven-development`.
+Then, in Claude Code, run `/plugin install my-pack@<project folder>-ipm`. Or do both in one step with `ipm deploy my-pack`. The skill is available as `my-pack:test-driven-development`.
 
 {: .note }
 Adding a marketplace changes your Claude Code configuration. To try it without that, point `CLAUDE_CONFIG_DIR` at an empty folder first: `CLAUDE_CONFIG_DIR=$(mktemp -d) claude plugin marketplace add ./.ipm`.

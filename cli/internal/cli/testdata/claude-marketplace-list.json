@@ -1,0 +1,8 @@
+[
+  {
+    "name": "work-ipm",
+    "source": "directory",
+    "path": "{{ROOT}}/.ipm",
+    "installLocation": "{{ROOT}}/.ipm"
+  }
+]

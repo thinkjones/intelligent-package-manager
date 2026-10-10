@@ -39,10 +39,14 @@ type fake struct {
 	errOut  bytes.Buffer
 	onPath  map[string]bool
 	results map[string]result
-	mu      sync.Mutex
-	calls   []string
-	http    *http.Client
-	cwd     string
+	// full answers by the whole command line, before results; dirs records
+	// each call's working directory, in the same order as calls.
+	full  map[string]result
+	dirs  []string
+	mu    sync.Mutex
+	calls []string
+	http  *http.Client
+	cwd   string
 }
 
 type result struct {
@@ -89,7 +93,12 @@ func (f *fake) system() System {
 			}
 			f.mu.Lock()
 			defer f.mu.Unlock()
-			f.calls = append(f.calls, name+" "+strings.Join(args, " "))
+			line := name + " " + strings.Join(args, " ")
+			f.calls = append(f.calls, line)
+			f.dirs = append(f.dirs, dir)
+			if r, ok := f.full[line]; ok {
+				return r.out, r.err
+			}
 			r := f.results[key]
 			return r.out, r.err
 		},
@@ -1566,7 +1575,7 @@ func TestLocalSearchRanking(t *testing.T) {
 	stars := func(id string) func(string) (int, bool) {
 		return func(string) (int, bool) { return 0, false }
 	}
-	res := localSearch(records, stars(""), "tdd", tui.Filter{})
+	res := localSearch(records, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{})
 	var names []string
 	for _, h := range res.Hits {
 		names = append(names, h.Name)
@@ -1582,17 +1591,17 @@ func TestLocalSearchRanking(t *testing.T) {
 		}
 		return 1, true
 	}
-	if res := localSearch(records, byStars, "tdd", tui.Filter{}); res.Hits[0].Name != "tdd-guard" {
+	if res := localSearch(records, byStars, func(string) int { return 0 }, "tdd", tui.Filter{}); res.Hits[0].Name != "tdd-guard" {
 		t.Errorf("equal scores should rank by stars: %v", res.Hits[0].Name)
 	}
-	if res := localSearch(records, stars(""), "tdd", tui.Filter{Type: "agent"}); len(res.Hits) != 0 {
+	if res := localSearch(records, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{Type: "agent"}); len(res.Hits) != 0 {
 		t.Errorf("type filter: %v", res.Hits)
 	}
 	var many []map[string]any
 	for i := range 60 {
 		many = append(many, rec(fmt.Sprintf("skill:o/r:s%02d", i), fmt.Sprintf("tdd %d", i), ""))
 	}
-	if res := localSearch(many, stars(""), "tdd", tui.Filter{}); len(res.Hits) != 50 || res.Found != 60 {
+	if res := localSearch(many, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{}); len(res.Hits) != 50 || res.Found != 60 {
 		t.Errorf("cap: %d hits, found %d", len(res.Hits), res.Found)
 	}
 }
@@ -1669,29 +1678,6 @@ func TestTuiPacks(t *testing.T) {
 	}
 }
 
-func TestTuiCatalogDetail(t *testing.T) {
-	root := checkout(t)
-	withGraphCatalog(t, root)
-	g, err := catgraph.Load(filepath.Join(cacheOf(root), "catalog"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	d, err := tuiCatalog{g}.Detail("skill:o/r:p/skills/s1")
-	if err != nil || d.Name != "s1" || d.Repo != "o/r" || d.Description != "Test first" {
-		t.Fatalf("%+v %v", d, err)
-	}
-	var up []string
-	for _, n := range d.Up {
-		up = append(up, n.ID+"="+n.Type)
-	}
-	if !slices.Contains(up, "plugin:o/r:p=plugin") {
-		t.Errorf("up %v", up)
-	}
-	if _, err := (tuiCatalog{g}).Detail("skill:gone"); err == nil {
-		t.Error("an unknown ID is an error")
-	}
-}
-
 func TestTuiInstallerStreams(t *testing.T) {
 	f, _ := installFake(t)
 	var out bytes.Buffer
@@ -1752,5 +1738,381 @@ func TestTuiSearcherConcurrentFirstSearches(t *testing.T) {
 	wg.Wait()
 	if len(s.records) != want {
 		t.Errorf("records loaded %d times over: %d, want %d", len(s.records)/max(1, want), len(s.records), want)
+	}
+}
+
+// deployFake is installFake with claude on PATH and empty claude listings;
+// it builds the project first so .ipm/ exists.
+func deployFake(t *testing.T) (*fake, string) {
+	t.Helper()
+	f, root := installFake(t)
+	f.onPath["claude"] = true
+	f.full = map[string]result{
+		"claude plugin marketplace list --json": {"[]", nil},
+		"claude plugin list --json":             {"[]", nil},
+	}
+	if err := f.run("install"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	f.calls, f.dirs = nil, nil
+	f.out.Reset()
+	return f, root
+}
+
+// claudeFixture is a captured claude --json listing with its paths filled in.
+func claudeFixture(t *testing.T, name, root string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.NewReplacer("{{ROOT}}", root, "{{CONFIG}}", "/cfg").Replace(string(data))
+}
+
+func cmdLines(cmds []claudeCmd) []string {
+	var out []string
+	for _, c := range cmds {
+		out = append(out, c.Dir+" | "+c.String())
+	}
+	return out
+}
+
+func TestPlanDeployFirstTime(t *testing.T) {
+	f, root := deployFake(t)
+	ipm := filepath.Join(root, ".ipm")
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	want := []string{
+		root + " | claude plugin marketplace add " + ipm + " --scope project",
+		root + " | claude plugin install kit@work-ipm --scope project",
+	}
+	if err != nil || !reflect.DeepEqual(cmdLines(cmds), want) {
+		t.Errorf("got %v %v\nwant %v", cmdLines(cmds), err, want)
+	}
+}
+
+func TestPlanDeployAgain(t *testing.T) {
+	f, root := deployFake(t)
+	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
+	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
+	ipm := filepath.Join(root, ".ipm")
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	want := []string{
+		root + " | claude plugin marketplace add " + ipm + " --scope project",
+		root + " | claude plugin marketplace update work-ipm",
+		root + " | claude plugin update kit@work-ipm --scope project",
+	}
+	if err != nil || !reflect.DeepEqual(cmdLines(cmds), want) {
+		t.Errorf("got %v %v\nwant %v", cmdLines(cmds), err, want)
+	}
+}
+
+func TestPlanDeployUserScope(t *testing.T) {
+	f, root := deployFake(t)
+	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
+	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
+	ipm := filepath.Join(root, ".ipm")
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "user"})
+	want := []string{
+		root + " | claude plugin marketplace add " + ipm + " --scope user",
+		root + " | claude plugin marketplace update work-ipm",
+		root + " | claude plugin install kit@work-ipm --scope user", // installed only at project scope
+	}
+	if err != nil || !reflect.DeepEqual(cmdLines(cmds), want) {
+		t.Errorf("got %v %v\nwant %v", cmdLines(cmds), err, want)
+	}
+}
+
+func TestPlanDeployUnreadableClaudeJSON(t *testing.T) {
+	f, root := deployFake(t)
+	f.full["claude plugin list --json"] = result{"not json", nil}
+	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	if err == nil || !strings.Contains(err.Error(), "claude plugin list --json") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestDeployTargetPathExpanded(t *testing.T) {
+	home := t.TempDir()
+	os.MkdirAll(filepath.Join(home, "work"), 0o755)
+	os.WriteFile(filepath.Join(home, "file"), []byte("x"), 0o644)
+	got, err := cleanTarget(deployTarget{Scope: "project", Path: "~/work/"}, "/elsewhere", home)
+	if err != nil || got.Path != filepath.Join(home, "work") {
+		t.Errorf("~ expansion: %+v %v", got, err)
+	}
+	if got, err := cleanTarget(deployTarget{Scope: "local", Path: "work"}, home, home); err != nil || got.Path != filepath.Join(home, "work") {
+		t.Errorf("relative path: %+v %v", got, err)
+	}
+	for _, bad := range []deployTarget{{Scope: "project", Path: "~/file"}, {Scope: "project", Path: "~/missing"}, {Scope: "team"}, {Scope: "project"}} {
+		if _, err := cleanTarget(bad, home, home); err == nil {
+			t.Errorf("%+v accepted", bad)
+		}
+	}
+	if got, err := cleanTarget(deployTarget{Scope: "user", Path: "~/work"}, home, home); err != nil || got.Path != "" {
+		t.Errorf("user scope keeps no path: %+v %v", got, err)
+	}
+}
+
+func TestRunDeployBuildsThenRuns(t *testing.T) {
+	f, root := deployFake(t)
+	if err := f.run("deploy", "kit"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	var order []string
+	for _, c := range f.calls {
+		switch {
+		case strings.HasPrefix(c, "pnpm install"), strings.HasPrefix(c, "claude plugin marketplace add"), strings.HasPrefix(c, "claude plugin install"):
+			order = append(order, strings.Join(strings.Fields(c)[:3], " "))
+		}
+	}
+	if strings.Join(order, ";") != "pnpm install --no-frozen-lockfile;claude plugin marketplace;claude plugin install" {
+		t.Errorf("order %v", order)
+	}
+	out := f.out.String()
+	if !strings.Contains(out, "$ claude plugin install kit@work-ipm --scope project") || !strings.Contains(out, "✓ deployed kit (project "+root+")") {
+		t.Errorf("output:\n%s", out)
+	}
+}
+
+func TestRunDeployStopsOnFailure(t *testing.T) {
+	f, root := deployFake(t)
+	f.full["claude plugin install kit@work-ipm --scope project"] = result{"boom", errors.New("exit status 1")}
+	err := f.run("deploy", "kit", "--path", root)
+	if err == nil || !strings.Contains(err.Error(), "claude plugin install kit@work-ipm") || strings.Contains(f.out.String(), "✓ deployed") {
+		t.Errorf("err %v\n%s", err, f.out.String())
+	}
+}
+
+func TestDeployNeedsClaude(t *testing.T) {
+	f, _ := deployFake(t)
+	f.onPath["claude"] = false
+	if err := f.run("deploy", "kit"); err == nil || !strings.Contains(err.Error(), "claude") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestDeployPackRequired(t *testing.T) {
+	f, _ := deployFake(t)
+	f.run("pack", "new", "second")
+	var usage *UsageError
+	if err := f.run("deploy"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "name a pack") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestTuiCatalogNode(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	g, err := catgraph.Load(filepath.Join(cacheOf(root), "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := tuiCatalog{g}.Node("skill:o/r:p/skills/s1")
+	if err != nil || n.Name != "s1" || n.Description != "Test first" {
+		t.Fatalf("%+v %v", n, err)
+	}
+	var parents []string
+	for _, p := range n.Parents {
+		parents = append(parents, p.ID+"="+p.Type)
+	}
+	if !slices.Contains(parents, "plugin:o/r:p=plugin") {
+		t.Errorf("parents %v", parents)
+	}
+	if _, err := (tuiCatalog{g}).Node("skill:gone"); err == nil {
+		t.Error("an unknown ID is an error")
+	}
+}
+
+func TestTuiDeployerPlan(t *testing.T) {
+	f, root := installFake(t) // not built yet: the plan must not need .ipm/
+	f.onPath["claude"] = true
+	f.full = map[string]result{
+		"claude plugin marketplace list --json": {"[]", nil},
+		"claude plugin list --json":             {"[]", nil},
+	}
+	d := tuiDeployer{sys: f.system(), scope: project.Scope{Root: root}}
+	if got := d.Default("kit"); got.Scope != "project" || got.Path != root {
+		t.Errorf("default %+v", got)
+	}
+	cleaned, plan, err := d.Plan("kit", tui.Target{Scope: "project", Path: root + "/"})
+	if cleaned.Path != root {
+		t.Errorf("Plan should return the cleaned target: %+v", cleaned)
+	}
+	want := []string{"ipm install", "claude plugin marketplace add " + filepath.Join(root, ".ipm") + " --scope project", "claude plugin install kit@work-ipm --scope project"}
+	if err != nil || !reflect.DeepEqual(plan, want) {
+		t.Errorf("plan %v %v\nwant %v", plan, err, want)
+	}
+	f.onPath["claude"] = false
+	if _, _, err := d.Plan("kit", tui.Target{Scope: "user"}); err == nil || !strings.Contains(err.Error(), "claude") {
+		t.Errorf("no claude: %v", err)
+	}
+}
+
+func TestDeployOutputSaysEachThingOnce(t *testing.T) {
+	f, root := deployFake(t)
+	var out bytes.Buffer
+	if err := (tuiDeployer{sys: f.system(), scope: project.Scope{Root: root}}).Deploy(context.Background(), "kit", tui.Target{Scope: "project", Path: root}, &out); err != nil {
+		t.Fatalf("%v\n%s", err, out.String())
+	}
+	if strings.Contains(out.String(), "✓ deployed") || strings.Contains(out.String(), "Install in Claude Code") {
+		t.Errorf("the TUI shows its own result, and deploy installs it itself:\n%s", out.String())
+	}
+	f.out.Reset()
+	if err := f.run("deploy", "kit"); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(f.out.String(), "✓ deployed kit"); n != 1 || strings.Contains(f.out.String(), "Install in Claude Code") {
+		t.Errorf("ipm deploy prints its result once (%d) and no install hints:\n%s", n, f.out.String())
+	}
+}
+
+func TestPlanDeployRefusesOtherProjectsMarketplace(t *testing.T) {
+	f, root := deployFake(t)
+	other := filepath.Join(t.TempDir(), "work")
+	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", other), nil}
+	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	if err == nil || !strings.Contains(err.Error(), "work-ipm") || !strings.Contains(err.Error(), other) {
+		t.Errorf("a same-named marketplace from another folder must stop the deploy: %v", err)
+	}
+}
+
+func TestTuiDeployerPlanGlobal(t *testing.T) {
+	f, _ := installFake(t)
+	f.onPath["claude"] = true
+	f.full = map[string]result{
+		"claude plugin marketplace list --json": {"[]", nil},
+		"claude plugin list --json":             {"[]", nil},
+	}
+	home := filepath.Join(t.TempDir(), "home")
+	os.MkdirAll(filepath.Join(home, "global"), 0o755)
+	d := tuiDeployer{sys: f.system(), scope: project.Scope{Root: filepath.Join(home, "global"), Global: true}, global: true}
+	_, plan, err := d.Plan("kit", tui.Target{Scope: "user"})
+	if err != nil || len(plan) == 0 || plan[0] != "ipm install -g" {
+		t.Errorf("plan %v %v", plan, err)
+	}
+}
+
+func TestShowUsedBy(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	f := newFake(root)
+	if err := f.run("show", "repo:x/c"); err != nil {
+		t.Fatal(err)
+	}
+	// x/c is only a placeholder (not a source), so nothing references it.
+	if strings.Contains(f.out.String(), "used by:") {
+		t.Errorf("a repo that isn't a source has no used-by:\n%s", f.out.String())
+	}
+}
+
+func TestSearchOldIndex(t *testing.T) {
+	root := checkout(t)
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, "{\"message\":\"Could not find a field named `used_by` in the schema for sorting.\"}")
+	}))
+	t.Cleanup(srv.Close)
+	f := newFake(root)
+	typesenseAt(f, srv)
+	if err := f.run("search", "x"); err == nil || err.Error() != "the search index is from an older ipm — run ipm load" {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestLocalSearchNameBoost(t *testing.T) {
+	other := rec("skill:x/y:other", "other", "cloudflare tips")
+	other["repo"] = "x/y"
+	sdk := rec("skill:cloudflare/skills:sdk", "agents-sdk", "Build agents")
+	sdk["repo"] = "cloudflare/skills"
+	none := func(string) (int, bool) { return 0, false }
+	res := localSearch([]map[string]any{other, sdk}, none, func(string) int { return 0 }, "cloudflare", tui.Filter{})
+	if len(res.Hits) != 2 || res.Hits[0].Name != "agents-sdk" {
+		t.Errorf("a repo-name match outranks a description match: %v", res.Hits)
+	}
+	a, b := rec("skill:p/q:a", "tdd", ""), rec("skill:r/s:b", "tdd", "")
+	a["repo"], b["repo"] = "p/q", "r/s"
+	usedBy := func(repo string) int {
+		if repo == "r/s" {
+			return 5
+		}
+		return 0
+	}
+	if res := localSearch([]map[string]any{a, b}, none, usedBy, "tdd", tui.Filter{}); res.Hits[0].Repo != "r/s" || res.Hits[0].UsedBy != 5 {
+		t.Errorf("equal scores go to the more-used repo: %+v", res.Hits)
+	}
+}
+
+func TestTuiCatalogNodeReferences(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	g, err := catgraph.Load(filepath.Join(cacheOf(root), "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := tuiCatalog{g}
+	e, _ := c.Node("plugin:o/r#e")
+	if e.External != nil || e.Unresolved != "x/c" {
+		t.Errorf("x/c isn't a source: External %+v Unresolved %q", e.External, e.Unresolved)
+	}
+	m, _ := c.Node("marketplace:o/r:.")
+	var ext bool
+	for _, ch := range m.Children {
+		if ch.ID == "plugin:o/r#e" {
+			ext = ch.External
+		}
+	}
+	if !ext {
+		t.Error("the marketplace's child ref should be marked external")
+	}
+	x, _ := c.Node("repo:x/c")
+	if len(x.UsedBy) != 0 || x.UsedByRepos != 0 || len(x.Parents) != 0 {
+		t.Errorf("repo:x/c %+v", x)
+	}
+}
+
+func TestShowUsedByCountsAnythingInARepo(t *testing.T) {
+	root := checkout(t)
+	dir := filepath.Join(cacheOf(root), "catalog")
+	files := map[string]string{
+		"repos.jsonl": `{"id":"repo:a/m","type":"repo","name":"a/m","repo":"a/m"}` + "\n" + `{"id":"repo:b/s","type":"repo","name":"b/s","repo":"b/s"}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:a/m#cf","type":"plugin","name":"cf","repo":"a/m","source_repo":"b/s","entry":{"name":"cf","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:b/s:.","type":"plugin","name":"skills","repo":"b/s","path":"."}` + "\n",
+	}
+	for _, typ := range catalog.Types {
+		body := files[catalog.Files[typ]]
+		write(t, filepath.Join(dir, catalog.Files[typ]), body)
+	}
+	f := newFake(root)
+	if err := f.run("show", "repo:b/s"); err != nil {
+		t.Fatal(err)
+	}
+	if out := f.out.String(); !strings.Contains(out, "used by:") || !strings.Contains(out[strings.Index(out, "used by:"):], "plugin:a/m#cf") {
+		t.Errorf("a repo's used-by includes references to its plugins:\n%s", out)
+	}
+}
+
+func TestShowSourceHintOnlyWhenUnresolved(t *testing.T) {
+	root := checkout(t)
+	dir := filepath.Join(cacheOf(root), "catalog")
+	files := map[string]string{
+		"repos.jsonl": `{"id":"repo:a/m","type":"repo","name":"a/m","repo":"a/m","followed":true}` + "\n" +
+			`{"id":"repo:b/s","type":"repo","name":"b/s","repo":"b/s","followed":true}` + "\n" +
+			`{"id":"repo:c/x","type":"repo","name":"c/x","repo":"c/x","followed":false}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:a/m#cf","type":"plugin","name":"cf","repo":"a/m","source_repo":"b/s","entry":{"name":"cf","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:a/m#other","type":"plugin","name":"other","repo":"a/m","source_repo":"c/x","entry":{"name":"other","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:b/s:.","type":"plugin","name":"cf","repo":"b/s","path":"."}` + "\n",
+	}
+	for _, typ := range catalog.Types {
+		write(t, filepath.Join(dir, catalog.Files[typ]), files[catalog.Files[typ]])
+	}
+	f := newFake(root)
+	f.run("show", "plugin:a/m#cf")
+	if strings.Contains(f.out.String(), "ipm source add") {
+		t.Errorf("b/s is already a source:\n%s", f.out.String())
+	}
+	f.out.Reset()
+	f.run("show", "plugin:a/m#other")
+	if !strings.Contains(f.out.String(), "ipm source add plugin:a/m#other") {
+		t.Errorf("c/x isn't a source:\n%s", f.out.String())
 	}
 }

@@ -19,6 +19,10 @@ type Hit struct {
 	Plugins                           []string
 	// Score is the SCORE ipm search prints; "" in local mode.
 	Score string
+	// UsedBy is how many other repos reference this artifact's repo.
+	UsedBy int
+	// External marks a marketplace entry for a plugin in another repo.
+	External bool
 }
 
 // Results is a page of hits and how many matched in all.
@@ -39,20 +43,35 @@ type Searcher interface {
 	Recheck()
 }
 
-// Neighbour is an artifact related to the one shown.
-type Neighbour struct{ ID, Type, Name string }
+// Ref is an artifact related to another: a parent, a child, or a reference.
+type Ref struct {
+	ID, Type, Name, Description string
+	// Repo is the repo the artifact lives in.
+	Repo string
+	// External marks a marketplace entry for a plugin in another repo.
+	External bool
+	// UsedBy is how many other repos reference this artifact directly.
+	UsedBy int
+}
 
-// Detail is everything the detail pane shows for one artifact.
-type Detail struct {
-	ID, Type, Name, Repo, Path, Commit, Description string
-	Stars                                           int
-	// Up is what contains the artifact; Down is what it contains.
-	Up, Down []Neighbour
+// Node is one artifact with its parents and children.
+type Node struct {
+	ID, Type, Name, Repo, Path, Description string
+	Stars                                   int
+	Parents, Children                       []Ref
+	// External is what an external entry references; Unresolved is its
+	// source repo when that repo isn't among the user's sources.
+	External   *Ref
+	Unresolved string
+	// UsedBy is the external entries in other repos that reference this
+	// node; UsedByRepos is how many other repos reference its repo.
+	UsedBy      []Ref
+	UsedByRepos int
 }
 
 // Catalog describes artifacts.
 type Catalog interface {
-	Detail(id string) (Detail, error)
+	Node(id string) (Node, error)
 }
 
 // Pack is one pack in the scope's ipm.toml.
@@ -76,10 +95,26 @@ type Installer interface {
 	Install(ctx context.Context, out io.Writer) error
 }
 
+// Target is where a pack is deployed in Claude Code: Scope is "user",
+// "project" or "local"; Path is the folder for project and local scope.
+type Target struct{ Scope, Path string }
+
+// Deployer installs a built pack into Claude Code.
+type Deployer interface {
+	// Default is the target a pack deploys to unless the user picks another.
+	Default(pack string) Target
+	// Plan checks t and returns it as Deploy will use it (its folder made
+	// absolute), with the commands Deploy will run, for the user to confirm.
+	Plan(pack string, t Target) (Target, []string, error)
+	// Deploy builds and installs pack at t, writing its output to out.
+	Deploy(ctx context.Context, pack string, t Target, out io.Writer) error
+}
+
 // Deps is what the TUI works with.
 type Deps struct {
 	Searcher  Searcher
 	Catalog   Catalog
 	Packs     Packs
 	Installer Installer
+	Deployer  Deployer
 }

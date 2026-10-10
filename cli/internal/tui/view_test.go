@@ -2,12 +2,15 @@ package tui
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 var update = flag.Bool("update", false, "rewrite testdata/*.golden")
@@ -38,17 +41,67 @@ func TestGoldenViews(t *testing.T) {
 		f.s.results["long"] = Results{Hits: []Hit{{ID: "skill:o/r:skills/" + long, Type: "copilot-plugin", Name: long, Score: "99", Description: strings.Repeat("words ", 40)}}, Found: 1}
 	}
 	cases := map[string]func(t *testing.T) *Model{
-		"main": func(t *testing.T) *Model {
+		"search-mode": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
 			typeText(t, m, "tdd")
 			press(t, m, "down")
 			return m
 		},
-		"narrow-long": func(t *testing.T) *Model {
+		"tree-mode": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			typeText(t, m, "tdd")
+			press(t, m, "down", "left", "tab")
+			return m
+		},
+		"deep-tree-scroll": func(t *testing.T) *Model {
+			m, f := newTestWith(t, setup)
+			p := f.c.details["plugin:o/r:p"]
+			for i := range 40 {
+				id := fmt.Sprintf("agent:o/r:agents/a%02d.md", i)
+				p.Children = append(p.Children, Ref{ID: id, Type: "agent", Name: fmt.Sprintf("agent-%02d", i), Description: "An agent"})
+				f.c.details[id] = Node{ID: id, Type: "agent", Name: fmt.Sprintf("agent-%02d", i), Description: "An agent", Parents: []Ref{{ID: "plugin:o/r:p", Type: "plugin", Name: "p"}}}
+			}
+			f.c.details["plugin:o/r:p"] = p
+			typeText(t, m, "tdd")
+			press(t, m, "down", "tab")
+			for range 25 {
+				press(t, m, "down")
+			}
+			return m
+		},
+		"also-in": func(t *testing.T) *Model {
+			m, f := newTestWith(t, setup)
+			tdd := f.c.details["skill:o/r:skills/tdd"]
+			tdd.Parents = append(tdd.Parents, Ref{ID: "plugin:o/r:p2", Type: "plugin", Name: "p2"}, Ref{ID: "plugin:x/y:q", Type: "plugin", Name: "q"})
+			f.c.details["skill:o/r:skills/tdd"] = tdd
+			typeText(t, m, "tdd")
+			press(t, m, "down", "tab")
+			return m
+		},
+		"no-color": func(t *testing.T) *Model {
+			t.Setenv("NO_COLOR", "1")
+			m, _ := newTestWith(t, setup)
+			typeText(t, m, "tdd")
+			press(t, m, "down")
+			return m
+		},
+		"narrow": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
 			m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 			typeText(t, m, "long")
 			press(t, m, "down")
+			return m
+		},
+		"deploy-confirm": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			typeText(t, m, "tdd")
+			press(t, m, "down", "D", "enter", "enter")
+			return m
+		},
+		"external-modal": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withRefs)
+			typeText(t, m, "cf")
+			press(t, m, "down", "e")
 			return m
 		},
 		"picker": func(t *testing.T) *Model {
@@ -78,5 +131,122 @@ func TestGoldenViews(t *testing.T) {
 	}
 	for name, build := range cases {
 		t.Run(name, func(t *testing.T) { golden(t, name, build(t)) })
+	}
+}
+
+// panels splits a screen into its bordered panels, top to bottom.
+func panels(screen string) [][]string {
+	var out [][]string
+	var cur []string
+	for _, l := range strings.Split(screen, "\n") {
+		plain := ansi.Strip(l)
+		switch {
+		case strings.HasPrefix(plain, "╭"):
+			cur = []string{l}
+		case strings.HasPrefix(plain, "╰") && cur != nil:
+			out = append(out, append(cur, l))
+			cur = nil
+		case cur != nil:
+			cur = append(cur, l)
+		}
+	}
+	return out
+}
+
+func TestPanelsByWeight(t *testing.T) {
+	m, _ := treeTest(t)
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
+	ps := panels(m.View().Content)
+	// body = 40 - header - tray (2) - status - hints = 35; results 40%.
+	if len(ps) != 2 || len(ps[0]) != 14 || len(ps[1]) != 21 {
+		t.Fatalf("panel heights %d, want 14 and 21", lens(ps))
+	}
+	for _, p := range ps {
+		for _, l := range p {
+			if w := lipgloss.Width(l); w != 120 {
+				t.Errorf("width %d: %q", w, ansi.Strip(l))
+			}
+		}
+	}
+}
+
+func lens(ps [][]string) []int {
+	var out []int
+	for _, p := range ps {
+		out = append(out, len(p))
+	}
+	return out
+}
+
+const amberCode = "38;2;240;168;71"
+
+func TestFocusedPanelBorder(t *testing.T) {
+	m, _ := treeTest(t)
+	ps := panels(m.View().Content)
+	if !strings.Contains(ps[0][0], amberCode) || strings.Contains(ps[1][0], amberCode) {
+		t.Errorf("results focused: the results border should be amber, the tree's not")
+	}
+	press(t, m, "tab")
+	ps = panels(m.View().Content)
+	if strings.Contains(ps[0][0], amberCode) || !strings.Contains(ps[1][0], amberCode) {
+		t.Errorf("tree mode: the tree border should be amber, the results' not")
+	}
+}
+
+func TestResultRowsNarrow(t *testing.T) {
+	m, _ := treeTest(t)
+	row := func() string {
+		for _, l := range panels(m.View().Content)[0] {
+			if p := ansi.Strip(l); strings.Contains(p, "tdd-guard") {
+				return p
+			}
+		}
+		return ""
+	}
+	if r := row(); !strings.Contains(r, "o/r") {
+		t.Errorf("at 120 columns a result row shows its repo: %q", r)
+	}
+	m.Update(tea.WindowSizeMsg{Width: 90, Height: 30})
+	if r := row(); r == "" || strings.Contains(r, "o/r") {
+		t.Errorf("at 90 columns a result row drops repo and stars: %q", r)
+	}
+}
+
+func TestShortTerminalTreeWithoutChildren(t *testing.T) {
+	m, _ := treeTest(t)
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 22})
+	if strings.Contains(strings.Join(panels(view(m))[1], "\n"), "helper") {
+		t.Errorf("a short terminal's tree shows no children:\n%s", view(m))
+	}
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 34})
+	if !strings.Contains(strings.Join(panels(view(m))[1], "\n"), "helper") {
+		t.Errorf("a taller terminal's tree shows children:\n%s", view(m))
+	}
+}
+
+func TestNoColor(t *testing.T) {
+	t.Setenv("NO_COLOR", "1")
+	m, _ := treeTest(t)
+	content := m.View().Content
+	if strings.Contains(content, "\x1b[") {
+		t.Errorf("NO_COLOR output has escape codes")
+	}
+	t.Setenv("NO_COLOR", "")
+	c, _ := treeTest(t)
+	if content != ansi.Strip(c.View().Content) {
+		t.Errorf("NO_COLOR should only remove colour")
+	}
+}
+
+func TestResultsUsedByCell(t *testing.T) {
+	m, f := newTest(t)
+	f.s.results["cf"] = Results{Hits: []Hit{
+		{ID: "skill:b/s:x", Type: "skill", Name: "agents-sdk", Repo: "b/s", UsedBy: 3, Score: "90"},
+		{ID: "plugin:a/m#cf", Type: "plugin", Name: "cloudflare", Repo: "a/m", External: true, Score: "80"},
+	}, Found: 2}
+	typeText(t, m, "cf")
+	res := strings.Join(panels(view(m))[0], "\n")
+	if !strings.Contains(res, "↗3") || !strings.Contains(res, "↗cloudflare") {
+		t.Errorf("results:\n%s", res)
 	}
 }

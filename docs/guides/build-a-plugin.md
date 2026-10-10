@@ -111,7 +111,7 @@ If an external plugin's upstream entry isn't pinned to a commit, `ipm install` w
 claude plugin marketplace add ./.ipm
 ```
 
-Then in Claude Code:
+Or let `ipm` do it: `ipm deploy csharp-sdlc` builds and installs it for this project (`--scope user` for every project). Otherwise, in Claude Code:
 
 ```text
 /plugin install csharp-sdlc@<project folder>-ipm

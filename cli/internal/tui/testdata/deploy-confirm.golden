@@ -1,0 +1,30 @@
+ipm  o/r › p › tdd                                                                                              ● hybrid
+╭─ deploy ─────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Deploy csharp-sdlc to Claude Code — project scope in /work                                                           │
+│                                                                                                                      │
+│   ipm install                                                                                                        │
+│   claude plugin marketplace add /work/.ipm --scope project                                                           │
+│   claude plugin install kit@work-ipm --scope project                                                                 │
+│                                                                                                                      │
+│ y deploy · esc cancel                                                                                                │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
+skill tdd · agent csharp-pro · plugin stripe                                                                            
+2 of 100                                                                                                                
+y deploy  esc cancel                                                                                                    

@@ -1,0 +1,30 @@
+ipm  o/r › p › agent-23                                                                                         ● hybrid
+╭─ search: tdd             ────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ›50   skill  ✓ tdd                              o/r                                                                  │
+│  50   skill    tdd-guard                        o/r                                                                  │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ tree ── agent:o/r:agents/a23.md ────────────────────────────────────────────────────────────────────────────────────╮
+│ repo    o/r                              The repo                                                                    │
+│ └ plugin  p                              The p plugin                                                                │
+│   ├ ↑ 21 more                                                                                                        │
+│   ├ agent   agent-19                     An agent                                                                    │
+│   ├ agent   agent-20                     An agent                                                                    │
+│   ├ agent   agent-21                     An agent                                                                    │
+│   ├ agent   agent-22                     An agent                                                                    │
+│   ├ agent  ▶agent-23 ──────────────────▶ An agent                                                                    │
+│   ├ agent   agent-24                     An agent                                                                    │
+│   ├ agent   agent-25                     An agent                                                                    │
+│   ├ agent   agent-26                     An agent                                                                    │
+│   ├ agent   agent-27                     An agent                                                                    │
+│   └ ↓ 12 more                                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
+skill tdd · agent csharp-pro · plugin stripe                                                                            
+2 of 100                                                                                                                
+↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help                                       

@@ -1,30 +1,30 @@
-ipm ─ search: tdd                                                                                               ● hybrid
-────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-ipm install                                                                                                             
-                                                                                                                        
-✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)                                                                      
-validate: ok                                                                                                            
-                                                                                                                        
-✓ installed  · esc close                                                                                                
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
-                                                                                                                        
+ipm  o/r › p › tdd                                                                                              ● hybrid
+╭─ install ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ipm install                                                                                                          │
+│                                                                                                                      │
+│ ✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)                                                                   │
+│ validate: ok                                                                                                         │
+│                                                                                                                      │
+│ ✓ installed  · esc close                                                                                             │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
 2 of 100                                                                                                                
-/ search  a add  d remove  p packs  i install  f type  ? help  q quit                                                   
+esc close (when finished)                                                                                               

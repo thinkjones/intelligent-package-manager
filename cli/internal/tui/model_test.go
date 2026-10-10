@@ -115,20 +115,20 @@ func (f *fakeSearcher) Notice() string { return f.notice }
 func (f *fakeSearcher) Recheck()       { f.checks++ }
 
 type fakeCatalog struct {
-	details map[string]Detail
+	details map[string]Node
 	asked   []string
 	err     error
 }
 
-func (f *fakeCatalog) Detail(id string) (Detail, error) {
+func (f *fakeCatalog) Node(id string) (Node, error) {
 	f.asked = append(f.asked, id)
 	if f.err != nil {
-		return Detail{}, f.err
+		return Node{}, f.err
 	}
 	if d, ok := f.details[id]; ok {
 		return d, nil
 	}
-	return Detail{ID: id, Name: id}, nil
+	return Node{ID: id, Name: id}, nil
 }
 
 type fakePacks struct {
@@ -207,11 +207,37 @@ func hits(names ...string) []Hit {
 	return out
 }
 
+type fakeDeployer struct {
+	def      Target
+	cleaned  *Target // what Plan returns as the target; nil returns t unchanged
+	plan     []string
+	planErr  error
+	lines    []string
+	err      error
+	deployed []string
+}
+
+func (f *fakeDeployer) Default(pack string) Target { return f.def }
+func (f *fakeDeployer) Plan(pack string, t Target) (Target, []string, error) {
+	if f.cleaned != nil {
+		t = *f.cleaned
+	}
+	return t, f.plan, f.planErr
+}
+func (f *fakeDeployer) Deploy(_ context.Context, pack string, t Target, out io.Writer) error {
+	f.deployed = append(f.deployed, fmt.Sprintf("%s %s %s", pack, t.Scope, t.Path))
+	for _, l := range f.lines {
+		fmt.Fprintln(out, l)
+	}
+	return f.err
+}
+
 type fakes struct {
 	s *fakeSearcher
 	c *fakeCatalog
 	p *fakePacks
 	i *fakeInstaller
+	d *fakeDeployer
 }
 
 func newTest(t *testing.T) (*Model, fakes) {
@@ -227,14 +253,16 @@ func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
 		s: &fakeSearcher{mode: "hybrid", results: map[string]Results{
 			"tdd": {Hits: hits("tdd", "tdd-guard"), Found: 100},
 		}, errs: map[string]error{}},
-		c: &fakeCatalog{details: map[string]Detail{}},
+		c: &fakeCatalog{details: map[string]Node{}},
 		p: &fakePacks{scope: "project /work"},
 		i: &fakeInstaller{},
+		d: &fakeDeployer{def: Target{Scope: "project", Path: "/work"},
+			plan: []string{"ipm install", "claude plugin marketplace add /work/.ipm --scope project", "claude plugin install kit@work-ipm --scope project"}},
 	}
 	if setup != nil {
 		setup(f)
 	}
-	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Installer: f.i})
+	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Installer: f.i, Deployer: f.d})
 	m.debounce = 0
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m, f
@@ -342,70 +370,39 @@ func TestQuit(t *testing.T) {
 	}
 }
 
+// withDetails gives the tdd result a plugin and repo above it and a child.
 func withDetails(f fakes) {
-	f.c.details["skill:o/r:skills/tdd"] = Detail{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd", Repo: "o/r", Stars: 31234,
+	f.c.details["skill:o/r:skills/tdd"] = Node{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd", Repo: "o/r", Stars: 31234,
 		Description: "Test first.",
-		Up:          []Neighbour{{ID: "plugin:o/r:p", Type: "plugin", Name: "p"}, {ID: "repo:o/r", Type: "repo", Name: "o/r"}},
-		Down:        []Neighbour{{ID: "agent:o/r:agents/helper.md", Type: "agent", Name: "helper"}}}
-	f.c.details["skill:o/r:skills/tdd-guard"] = Detail{ID: "skill:o/r:skills/tdd-guard", Type: "skill", Name: "tdd-guard", Repo: "o/r"}
+		Parents:     []Ref{{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Description: "The p plugin"}},
+		Children:    []Ref{{ID: "agent:o/r:agents/helper.md", Type: "agent", Name: "helper", Description: "Helps"}}}
+	f.c.details["plugin:o/r:p"] = Node{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Description: "The p plugin",
+		Parents:  []Ref{{ID: "repo:o/r", Type: "repo", Name: "o/r", Description: "The repo"}},
+		Children: []Ref{{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd", Description: "Test first."}, {ID: "skill:o/r:skills/tdd-guard", Type: "skill", Name: "tdd-guard"}}}
+	f.c.details["repo:o/r"] = Node{ID: "repo:o/r", Type: "repo", Name: "o/r", Description: "The repo",
+		Children: []Ref{{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Description: "The p plugin"}}}
+	f.c.details["agent:o/r:agents/helper.md"] = Node{ID: "agent:o/r:agents/helper.md", Type: "agent", Name: "helper", Description: "Helps",
+		Parents: []Ref{{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd"}}}
+	f.c.details["skill:o/r:skills/tdd-guard"] = Node{ID: "skill:o/r:skills/tdd-guard", Type: "skill", Name: "tdd-guard", Repo: "o/r",
+		Parents: []Ref{{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Description: "The p plugin"}}}
 }
 
-func TestDetailFollowsSelection(t *testing.T) {
+func TestTreeFollowsSelection(t *testing.T) {
 	m, f := newTest(t)
 	withDetails(f)
 	typeText(t, m, "tdd")
-	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd" {
-		t.Fatalf("detail asked for %q", last)
+	if m.cursor != "skill:o/r:skills/tdd" {
+		t.Fatalf("cursor %q", m.cursor)
 	}
 	v := view(m)
-	for _, want := range []string{"skill:o/r:skills/tdd", "31.2k", "Test first.", "plugin", "p", "helper"} {
+	for _, want := range []string{"o/r", "The p plugin", "▶tdd", "Test first.", "helper"} {
 		if !strings.Contains(v, want) {
-			t.Errorf("detail lacks %q:\n%s", want, v)
+			t.Errorf("tree lacks %q:\n%s", want, v)
 		}
 	}
 	press(t, m, "down", "j")
-	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd-guard" {
-		t.Errorf("moving should show the new selection, asked %q", last)
-	}
-}
-
-func TestWalkNeighbours(t *testing.T) {
-	m, f := newTest(t)
-	withDetails(f)
-	typeText(t, m, "tdd")
-	press(t, m, "down", "right")
-	if m.focus != focusDetail {
-		t.Fatalf("right should focus the detail pane")
-	}
-	press(t, m, "down", "enter")
-	if last := f.c.asked[len(f.c.asked)-1]; last != "repo:o/r" {
-		t.Fatalf("enter should open the second neighbour, asked %q", last)
-	}
-	press(t, m, "backspace")
-	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd" || m.detail.ID != "skill:o/r:skills/tdd" {
-		t.Errorf("backspace should go back, asked %q", last)
-	}
-	press(t, m, "left")
-	if m.focus != focusResults {
-		t.Errorf("left should return to the results")
-	}
-}
-
-func TestNarrowHidesDetail(t *testing.T) {
-	m, f := newTest(t)
-	withDetails(f)
-	m.Update(tea.WindowSizeMsg{Width: 90, Height: 30})
-	typeText(t, m, "tdd")
-	if strings.Contains(view(m), "Test first.") {
-		t.Fatalf("a 90-column terminal should not show the detail pane:\n%s", view(m))
-	}
-	press(t, m, "down", "enter")
-	if !strings.Contains(view(m), "Test first.") || strings.Contains(view(m), "tdd-guard") {
-		t.Errorf("enter should show the detail full-width:\n%s", view(m))
-	}
-	press(t, m, "esc")
-	if strings.Contains(view(m), "Test first.") || m.focus != focusResults {
-		t.Errorf("esc should return to the results:\n%s", view(m))
+	if m.cursor != "skill:o/r:skills/tdd-guard" {
+		t.Errorf("moving should move the tree to the new result, cursor %q", m.cursor)
 	}
 }
 
@@ -424,7 +421,7 @@ func TestTooSmall(t *testing.T) {
 	}
 }
 
-func TestDetailError(t *testing.T) {
+func TestTreeError(t *testing.T) {
 	m, f := newTest(t)
 	f.c.err = errors.New("catalog record broken")
 	typeText(t, m, "tdd")
@@ -462,16 +459,6 @@ func TestAddAndMark(t *testing.T) {
 	}
 }
 
-func TestAddFromDetail(t *testing.T) {
-	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
-	withDetails(f)
-	typeText(t, m, "tdd")
-	press(t, m, "down", "right", "a")
-	if strings.Join(f.p.calls, ";") != "add a plugin:o/r:p" {
-		t.Errorf("a in the detail pane adds the selected neighbour: %v", f.p.calls)
-	}
-}
-
 func TestAddExistingItem(t *testing.T) {
 	m, f := newTestWith(t, withPacks(Pack{Name: "a", Items: []string{tddID}}))
 	typeText(t, m, "tdd")
@@ -498,9 +485,9 @@ func TestRemove(t *testing.T) {
 	if f.p.calls[0] != "remove a "+tddID {
 		t.Fatalf("calls %v", f.p.calls)
 	}
-	press(t, m, "tab")
+	press(t, m, "t")
 	if m.focus != focusTray {
-		t.Fatalf("tab from results should focus the tray")
+		t.Fatalf("t should focus the tray")
 	}
 	press(t, m, "d")
 	if f.p.calls[1] != "remove a agent:o/r:agents/x.md" {
@@ -618,7 +605,7 @@ func TestHelpOverlay(t *testing.T) {
 	m, _ := newTest(t)
 	press(t, m, "down", "?")
 	v := view(m)
-	for _, kh := range keyHelp {
+	for _, kh := range append(append([][2]string{}, searchKeys...), treeKeys...) {
 		if !strings.Contains(v, kh[0]) || !strings.Contains(v, kh[1]) {
 			t.Errorf("help lacks %q %q", kh[0], kh[1])
 		}
@@ -659,22 +646,13 @@ func TestPickerWithNoPacks(t *testing.T) {
 	}
 }
 
-func TestDetailWithoutNeighbours(t *testing.T) {
-	m, _ := newTestWith(t, withPacks(Pack{Name: "a"}))
-	typeText(t, m, "tdd") // the fake catalog's default detail has no neighbours
-	press(t, m, "down", "right", "down", "j", "enter", "a", "d")
-	if m.detail.ID != tddID {
-		t.Errorf("detail %q", m.detail.ID)
-	}
-}
-
 func TestTraySelectionStaysVisible(t *testing.T) {
 	var items []string
 	for i := range 15 {
 		items = append(items, fmt.Sprintf("skill:o/r:skills/item-number-%c-with-a-long-name", 'a'+i))
 	}
 	m, _ := newTestWith(t, withPacks(Pack{Name: "a", Items: items}))
-	press(t, m, "tab", "tab")
+	press(t, m, "down", "t")
 	if m.focus != focusTray {
 		t.Fatalf("focus %v", m.focus)
 	}
@@ -683,23 +661,6 @@ func TestTraySelectionStaysVisible(t *testing.T) {
 	}
 	if v := view(m); !strings.Contains(v, "▶skill item-number-o-with-a-long-name") {
 		t.Errorf("the selected tray item must be visible:\n%s", v)
-	}
-}
-
-func TestDetailNeighboursScroll(t *testing.T) {
-	m, f := newTest(t)
-	var down []Neighbour
-	for i := range 40 {
-		down = append(down, Neighbour{ID: fmt.Sprintf("plugin:o/r#p%02d", i), Type: "plugin", Name: fmt.Sprintf("plugin-%02d", i)})
-	}
-	f.c.details[tddID] = Detail{ID: tddID, Type: "skill", Name: "tdd", Down: down}
-	typeText(t, m, "tdd")
-	press(t, m, "down", "right")
-	for range 35 {
-		press(t, m, "down")
-	}
-	if v := view(m); !strings.Contains(v, "▶down  plugin         plugin-35") {
-		t.Errorf("the selected neighbour must be visible:\n%s", v)
 	}
 }
 
@@ -718,5 +679,481 @@ func TestInstallLongLineDoesNotHang(t *testing.T) {
 	}
 	if !m.inst.done {
 		t.Error("install should be done")
+	}
+}
+
+// treeTest is a model whose "tdd" results sit in the withDetails tree, with
+// the results focused.
+func treeTest(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	m, f := newTestWith(t, func(f fakes) {
+		withDetails(f)
+		f.p.packs = []Pack{{Name: "a"}}
+	})
+	typeText(t, m, "tdd")
+	press(t, m, "down")
+	return m, f
+}
+
+func TestSearchModeArrowsMoveTree(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "right")
+	if m.cursor != "agent:o/r:agents/helper.md" || m.sel != 0 || m.focus != focusResults {
+		t.Fatalf("right: cursor %q sel %d focus %v", m.cursor, m.sel, m.focus)
+	}
+	press(t, m, "left", "left")
+	if m.cursor != "plugin:o/r:p" {
+		t.Errorf("left twice: cursor %q", m.cursor)
+	}
+	press(t, m, "down")
+	if m.cursor != "skill:o/r:skills/tdd-guard" {
+		t.Errorf("moving the result should reset the tree: %q", m.cursor)
+	}
+}
+
+func TestLeftAtRootRightAtLeaf(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "left", "left", "left")
+	if m.cursor != "repo:o/r" {
+		t.Errorf("left at the root: %q", m.cursor)
+	}
+	m, _ = treeTest(t)
+	press(t, m, "right", "right")
+	if m.cursor != "agent:o/r:agents/helper.md" {
+		t.Errorf("right at a leaf: %q", m.cursor)
+	}
+}
+
+func TestTreeModeSiblings(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "tab")
+	if m.focus != focusTree {
+		t.Fatalf("tab from results should enter tree mode")
+	}
+	press(t, m, "down")
+	if m.cursor != "skill:o/r:skills/tdd-guard" {
+		t.Errorf("down: %q", m.cursor)
+	}
+	press(t, m, "k")
+	if m.cursor != "skill:o/r:skills/tdd" {
+		t.Errorf("k: %q", m.cursor)
+	}
+	press(t, m, "j")
+	if m.cursor != "skill:o/r:skills/tdd-guard" || m.sel != 0 {
+		t.Errorf("j: %q, result selection %d", m.cursor, m.sel)
+	}
+}
+
+func TestTreeModeAlsoIn(t *testing.T) {
+	m, f := treeTest(t)
+	tdd := f.c.details["skill:o/r:skills/tdd"]
+	tdd.Parents = append(tdd.Parents, Ref{ID: "plugin:o/r:p2", Type: "plugin", Name: "p2"})
+	f.c.details["skill:o/r:skills/tdd"] = tdd
+	f.c.details["plugin:o/r:p2"] = Node{ID: "plugin:o/r:p2", Type: "plugin", Name: "p2",
+		Children: []Ref{{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd"}}}
+	m.followSelection()
+	press(t, m, "tab", "down")
+	if m.cursor != "skill:o/r:skills/tdd" || !strings.Contains(view(m), "also in: plugin p2") {
+		t.Fatalf("down onto also-in should not move the cursor: %q\n%s", m.cursor, view(m))
+	}
+	press(t, m, "enter")
+	if m.chosen["skill:o/r:skills/tdd"] != "plugin:o/r:p2" || len(m.tree.Path) == 0 || m.tree.Path[len(m.tree.Path)-1].ID != "plugin:o/r:p2" {
+		t.Errorf("enter should follow p2: chosen %v path %v", m.chosen, m.tree.Path)
+	}
+}
+
+func TestTreeModeExit(t *testing.T) {
+	for _, k := range []string{"esc", "tab"} {
+		m, _ := treeTest(t)
+		press(t, m, "tab", "down", k)
+		if m.focus != focusResults || m.cursor != "skill:o/r:skills/tdd" {
+			t.Errorf("%s: focus %v cursor %q", k, m.focus, m.cursor)
+		}
+	}
+}
+
+func TestTreeModeAdd(t *testing.T) {
+	m, f := treeTest(t)
+	press(t, m, "left", "tab", "a")
+	if strings.Join(f.p.calls, ";") != "add a plugin:o/r:p" {
+		t.Errorf("calls %v", f.p.calls)
+	}
+}
+
+func TestEnterFromResultsOpensTreeMode(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "enter")
+	if m.focus != focusTree {
+		t.Errorf("focus %v", m.focus)
+	}
+}
+
+func TestHelpListsBothModes(t *testing.T) {
+	m, _ := treeTest(t)
+	press(t, m, "?")
+	v := view(m)
+	for _, kh := range append(append([][2]string{}, searchKeys...), treeKeys...) {
+		if !strings.Contains(v, kh[1]) {
+			t.Errorf("help lacks %q", kh[1])
+		}
+	}
+}
+
+func TestBreadcrumb(t *testing.T) {
+	m, _ := treeTest(t)
+	if !strings.Contains(view(m), "o/r › p › tdd") {
+		t.Errorf("breadcrumb:\n%s", view(m))
+	}
+}
+
+func deployTest(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	m, f := newTestWith(t, withPacks(Pack{Name: "kit", Items: []string{tddID}}))
+	typeText(t, m, "tdd")
+	press(t, m, "down")
+	return m, f
+}
+
+func TestBuildKey(t *testing.T) {
+	for _, k := range []string{"b", "i"} {
+		m, _ := deployTest(t)
+		press(t, m, k)
+		if m.inst == nil {
+			t.Errorf("%s should build", k)
+		}
+	}
+}
+
+func TestDeployFlow(t *testing.T) {
+	m, f := deployTest(t)
+	f.d.lines = []string{"$ claude plugin install kit@work-ipm --scope project"}
+	press(t, m, "D")
+	if m.deploy == nil || !strings.Contains(view(m), "▶project") {
+		t.Fatalf("D should open the target step on the default:\n%s", view(m))
+	}
+	press(t, m, "enter")
+	if m.deploy.path.Value() != "/work" {
+		t.Fatalf("path step prefilled %q", m.deploy.path.Value())
+	}
+	press(t, m, "enter")
+	v := view(m)
+	for _, want := range append([]string{"Deploy kit to Claude Code — project scope in /work", "y deploy · esc cancel"}, f.d.plan...) {
+		if !strings.Contains(v, want) {
+			t.Errorf("confirm lacks %q:\n%s", want, v)
+		}
+	}
+	press(t, m, "y")
+	v = view(m)
+	if strings.Join(f.d.deployed, ";") != "kit project /work" || !strings.Contains(v, "$ claude plugin install") || !strings.Contains(v, "✓ deployed kit (project /work)") {
+		t.Errorf("deployed %v:\n%s", f.d.deployed, v)
+	}
+	press(t, m, "esc")
+	if m.inst != nil || m.deploy != nil {
+		t.Error("esc should close the finished deploy")
+	}
+}
+
+func TestDeployUserSkipsPath(t *testing.T) {
+	m, _ := deployTest(t)
+	press(t, m, "D", "up", "enter")
+	if !strings.Contains(view(m), "Deploy kit to Claude Code — user scope") || strings.Contains(view(m), "user scope in") {
+		t.Errorf("user scope should go straight to confirm:\n%s", view(m))
+	}
+}
+
+func TestDeployBadPath(t *testing.T) {
+	m, f := deployTest(t)
+	f.d.planErr = errors.New("/nope is not a folder")
+	press(t, m, "D", "enter", "enter")
+	if m.deploy == nil || m.deploy.step != stepPath || !strings.Contains(m.status, "/nope is not a folder") {
+		t.Errorf("step %v status %q", m.deploy, m.status)
+	}
+}
+
+func TestDeployFailure(t *testing.T) {
+	m, f := deployTest(t)
+	f.d.err = errors.New("`claude plugin install kit@work-ipm --scope project` failed: exit status 1")
+	press(t, m, "D", "enter", "enter", "y")
+	if !strings.Contains(view(m), "✗ `claude plugin install") {
+		t.Errorf("modal:\n%s", view(m))
+	}
+	press(t, m, "esc")
+	if m.inst != nil {
+		t.Error("esc should close")
+	}
+}
+
+func TestDeployCancel(t *testing.T) {
+	for _, keys := range [][]string{{"D", "esc"}, {"D", "enter", "esc"}, {"D", "enter", "enter", "esc"}} {
+		m, f := deployTest(t)
+		press(t, m, keys...)
+		if m.deploy != nil || len(f.d.deployed) != 0 {
+			t.Errorf("%v: modal %v deployed %v", keys, m.deploy, f.d.deployed)
+		}
+	}
+}
+
+func TestDeployWithoutPack(t *testing.T) {
+	m, _ := newTest(t)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "D")
+	if m.deploy != nil || !strings.Contains(m.status, "no pack to deploy — press p to create one") {
+		t.Errorf("modal %v status %q", m.deploy, m.status)
+	}
+}
+
+func TestDeployIgnoredWhileRunning(t *testing.T) {
+	m, f := deployTest(t)
+	f.i.gate = make(chan struct{})
+	_, cmd := m.Update(key("b"))
+	for _, k := range []string{"D", "b"} {
+		if _, c := m.Update(key(k)); c != nil || m.deploy != nil || !strings.Contains(m.status, "running") {
+			t.Errorf("%s while building: cmd %v deploy %v status %q", k, c, m.deploy, m.status)
+		}
+	}
+	close(f.i.gate)
+	drain(t, m, cmd)
+}
+
+func TestDeployShowsCleanedTarget(t *testing.T) {
+	m, f := deployTest(t)
+	f.d.cleaned = &Target{Scope: "project", Path: "/home/me/work"}
+	press(t, m, "D", "enter")
+	m.deploy.path.SetValue("~/work/")
+	press(t, m, "enter")
+	if !strings.Contains(view(m), "project scope in /home/me/work") {
+		t.Errorf("confirm should show the folder claude runs in:\n%s", view(m))
+	}
+	press(t, m, "y")
+	if !strings.Contains(view(m), "✓ deployed kit (project /home/me/work)") || f.d.deployed[0] != "kit project /home/me/work" {
+		t.Errorf("deployed %v:\n%s", f.d.deployed, view(m))
+	}
+}
+
+// withExternal gives the fake catalog repo a/m whose marketplace lists a local
+// plugin and an external entry for b/s's plugin cf, and b/s itself.
+func withExternal(f fakes) {
+	ref := func(id, typ, name, repo string) Ref { return Ref{ID: id, Type: typ, Name: name, Repo: repo} }
+	d := f.c.details
+	d["repo:a/m"] = Node{ID: "repo:a/m", Type: "repo", Name: "a/m", Repo: "a/m", Children: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	entry := ref("plugin:a/m#cf", "plugin", "cf", "a/m")
+	entry.External = true
+	d["marketplace:a/m:."] = Node{ID: "marketplace:a/m:.", Type: "marketplace", Name: "m", Repo: "a/m",
+		Parents: []Ref{ref("repo:a/m", "repo", "a/m", "a/m")}, Children: []Ref{entry, ref("plugin:a/m:local", "plugin", "local", "a/m")}}
+	target := ref("plugin:b/s:cf", "plugin", "cf", "b/s")
+	d["plugin:a/m#cf"] = Node{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: &target,
+		Parents: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	d["plugin:a/m:local"] = Node{ID: "plugin:a/m:local", Type: "plugin", Name: "local", Repo: "a/m", Parents: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	d["repo:b/s"] = Node{ID: "repo:b/s", Type: "repo", Name: "b/s", Repo: "b/s", Children: []Ref{ref("marketplace:b/s:.", "marketplace", "m", "b/s")}}
+	d["marketplace:b/s:."] = Node{ID: "marketplace:b/s:.", Type: "marketplace", Name: "m", Repo: "b/s",
+		Parents: []Ref{ref("repo:b/s", "repo", "b/s", "b/s")}, Children: []Ref{target}}
+	d["plugin:b/s:cf"] = Node{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s", Parents: []Ref{ref("marketplace:b/s:.", "marketplace", "m", "b/s")}}
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: true}}, Found: 1}
+}
+
+func externalTest(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	m, f := newTestWith(t, withExternal)
+	typeText(t, m, "cf")
+	press(t, m, "down")
+	return m, f
+}
+
+func TestJumpIntoExternal(t *testing.T) {
+	m, _ := externalTest(t)
+	press(t, m, "tab", "right")
+	if m.cursor != "plugin:b/s:cf" || len(m.tree.Path) == 0 || m.tree.Path[0].ID != "repo:b/s" {
+		t.Fatalf("cursor %q path %v", m.cursor, m.tree.Path)
+	}
+	if len(m.backStack) != 1 || m.backStack[0] != "plugin:a/m#cf" {
+		t.Errorf("back stack %v", m.backStack)
+	}
+	tree := panels(view(m))[1]
+	if !strings.Contains(ansiStrip(tree[1]), "↩ a/m — back to cf") {
+		t.Errorf("the first tree row should be the back root:\n%s", strings.Join(tree, "\n"))
+	}
+}
+
+func TestBackRootReturns(t *testing.T) {
+	m, _ := externalTest(t)
+	press(t, m, "tab", "right", "up")
+	if m.treeSel != backRow {
+		t.Fatalf("up from the first sibling selects the back root, treeSel %d", m.treeSel)
+	}
+	press(t, m, "enter")
+	if m.cursor != "plugin:a/m#cf" || len(m.backStack) != 0 || strings.Contains(view(m), "↩") {
+		t.Errorf("cursor %q stack %v", m.cursor, m.backStack)
+	}
+}
+
+func TestJumpUnresolved(t *testing.T) {
+	m, f := newTestWith(t, withExternal)
+	e := f.c.details["plugin:a/m#cf"]
+	e.External, e.Unresolved = nil, "c/missing"
+	f.c.details["plugin:a/m#cf"] = e
+	typeText(t, m, "cf")
+	press(t, m, "down", "right")
+	if m.cursor != "plugin:a/m#cf" || !strings.Contains(m.status, "ipm source add plugin:a/m#cf") {
+		t.Errorf("cursor %q status %q", m.cursor, m.status)
+	}
+}
+
+func TestJumpCycleBackStack(t *testing.T) {
+	m, f := newTest(t)
+	d := f.c.details
+	toB := Ref{ID: "plugin:b:x", Type: "plugin", Name: "x", Repo: "b"}
+	toA := Ref{ID: "plugin:a:y", Type: "plugin", Name: "y", Repo: "a"}
+	d["plugin:a#tob"] = Node{ID: "plugin:a#tob", Type: "plugin", Name: "tob", Repo: "a", External: &toB}
+	d["plugin:b#toa"] = Node{ID: "plugin:b#toa", Type: "plugin", Name: "toa", Repo: "b", External: &toA}
+	m.setCursor("plugin:a#tob")
+	m.treeDown()
+	m.setCursor("plugin:b#toa")
+	m.treeDown()
+	if m.cursor != "plugin:a:y" || len(m.backStack) != 2 {
+		t.Fatalf("cursor %q stack %v", m.cursor, m.backStack)
+	}
+	m.back()
+	m.back()
+	if m.cursor != "plugin:a#tob" || len(m.backStack) != 0 {
+		t.Errorf("two backs: cursor %q stack %v", m.cursor, m.backStack)
+	}
+	for range 21 {
+		m.setCursor("plugin:a#tob")
+		m.treeDown()
+	}
+	if len(m.backStack) != 20 {
+		t.Errorf("the back stack holds 20, has %d", len(m.backStack))
+	}
+}
+
+func TestMovingResultClearsBackStack(t *testing.T) {
+	m, _ := newTestWith(t, func(f fakes) {
+		withExternal(f)
+		r := f.s.results["cf"]
+		r.Hits, r.Found = append(r.Hits, Hit{ID: "plugin:a/m:local", Type: "plugin", Name: "local", Repo: "a/m"}), 2
+		f.s.results["cf"] = r
+	})
+	typeText(t, m, "cf")
+	press(t, m, "down", "right")
+	if len(m.backStack) != 1 {
+		t.Fatalf("search-mode → on an external entry jumps too: %v", m.backStack)
+	}
+	press(t, m, "down")
+	if len(m.backStack) != 0 {
+		t.Errorf("moving the result clears the back stack: %v", m.backStack)
+	}
+}
+
+func ansiStrip(s string) string { return ansi.Strip(s) }
+
+// withRefs gives b/s's repo node references from a/m (twice) and c/n.
+func withRefs(f fakes) {
+	withExternal(f)
+	d := f.c.details
+	b := d["repo:b/s"]
+	b.UsedByRepos = 2
+	b.UsedBy = []Ref{
+		{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: true},
+		{ID: "plugin:c/n#cloud", Type: "plugin", Name: "cloud", Repo: "c/n", External: true},
+		{ID: "plugin:a/m#cf2", Type: "plugin", Name: "cf2", Repo: "a/m", External: true},
+	}
+	d["repo:b/s"] = b
+	a := d["repo:a/m"]
+	a.Stars = 37600
+	d["repo:a/m"] = a
+	d["repo:c/n"] = Node{ID: "repo:c/n", Type: "repo", Name: "c/n", Repo: "c/n", Stars: 120}
+	d["plugin:c/n#cloud"] = Node{ID: "plugin:c/n#cloud", Type: "plugin", Name: "cloud", Repo: "c/n",
+		Parents: []Ref{{ID: "marketplace:c/n:.", Type: "marketplace", Name: "plugins", Repo: "c/n"}}}
+	d["plugin:a/m#cf2"] = Node{ID: "plugin:a/m#cf2", Type: "plugin", Name: "cf2", Repo: "a/m",
+		Parents: []Ref{{ID: "marketplace:a/m:.", Type: "marketplace", Name: "m", Repo: "a/m"}}}
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+}
+
+func TestExternalModal(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	v := view(m)
+	for _, want := range []string{"External references to b/s — used by 2 repos", "a/m", "★37.6k", "cf", "c/n", "cloud", "enter jump · esc close"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("modal lacks %q:\n%s", want, v)
+		}
+	}
+}
+
+func TestExternalModalGroups(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	var order []string
+	for _, r := range m.ext.rows {
+		order = append(order, r.ref.Repo+" "+r.ref.Name)
+	}
+	if strings.Join(order, ";") != "a/m cf;a/m cf2;c/n cloud" {
+		t.Errorf("rows grouped by repo: %v", order)
+	}
+}
+
+func TestExternalModalJump(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e", "down", "enter")
+	if m.ext != nil || m.cursor != "plugin:a/m#cf2" || len(m.backStack) != 1 || m.backStack[0] != "plugin:b/s:cf" {
+		t.Errorf("modal %v cursor %q stack %v", m.ext, m.cursor, m.backStack)
+	}
+}
+
+func TestExternalModalEmpty(t *testing.T) {
+	m, _ := newTestWith(t, withExternal)
+	f := m.d.Searcher.(*fakeSearcher)
+	f.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	if !strings.Contains(view(m), "no other repo references b/s") {
+		t.Errorf("empty modal:\n%s", view(m))
+	}
+	press(t, m, "esc")
+	if m.ext != nil {
+		t.Error("esc should close")
+	}
+}
+
+func TestExternalModalSingular(t *testing.T) {
+	m, f := newTestWith(t, withRefs)
+	b := f.c.details["repo:b/s"]
+	b.UsedBy = b.UsedBy[:1]
+	f.c.details["repo:b/s"] = b
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	if !strings.Contains(view(m), "used by 1 repo\n") && !strings.Contains(view(m), "used by 1 repo ") {
+		t.Errorf("one repo, singular:\n%s", view(m))
+	}
+}
+
+func TestExternalModalEmptyKeys(t *testing.T) {
+	m, f := newTestWith(t, withExternal)
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+	typeText(t, m, "cf")
+	press(t, m, "down", "e", "down", "enter")
+	if m.cursor != "plugin:b/s:cf" {
+		t.Errorf("enter in an empty modal does nothing: cursor %q", m.cursor)
+	}
+}
+
+func TestExternalModalScrolls(t *testing.T) {
+	m, f := newTestWith(t, withRefs)
+	b := f.c.details["repo:b/s"]
+	b.UsedBy = nil
+	for i := range 30 {
+		b.UsedBy = append(b.UsedBy, Ref{ID: fmt.Sprintf("plugin:r%02d/m#x", i), Type: "plugin", Name: fmt.Sprintf("entry-%02d", i), Repo: fmt.Sprintf("r%02d/m", i), External: true})
+	}
+	f.c.details["repo:b/s"] = b
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	for range 25 {
+		press(t, m, "down")
+	}
+	if v := view(m); !strings.Contains(v, "▶ r25/m") || !strings.Contains(v, "enter jump · esc close") {
+		t.Errorf("the selected reference and the hint must stay visible:\n%s", v)
 	}
 }

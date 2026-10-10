@@ -26,7 +26,8 @@ The source code of `ipm`, a Go CLI (`cli/`) that keeps a per-user list of repos 
 | Create a pack (creates `ipm.toml` in the working directory if no ancestor has one; `-g` for user scope) | `ipm pack new <name> [--description …]` |
 | Add or remove catalog items in a pack; list packs; show a pack's items | `ipm pack add <pack> <id>…`, `ipm pack remove <pack> <id>…`, `ipm pack list`, `ipm pack show <pack>` |
 | Build every pack into a plugin and marketplace under `.ipm/`, then validate | `ipm install [-g] [--update] [--no-validate]` |
-| Search, collect into packs and build in one screen (Bubble Tea) | `ipm tui [-g]` |
+| Search, see the tree, collect, build and deploy in one screen (Bubble Tea) | `ipm tui [-g]` |
+| Build, then install a pack into Claude Code (user, project or local scope) | `ipm deploy [pack] [--scope] [--path] [-g]` |
 | Report the plugin, skills, hooks and agents folders in synced sources | `ipm scan [--paths] [owner/repo...]` |
 | Check home, cache, pnpm, sources, catalog, docker, typesense, claude | `ipm doctor` |
 | Test changes to `cli/` (the gate) | `mise run cli:test` |
@@ -46,7 +47,7 @@ The loop: `ipm source add <repo>` → `ipm sync` (installs, then indexes) → `i
 - **Tests never touch your real home**: set `IPM_HOME` and `IPM_CACHE_DIR` to absolute temp paths (relative ones are refused).
 - **Verify upstream facts from the installed sources**, not from memory: `$IPM_HOME/sources/node_modules/<owner--repo>/` is the repo at its pinned commit. Run `ipm sync` first if it is missing.
 - **The search server is container `ipm-typesense` on `127.0.0.1:8108`.** `ipm serve` removes an old `aihs-typesense` container that would hold the port.
-- **Installing plugins changes the user's Claude config.** Test installs with `CLAUDE_CONFIG_DIR` pointing at a temporary directory.
+- **`ipm deploy` (and `D` in the TUI) changes the user's Claude config** through `claude plugin marketplace add|update` and `claude plugin install|update`; every `claude` call goes through `System.Output`, so tests fake it. `internal/cli/testdata/claude-*.json` are real `claude` 2.1.296 listings. **Installing plugins changes the user's Claude config.** Test installs with `CLAUDE_CONFIG_DIR` pointing at a temporary directory.
 - **The docs site is `docs/`**, published by GitHub Pages from `main` (`docs/_config.yml`, Just the Docs). Commands, flags, messages and file formats are documented there; update [the commands reference](docs/reference/commands.md), the relevant guide and [troubleshooting](docs/troubleshooting.md) when they change. Verify claims against the code or a live run, not memory.
 - **`internal/tui` depends only on its four interfaces** (`Searcher`, `Catalog`, `Packs`, `Installer`); never import ipm packages or `System` there. The adapters in `internal/cli/tui.go` reuse the CLI's functions (`addToPack`, `runInstall`, `search.Query`), so the TUI adds no behaviour of its own. Screen changes update `internal/tui/testdata/*.golden` with `go test ./internal/tui -run Golden -update`; read the diff before committing.
 - **`docs/superpowers/` is history.** Specs and plans describe what was intended at the time; don't edit them to match the code.

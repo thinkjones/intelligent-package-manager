@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"fmt"
+	"strconv"
 
 	"charm.land/lipgloss/v2"
 )
@@ -18,24 +18,61 @@ func (m *Model) resultLines(w, rows int) []string {
 		m.offset = m.sel - rows + 1
 	}
 	lines := make([]string, 0, rows)
+	wideRows := w >= wideWidth-4
+	nameW := max(10, w-6-labelWidth-4)
+	if wideRows {
+		nameW = max(10, min(32, w-6-labelWidth-4-39))
+	}
 	for i := m.offset; i < len(m.res.Hits) && len(lines) < rows; i++ {
 		h := m.res.Hits[i]
 		mark := " "
 		if m.inPack(h.ID) {
-			mark = "✓"
+			mark = stTeal.Render("✓")
 		}
-		row := fmt.Sprintf("%-4s %-14s %s %s", h.Score, h.Type, mark, h.Name)
+		row := fit(h.Score, 4) + " " + typeStyle(h.Type).Render(fit(typeLabel(h.Type), labelWidth)) + " " + mark + " "
+		label := h.Name
+		if h.External {
+			label = "↗" + label
+		}
+		name := fit(label, nameW)
 		switch {
 		case i == m.sel && m.focus == focusResults:
-			lines = append(lines, stSelected.Render(fit("▶"+row, w)))
+			name = stSelected.Render(name)
+			row = stAmber.Render("▶") + row
 		case i == m.sel:
-			lines = append(lines, stTitle.Render(fit("›"+row, w)))
+			name = stTitle.Render(name)
+			row = stMuted.Render("›") + row
 		default:
-			lines = append(lines, stText.Render(fit(" "+row, w)))
+			name = stText.Render(name)
+			row = " " + row
 		}
+		row += name
+		if wideRows {
+			star := ""
+			if h.Stars > 0 {
+				star = "★" + stars(h.Stars)
+			}
+			used := ""
+			if h.UsedBy > 0 {
+				used = "↗" + strconv.Itoa(h.UsedBy)
+			}
+			row += " " + stMuted.Render(fit(h.Repo, 26)) + " " + stAmber.Render(fit(used, 4)) + " " + starStyle(h.Stars).Render(fit(star, 7))
+		}
+		lines = append(lines, fit(row, w))
 	}
 	for len(lines) < rows {
 		lines = append(lines, spaces(w))
 	}
 	return lines
+}
+
+// stars formats a star count as ipm search does: 31234 → 31.2k.
+func stars(n int) string {
+	switch {
+	case n >= 100_000:
+		return strconv.Itoa(n/1000) + "k"
+	case n >= 1000:
+		return strconv.FormatFloat(float64(n)/1000, 'f', 1, 64) + "k"
+	}
+	return strconv.Itoa(n)
 }
