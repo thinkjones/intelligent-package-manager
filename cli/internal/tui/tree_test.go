@@ -313,3 +313,17 @@ func TestTreeUsedBySuffix(t *testing.T) {
 		t.Errorf("used-by suffixes:\n%s", text)
 	}
 }
+
+func TestTreePathRowShowsUsedBy(t *testing.T) {
+	c := sample()
+	p := c["plugin:o/r:p"]
+	p.UsedBy = []Ref{{ID: "plugin:x/y#p", Repo: "x/y", External: true}, {ID: "plugin:z/w#p", Repo: "z/w", External: true}}
+	c["plugin:o/r:p"] = p
+	tv, _ := buildTree(c, "skill:o/r:a", nil)
+	lines := tv.lines(120, 12, -1, false)
+	for _, l := range lines {
+		if p := ansi.Strip(l); strings.Contains(p, "plugin  p ") && !strings.Contains(p, "↗ used by 2") {
+			t.Errorf("the referenced plugin on the path should say so: %q", p)
+		}
+	}
+}

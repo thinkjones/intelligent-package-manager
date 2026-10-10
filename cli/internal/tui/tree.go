@@ -95,8 +95,12 @@ func pickParent(n Node, chosen map[string]string) string {
 }
 
 func refOf(n Node) Ref {
+	repos := map[string]bool{}
+	for _, u := range n.UsedBy {
+		repos[u.Repo] = true
+	}
 	return Ref{ID: n.ID, Type: n.Type, Name: n.Name, Description: n.Description, Repo: n.Repo,
-		External: n.External != nil || n.Unresolved != ""}
+		External: n.External != nil || n.Unresolved != "", UsedBy: len(repos)}
 }
 
 // cursorText is the cursor's description, led by where an external entry
