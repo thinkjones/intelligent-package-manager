@@ -90,6 +90,16 @@ func findPack(packs []project.Pack, name string) int {
 }
 
 func packNew(sys System, scope project.Scope, name, description string) error {
+	if err := createPack(scope, name, description); err != nil {
+		return err
+	}
+	fmt.Fprintf(sys.Stdout, "%s pack %s created in %s\n\nNext: ipm pack add %s <item id>…  (find IDs with `ipm search`)\n", ok, name, scope.Root+"/"+project.File, name)
+	return nil
+}
+
+// createPack adds an empty pack to the scope's ipm.toml. ipm pack new and the
+// TUI share it.
+func createPack(scope project.Scope, name, description string) error {
 	if !pack.ValidName(name) || pack.Reserved(name) {
 		return fmt.Errorf("%q can't be a pack name: use letters, digits, '.', '_' and '-', and avoid names Claude Code reserves (claude-…, anthropic-…, \"official\" beside claude or anthropic)", name)
 	}
@@ -101,11 +111,7 @@ func packNew(sys System, scope project.Scope, name, description string) error {
 		return fmt.Errorf("pack %s already exists", name)
 	}
 	packs = append(packs, project.Pack{Name: name, Description: description})
-	if err := project.SavePacks(scope.Root, packs); err != nil {
-		return err
-	}
-	fmt.Fprintf(sys.Stdout, "%s pack %s created in %s\n\nNext: ipm pack add %s <item id>…  (find IDs with `ipm search`)\n", ok, name, scope.Root+"/"+project.File, name)
-	return nil
+	return project.SavePacks(scope.Root, packs)
 }
 
 // pickable checks that an item exists and can be picked on its own; when it
@@ -139,20 +145,28 @@ func pickable(g *catgraph.Graph, packName, id string) error {
 }
 
 func packEdit(sys System, scope project.Scope, verb, name string, ids []string) error {
-	packs, err := project.LoadPacks(scope.Root)
+	edit := func() (project.Pack, error) { return removeFromPack(scope, name, ids) }
+	if verb == "add" {
+		edit = func() (project.Pack, error) { return addToPack(sys, scope, name, ids) }
+	}
+	p, err := edit()
 	if err != nil {
 		return err
 	}
-	i := findPack(packs, name)
-	if i < 0 {
-		return fmt.Errorf("no pack %s — create it with `ipm pack new %s`", name, name)
-	}
-	if verb == "add" {
-		p, err := ipmPaths(sys)
+	fmt.Fprintf(sys.Stdout, "%s pack %s: %d item(s)\n\nNext: ipm install\n", ok, name, len(p.Items))
+	return nil
+}
+
+// addToPack adds catalog items to a pack: every ID is checked first, so a
+// refusal writes nothing; IDs already in the pack are skipped. ipm pack add
+// and the TUI share it.
+func addToPack(sys System, scope project.Scope, name string, ids []string) (project.Pack, error) {
+	return editPack(scope, name, func(p *project.Pack) error {
+		paths, err := ipmPaths(sys)
 		if err != nil {
 			return err
 		}
-		g, err := catgraph.Load(p.Catalog())
+		g, err := catgraph.Load(paths.Catalog())
 		if err != nil {
 			return err
 		}
@@ -162,24 +176,44 @@ func packEdit(sys System, scope project.Scope, verb, name string, ids []string) 
 			}
 		}
 		for _, id := range ids {
-			if !slices.Contains(packs[i].Items, id) {
-				packs[i].Items = append(packs[i].Items, id)
+			if !slices.Contains(p.Items, id) {
+				p.Items = append(p.Items, id)
 			}
 		}
-	} else {
+		return nil
+	})
+}
+
+// removeFromPack removes items from a pack; an ID not in it is an error and
+// nothing is written.
+func removeFromPack(scope project.Scope, name string, ids []string) (project.Pack, error) {
+	return editPack(scope, name, func(p *project.Pack) error {
 		for _, id := range ids {
-			j := slices.Index(packs[i].Items, id)
+			j := slices.Index(p.Items, id)
 			if j < 0 {
 				return fmt.Errorf("%s is not in pack %s", id, name)
 			}
-			packs[i].Items = slices.Delete(packs[i].Items, j, j+1)
+			p.Items = slices.Delete(p.Items, j, j+1)
 		}
+		return nil
+	})
+}
+
+// editPack loads the scope's packs, applies change to the named one and saves
+// them all, unless change fails.
+func editPack(scope project.Scope, name string, change func(*project.Pack) error) (project.Pack, error) {
+	packs, err := project.LoadPacks(scope.Root)
+	if err != nil {
+		return project.Pack{}, err
 	}
-	if err := project.SavePacks(scope.Root, packs); err != nil {
-		return err
+	i := findPack(packs, name)
+	if i < 0 {
+		return project.Pack{}, fmt.Errorf("no pack %s — create it with `ipm pack new %s`", name, name)
 	}
-	fmt.Fprintf(sys.Stdout, "%s pack %s: %d item(s)\n\nNext: ipm install\n", ok, name, len(packs[i].Items))
-	return nil
+	if err := change(&packs[i]); err != nil {
+		return project.Pack{}, err
+	}
+	return packs[i], project.SavePacks(scope.Root, packs)
 }
 
 func packList(sys System, scope project.Scope) error {

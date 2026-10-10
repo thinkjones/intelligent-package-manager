@@ -251,9 +251,9 @@ type TableOptions struct {
 	TopTextMatch int64
 }
 
-// score is a hit's SCORE: its hybrid rank-fusion score × 100, or for a
+// Score is a hit's SCORE: its hybrid rank-fusion score × 100, or for a
 // keyword-only search, its text match as a percentage of the best hit's.
-func score(h typesense.Hit, top int64) string {
+func Score(h typesense.Hit, top int64) string {
 	switch {
 	case h.Hybrid != nil:
 		return strconv.Itoa(int(math.Round(h.Hybrid.RankFusionScore * 100)))
@@ -296,7 +296,7 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 		if plugins == "" {
 			plugins = "—"
 		}
-		row := []string{score(h, top)}
+		row := []string{Score(h, top)}
 		if o.Explain {
 			kw, sem := "—", "—"
 			if h.TextMatch > 0 {

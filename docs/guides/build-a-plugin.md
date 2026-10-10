@@ -1,7 +1,7 @@
 ---
 title: Build your own plugin
 parent: Guides
-nav_order: 3
+nav_order: 4
 ---
 
 # Build your own plugin

@@ -2,13 +2,13 @@
 
 Router for agents working in [thinkjones/intelligent-package-manager](https://github.com/thinkjones/intelligent-package-manager): the source code of `ipm` ("intelligent package manager"), a local Go CLI that fetches repos of agent artifacts with pnpm, catalogs every skill, agent, command, hook, MCP server and plugin in them, searches the catalog, and builds packs of picked items into Claude Code plugins. Read the linked file for detail; this page is only where things are.
 
-`ipm` was called `aihs`. The design and its parts are in [the ipm design](docs/superpowers/specs/2026-10-09-ipm-design.md); parts 1 (rename), 2 (sources on pnpm) and 3 (packs built into plugins with `ipm install`) are built; part 4 (a TUI) is not.
+`ipm` was called `aihs`. The design and its parts are in [the ipm design](docs/superpowers/specs/2026-10-09-ipm-design.md); parts 1 (rename), 2 (sources on pnpm), 3 (packs built into plugins with `ipm install`) and 4 (`ipm tui`, a Bubble Tea TUI over search and packs) are built.
 
 ## Where things are
 
 | Path | What it is |
 | --- | --- |
-| [`cli/`](cli/README.md) | `ipm`, the Go CLI. Every command is in `cli/internal/cli`. |
+| [`cli/`](cli/README.md) | `ipm`, the Go CLI. Every command is in `cli/internal/cli`; the TUI's model is `cli/internal/tui` (Bubble Tea, behind four interfaces that `cli/internal/cli/tui.go` implements). |
 | `bin/ipm` | Shim that builds `cli/bin/ipm` when a Go source changes and runs it; `direnv allow` puts `bin/` on PATH. |
 | [`docs/`](docs/) | The user documentation, published to GitHub Pages at <https://thinkjones.github.io/intelligent-package-manager/> (Jekyll, Just the Docs theme, `docs/_config.yml`): [getting started](docs/getting-started.md), [concepts](docs/concepts.md), `guides/`, `reference/` ([commands](docs/reference/commands.md), [sources](docs/reference/sources.md), [files](docs/reference/files.md)), [troubleshooting](docs/troubleshooting.md), [how it works](docs/architecture.md). |
 | `docs/assets/brand/` | The hero, workflow and logo SVGs, shared by the README and the site. The palette (`#11151C` background, `#F3EFE6` text, `#F0A847` pins, `#5CC8A8` verified) is also in `docs/_sass/custom/setup.scss`; change both together. |

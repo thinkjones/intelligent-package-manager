@@ -1,0 +1,30 @@
+ipm ─ search: tdd                                                                                               ● hybrid
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+▶50   skill          ✓ tdd                             │ skill  tdd                                                     
+ 50   skill            tdd-guard                       │ o/r ★ 31.2k                                                    
+                                                       │ skill:o/r:skills/tdd                                           
+                                                       │ Test first.                                                    
+                                                       │                                                                
+                                                       │  up    plugin         p                                        
+                                                       │  up    repo           o/r                                      
+                                                       │  down  agent          helper                                   
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+                                                       │                                                                
+─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
+skill tdd · agent csharp-pro · plugin stripe                                                                            
+2 of 100                                                                                                                
+/ search  a add  d remove  p packs  i install  f type  ? help  q quit                                                   

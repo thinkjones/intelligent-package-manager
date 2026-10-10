@@ -12,5 +12,6 @@ Task-by-task walkthroughs.
 | --- | --- |
 | [Add and sync sources](sources.md) | Choose the repos `ipm` follows, pin them and keep them current |
 | [Search and explore](search.md) | Find artifacts, see what owns what, and get IDs |
+| [Use the TUI](tui.md) | Search, judge, collect into a pack and build it in one screen |
 | [Build your own plugin](build-a-plugin.md) | Pick items from several repos into a pack and install it in Claude Code |
 | [Share packs with a team](teams.md) | Commit a pack so teammates build the same plugin |
