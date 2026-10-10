@@ -165,6 +165,18 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 	col := guideW + labelWidth + 2 + nameWidth + 3
 	descW := w - col
 
+	// The cursor's block (row, description, also-in rows, children) leaves
+	// room for a sibling and a scroll row on each side that has siblings.
+	room := max(1, rows-len(head))
+	budget := room
+	if tv.Cursor > 0 {
+		budget -= 2
+	}
+	if tv.Cursor < len(tv.Siblings)-1 {
+		budget -= 2
+	}
+	budget = max(1, budget)
+
 	var body []treeRow
 	cursorStart, cursorEnd := 0, 0
 	selIdx := 0
@@ -181,6 +193,9 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 			desc = s.Description
 		}
 		wrapped := wrapDesc(desc, descW)
+		if keep := max(1, budget-len(tv.AlsoIn)); len(wrapped) > keep {
+			wrapped = append(wrapped[:keep-1], ansi.Truncate(wrapped[keep-1], max(1, descW-1), "")+"…")
+		}
 		first := ""
 		if len(wrapped) > 0 {
 			first = wrapped[0]
@@ -199,7 +214,21 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 			selIdx++
 		}
 		if rows >= childRowsMin {
+			// Children get what the block has left; the last slot says how
+			// many more there are.
+			left := budget - (len(body) - cursorStart)
+			limit := min(maxChildren, left)
+			if len(tv.Children) > limit {
+				limit = max(0, left-1)
+			}
 			for j, ch := range tv.Children {
+				if j == limit && left > 0 {
+					body = append(body, treeRow{kind: rowMore, guide: under + "└ ", text: fmt.Sprintf("↓ %d more", len(tv.Children)-j), sel: -1})
+					break
+				}
+				if j == limit {
+					break
+				}
 				if j == maxChildren {
 					body = append(body, treeRow{kind: rowMore, guide: under + "└ ", text: fmt.Sprintf("↓ %d more", len(tv.Children)-j), sel: -1})
 					break
@@ -214,8 +243,8 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 		cursorEnd = len(body) - 1
 	}
 
-	// Scroll the siblings so the cursor and its description stay in view.
-	room := max(1, rows-len(head))
+	// Scroll the siblings so the cursor's block stays in view, with a
+	// scroll row standing in for whatever is hidden above or below.
 	start := 0
 	if len(body) > room {
 		block := cursorEnd - cursorStart + 1
@@ -227,7 +256,7 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 	if start > 0 && start < cursorStart {
 		window[0] = treeRow{kind: rowMore, guide: sibGuide(false), text: fmt.Sprintf("↑ %d more", start+1), sel: -1}
 	}
-	if end < len(body) && end-1 > cursorEnd {
+	if end < len(body) && end-1 > cursorEnd && len(window) > 1 {
 		window[len(window)-1] = treeRow{kind: rowMore, guide: sibGuide(true), text: fmt.Sprintf("↓ %d more", len(body)-end+1), sel: -1}
 	}
 

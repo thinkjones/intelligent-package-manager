@@ -83,8 +83,9 @@ type Target struct{ Scope, Path string }
 type Deployer interface {
 	// Default is the target a pack deploys to unless the user picks another.
 	Default(pack string) Target
-	// Plan is the commands Deploy will run, for the user to confirm.
-	Plan(pack string, t Target) ([]string, error)
+	// Plan checks t and returns it as Deploy will use it (its folder made
+	// absolute), with the commands Deploy will run, for the user to confirm.
+	Plan(pack string, t Target) (Target, []string, error)
 	// Deploy builds and installs pack at t, writing its output to out.
 	Deploy(ctx context.Context, pack string, t Target, out io.Writer) error
 }

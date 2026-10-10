@@ -90,12 +90,12 @@ func (m *Model) deployKey(msg keyMsg) tea.Cmd {
 
 // planFor asks the deployer what it will run for t, and shows it to confirm.
 func (m *Model) planFor(t Target) {
-	plan, err := m.d.Deployer.Plan(m.deploy.pack, t)
+	cleaned, plan, err := m.d.Deployer.Plan(m.deploy.pack, t)
 	if err != nil {
 		m.status = err.Error()
 		return
 	}
-	m.deploy.target, m.deploy.plan, m.deploy.step = t, plan, stepConfirm
+	m.deploy.target, m.deploy.plan, m.deploy.step = cleaned, plan, stepConfirm
 }
 
 func (m *Model) startDeploy() tea.Cmd {

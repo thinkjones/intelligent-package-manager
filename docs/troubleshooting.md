@@ -88,6 +88,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | Message | Cause and fix |
 | --- | --- |
 | `ipm deploy needs claude (Claude Code) on PATH` | Install Claude Code, or put `claude` on your `PATH`. |
+| `Claude Code already has a marketplace named … from …` | Another project whose folder has the same name already deployed a marketplace with this name. Deploying would repoint it, and its plugins, here. Rename one of the folders, or remove the other with the `claude plugin marketplace remove` command shown. |
 | `… is not a folder` | The project or local folder doesn't exist. Check the path; `~` and relative paths work. |
 | `deploy: name a pack — this scope has N` | Give the pack: `ipm deploy <pack>`. `ipm pack list` shows them. |
 | `can't read the output of claude plugin list --json` | Your `claude` prints a format `ipm` doesn't know. Update Claude Code, or install by hand with the commands from `ipm install`. |

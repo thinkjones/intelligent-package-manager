@@ -105,7 +105,7 @@ In the search box every letter is part of the query, so the other keys work once
       ```
    4. The output streams in and ends with `✓ deployed csharp-sdlc (project /work)`.
 
-Deploy always builds first, so Claude Code gets the current pack. Deploying again updates the marketplace and the plugin instead of adding them. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
+Deploy always builds first, so Claude Code gets the current pack. Deploying again adds the marketplace again (Claude Code accepts that), refreshes it, and updates the plugin instead of installing it. If Claude Code already has a marketplace of the same name from another folder — two projects in folders with the same name — deploy stops rather than repoint it. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
 
 The same works from the command line with [`ipm deploy`](../reference/commands.md#ipm-deploy).
 

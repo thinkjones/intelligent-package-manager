@@ -98,6 +98,7 @@ func planDeploy(sys System, ipmDir, mp, pack string, t deployTarget) ([]claudeCm
 	}
 	var marketplaces []struct {
 		Name string `json:"name"`
+		Path string `json:"path"`
 	}
 	if err := claudeJSON(sys, dir, &marketplaces, "plugin", "marketplace", "list", "--json"); err != nil {
 		return nil, err
@@ -113,10 +114,17 @@ func planDeploy(sys System, ipmDir, mp, pack string, t deployTarget) ([]claudeCm
 	id := pack + "@" + mp
 	cmds := []claudeCmd{{dir, []string{"plugin", "marketplace", "add", ipmDir, "--scope", t.Scope}}}
 	for _, m := range marketplaces {
-		if m.Name == mp {
-			cmds = append(cmds, claudeCmd{dir, []string{"plugin", "marketplace", "update", mp}})
-			break
+		if m.Name != mp {
+			continue
 		}
+		// Another project with the same folder name built a marketplace of
+		// the same name; adding ours would repoint it, and every plugin
+		// installed from it, at this project.
+		if m.Path != "" && !samePath(m.Path, ipmDir) {
+			return nil, fmt.Errorf("Claude Code already has a marketplace named %s, from %s — deploying %s would repoint it and every plugin installed from it; rename this project's folder, or remove the other with `claude plugin marketplace remove %s`", mp, m.Path, ipmDir, mp)
+		}
+		cmds = append(cmds, claudeCmd{dir, []string{"plugin", "marketplace", "update", mp}})
+		break
 	}
 	verb := "install"
 	for _, p := range plugins {

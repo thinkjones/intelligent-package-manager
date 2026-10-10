@@ -341,23 +341,27 @@ func (d tuiDeployer) Default(string) tui.Target {
 	return tui.Target{Scope: t.Scope, Path: t.Path}
 }
 
-func (d tuiDeployer) Plan(pack string, t tui.Target) ([]string, error) {
+func (d tuiDeployer) Plan(pack string, t tui.Target) (tui.Target, []string, error) {
 	if err := needClaude(d.sys); err != nil {
-		return nil, err
+		return t, nil, err
 	}
 	target, err := cleanTarget(deployTarget{Scope: t.Scope, Path: t.Path}, workDir(d.sys, d.scope), d.sys.Getenv("HOME"))
 	if err != nil {
-		return nil, err
+		return t, nil, err
 	}
 	cmds, err := planDeploy(d.sys, d.scope.IPMDir(), marketName(d.scope), pack, target)
 	if err != nil {
-		return nil, err
+		return t, nil, err
 	}
-	out := []string{"ipm install"}
+	build := "ipm install"
+	if d.global {
+		build += " -g"
+	}
+	out := []string{build}
 	for _, c := range cmds {
 		out = append(out, c.String())
 	}
-	return out, nil
+	return tui.Target{Scope: target.Scope, Path: target.Path}, out, nil
 }
 
 func (d tuiDeployer) Deploy(_ context.Context, pack string, t tui.Target, out io.Writer) error {

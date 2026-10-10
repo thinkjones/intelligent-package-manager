@@ -209,6 +209,7 @@ func hits(names ...string) []Hit {
 
 type fakeDeployer struct {
 	def      Target
+	cleaned  *Target // what Plan returns as the target; nil returns t unchanged
 	plan     []string
 	planErr  error
 	lines    []string
@@ -217,8 +218,11 @@ type fakeDeployer struct {
 }
 
 func (f *fakeDeployer) Default(pack string) Target { return f.def }
-func (f *fakeDeployer) Plan(pack string, t Target) ([]string, error) {
-	return f.plan, f.planErr
+func (f *fakeDeployer) Plan(pack string, t Target) (Target, []string, error) {
+	if f.cleaned != nil {
+		t = *f.cleaned
+	}
+	return t, f.plan, f.planErr
 }
 func (f *fakeDeployer) Deploy(_ context.Context, pack string, t Target, out io.Writer) error {
 	f.deployed = append(f.deployed, fmt.Sprintf("%s %s %s", pack, t.Scope, t.Path))
@@ -909,4 +913,19 @@ func TestDeployIgnoredWhileRunning(t *testing.T) {
 	}
 	close(f.i.gate)
 	drain(t, m, cmd)
+}
+
+func TestDeployShowsCleanedTarget(t *testing.T) {
+	m, f := deployTest(t)
+	f.d.cleaned = &Target{Scope: "project", Path: "/home/me/work"}
+	press(t, m, "D", "enter")
+	m.deploy.path.SetValue("~/work/")
+	press(t, m, "enter")
+	if !strings.Contains(view(m), "project scope in /home/me/work") {
+		t.Errorf("confirm should show the folder claude runs in:\n%s", view(m))
+	}
+	press(t, m, "y")
+	if !strings.Contains(view(m), "✓ deployed kit (project /home/me/work)") || f.d.deployed[0] != "kit project /home/me/work" {
+		t.Errorf("deployed %v:\n%s", f.d.deployed, view(m))
+	}
 }

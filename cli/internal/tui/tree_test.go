@@ -225,3 +225,31 @@ func TestTreeNameCut(t *testing.T) {
 		t.Errorf("names cut to 24:\n%s", text)
 	}
 }
+
+func TestTreeKeepsSiblingsAroundBigCursor(t *testing.T) {
+	c := mapCatalog{}
+	c.add("market:m", "marketplace", "m", "")
+	for i := range 80 {
+		id := fmt.Sprintf("plugin:p%02d", i)
+		c.add(id, "plugin", fmt.Sprintf("p%02d", i), "A plugin")
+		c.link("market:m", id)
+	}
+	cur := c["plugin:p40"]
+	cur.Description = strings.Repeat("A long description that wraps. ", 12)
+	c["plugin:p40"] = cur
+	for i := range 20 {
+		id := fmt.Sprintf("skill:s%02d", i)
+		c.add(id, "skill", fmt.Sprintf("s%02d", i), "")
+		c.link("plugin:p40", id)
+	}
+	tv, _ := buildTree(c, "plugin:p40", nil)
+	for _, rows := range []int{10, 12, 14} {
+		text := ansi.Strip(strings.Join(tv.lines(76, rows, -1, false), "\n"))
+		if !strings.Contains(text, "▶p40") || !strings.Contains(text, "↑ ") || !strings.Contains(text, "more") || !(strings.Contains(text, "p39") || strings.Contains(text, "p41")) {
+			t.Errorf("rows %d: want the cursor, a sibling and the scroll rows:\n%s", rows, text)
+		}
+		if strings.Count(text, "↓ ") < 1 {
+			t.Errorf("rows %d: no ↓ more row:\n%s", rows, text)
+		}
+	}
+}
