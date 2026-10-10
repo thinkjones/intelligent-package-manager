@@ -55,6 +55,9 @@ type Model struct {
 	dirty    bool // a pack changed since the last install
 	picker   *picker
 	statusOK bool // status is a note, not an error
+
+	inst *install // the install modal, while open
+	help bool     // the ? overlay
 }
 
 type keyMsg = tea.KeyPressMsg
@@ -79,6 +82,7 @@ func New(d Deps) *Model {
 	in.Placeholder = "type to search"
 	in.Focus()
 	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond}
+	m.input.SetWidth(m.width - 30)
 	m.reloadPacks()
 	return m
 }
@@ -91,6 +95,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		m.input.SetWidth(max(10, m.width-30))
 		return m, nil
 	case searchTick:
 		if msg.seq != m.seq {
@@ -108,6 +113,19 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.res, m.sel, m.offset = msg.res, 0, 0
 		m.followSelection()
 		return m, nil
+	case installLine:
+		if m.inst != nil {
+			m.inst.lines = append(m.inst.lines, msg.text)
+			return m, m.inst.next
+		}
+	case installDone:
+		if m.inst != nil {
+			m.inst.done, m.inst.err = true, msg.err
+			if msg.err == nil {
+				m.dirty = false
+			}
+			m.reloadPacks()
+		}
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
 	}
@@ -118,8 +136,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	m.status, m.statusOK = "", false
 	k := msg.String()
+	if m.inst != nil {
+		return m.installKey(k)
+	}
 	if k == "ctrl+c" {
 		return tea.Quit
+	}
+	if k == "ctrl+r" {
+		m.d.Searcher.Recheck()
+		return m.queryChanged()
+	}
+	if m.help {
+		if k == "esc" || k == "?" {
+			m.help = false
+		}
+		if k == "q" {
+			return tea.Quit
+		}
+		return nil
 	}
 	if m.tooSmall() {
 		if k == "q" {
@@ -141,6 +175,11 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		case "p":
 			m.openPicker(false)
+			return nil
+		case "i":
+			return m.startInstall()
+		case "?":
+			m.help = true
 			return nil
 		}
 	}
@@ -279,9 +318,16 @@ func (m *Model) View() tea.View {
 	}
 	b.WriteString(stRule.Render(strings.Repeat("─", w)) + "\n")
 	rows := max(1, m.height-strings.Count(b.String(), "\n")-4)
-	body := m.bodyLines(w, rows)
-	if m.picker != nil {
+	var body []string
+	switch {
+	case m.inst != nil:
+		body = m.installLines(w, rows)
+	case m.help:
+		body = m.helpLines(w, rows)
+	case m.picker != nil:
 		body = m.pickerLines(w, rows)
+	default:
+		body = m.bodyLines(w, rows)
 	}
 	for _, line := range body {
 		b.WriteString(line + "\n")

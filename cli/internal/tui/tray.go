@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+
+	"charm.land/lipgloss/v2"
 )
 
 // reloadPacks reads the scope's packs, keeping the active pack when it still
@@ -147,5 +149,6 @@ func (m *Model) trayLines(w int) []string {
 	if len(items) == 0 {
 		line = stMuted.Render("empty — select a result and press a")
 	}
-	return []string{fit(head+" "+stRule.Render(strings.Repeat("─", w)), w), fit(line, w)}
+	rule := stRule.Render(strings.Repeat("─", max(0, w-lipgloss.Width(head)-1)))
+	return []string{fit(head+" "+rule, w), fit(line, w)}
 }

@@ -553,3 +553,87 @@ func TestPacksErrorShown(t *testing.T) {
 		t.Error("the TUI must keep running")
 	}
 }
+
+func TestInstallStreams(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	f.i.lines = []string{"✓ kit: 2 item(s)", "validate: ok"}
+	typeText(t, m, "tdd")
+	press(t, m, "down", "a", "i")
+	v := view(m)
+	for _, want := range []string{"✓ kit: 2 item(s)", "validate: ok", "✓ installed"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("install modal lacks %q:\n%s", want, v)
+		}
+	}
+	if m.dirty {
+		t.Error("a successful install clears • not built")
+	}
+	press(t, m, "esc")
+	if m.inst != nil {
+		t.Error("esc should close the finished install")
+	}
+}
+
+func TestQuitIgnoredDuringInstall(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	f.i.gate = make(chan struct{})
+	typeText(t, m, "tdd")
+	press(t, m, "down")
+	_, cmd := m.Update(key("i"))
+	for _, k := range []string{"q", "ctrl+c", "esc"} {
+		if _, c := m.Update(key(k)); c != nil {
+			t.Errorf("%s during install returned a command", k)
+		}
+	}
+	if m.inst == nil || !strings.Contains(m.status, "install is running") {
+		t.Errorf("modal %v status %q", m.inst, m.status)
+	}
+	close(f.i.gate)
+	drain(t, m, cmd)
+	if !strings.Contains(view(m), "✓ installed") {
+		t.Errorf("install should finish:\n%s", view(m))
+	}
+}
+
+func TestInstallFailure(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	f.i.lines = []string{"pnpm install …"}
+	f.i.err = errors.New("pnpm failed")
+	typeText(t, m, "tdd")
+	press(t, m, "down", "a", "i")
+	if v := view(m); !strings.Contains(v, "pnpm install …") || !strings.Contains(v, "✗ pnpm failed") {
+		t.Errorf("modal:\n%s", v)
+	}
+	if !m.dirty {
+		t.Error("a failed install keeps • not built")
+	}
+	press(t, m, "esc")
+	if !press(t, m, "q") {
+		t.Error("q should quit once install has finished")
+	}
+}
+
+func TestHelpOverlay(t *testing.T) {
+	m, _ := newTest(t)
+	press(t, m, "down", "?")
+	v := view(m)
+	for _, kh := range keyHelp {
+		if !strings.Contains(v, kh[0]) || !strings.Contains(v, kh[1]) {
+			t.Errorf("help lacks %q %q", kh[0], kh[1])
+		}
+	}
+	press(t, m, "esc")
+	if m.help {
+		t.Error("esc should hide the help")
+	}
+}
+
+func TestRecheck(t *testing.T) {
+	m, f := newTest(t)
+	typeText(t, m, "tdd")
+	n := len(f.s.queries)
+	press(t, m, "ctrl+r")
+	if f.s.checks != 1 || len(f.s.queries) != n+1 {
+		t.Errorf("checks %d, searches %d → %d", f.s.checks, n, len(f.s.queries))
+	}
+}
