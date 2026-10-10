@@ -1575,7 +1575,7 @@ func TestLocalSearchRanking(t *testing.T) {
 	stars := func(id string) func(string) (int, bool) {
 		return func(string) (int, bool) { return 0, false }
 	}
-	res := localSearch(records, stars(""), "tdd", tui.Filter{})
+	res := localSearch(records, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{})
 	var names []string
 	for _, h := range res.Hits {
 		names = append(names, h.Name)
@@ -1591,17 +1591,17 @@ func TestLocalSearchRanking(t *testing.T) {
 		}
 		return 1, true
 	}
-	if res := localSearch(records, byStars, "tdd", tui.Filter{}); res.Hits[0].Name != "tdd-guard" {
+	if res := localSearch(records, byStars, func(string) int { return 0 }, "tdd", tui.Filter{}); res.Hits[0].Name != "tdd-guard" {
 		t.Errorf("equal scores should rank by stars: %v", res.Hits[0].Name)
 	}
-	if res := localSearch(records, stars(""), "tdd", tui.Filter{Type: "agent"}); len(res.Hits) != 0 {
+	if res := localSearch(records, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{Type: "agent"}); len(res.Hits) != 0 {
 		t.Errorf("type filter: %v", res.Hits)
 	}
 	var many []map[string]any
 	for i := range 60 {
 		many = append(many, rec(fmt.Sprintf("skill:o/r:s%02d", i), fmt.Sprintf("tdd %d", i), ""))
 	}
-	if res := localSearch(many, stars(""), "tdd", tui.Filter{}); len(res.Hits) != 50 || res.Found != 60 {
+	if res := localSearch(many, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{}); len(res.Hits) != 50 || res.Found != 60 {
 		t.Errorf("cap: %d hits, found %d", len(res.Hits), res.Found)
 	}
 }
@@ -1988,5 +1988,131 @@ func TestTuiDeployerPlanGlobal(t *testing.T) {
 	_, plan, err := d.Plan("kit", tui.Target{Scope: "user"})
 	if err != nil || len(plan) == 0 || plan[0] != "ipm install -g" {
 		t.Errorf("plan %v %v", plan, err)
+	}
+}
+
+func TestShowUsedBy(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	f := newFake(root)
+	if err := f.run("show", "repo:x/c"); err != nil {
+		t.Fatal(err)
+	}
+	// x/c is only a placeholder (not a source), so nothing references it.
+	if strings.Contains(f.out.String(), "used by:") {
+		t.Errorf("a repo that isn't a source has no used-by:\n%s", f.out.String())
+	}
+}
+
+func TestSearchOldIndex(t *testing.T) {
+	root := checkout(t)
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, "{\"message\":\"Could not find a field named `used_by` in the schema for sorting.\"}")
+	}))
+	t.Cleanup(srv.Close)
+	f := newFake(root)
+	typesenseAt(f, srv)
+	if err := f.run("search", "x"); err == nil || err.Error() != "the search index is from an older ipm — run ipm load" {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestLocalSearchNameBoost(t *testing.T) {
+	other := rec("skill:x/y:other", "other", "cloudflare tips")
+	other["repo"] = "x/y"
+	sdk := rec("skill:cloudflare/skills:sdk", "agents-sdk", "Build agents")
+	sdk["repo"] = "cloudflare/skills"
+	none := func(string) (int, bool) { return 0, false }
+	res := localSearch([]map[string]any{other, sdk}, none, func(string) int { return 0 }, "cloudflare", tui.Filter{})
+	if len(res.Hits) != 2 || res.Hits[0].Name != "agents-sdk" {
+		t.Errorf("a repo-name match outranks a description match: %v", res.Hits)
+	}
+	a, b := rec("skill:p/q:a", "tdd", ""), rec("skill:r/s:b", "tdd", "")
+	a["repo"], b["repo"] = "p/q", "r/s"
+	usedBy := func(repo string) int {
+		if repo == "r/s" {
+			return 5
+		}
+		return 0
+	}
+	if res := localSearch([]map[string]any{a, b}, none, usedBy, "tdd", tui.Filter{}); res.Hits[0].Repo != "r/s" || res.Hits[0].UsedBy != 5 {
+		t.Errorf("equal scores go to the more-used repo: %+v", res.Hits)
+	}
+}
+
+func TestTuiCatalogNodeReferences(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	g, err := catgraph.Load(filepath.Join(cacheOf(root), "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := tuiCatalog{g}
+	e, _ := c.Node("plugin:o/r#e")
+	if e.External != nil || e.Unresolved != "x/c" {
+		t.Errorf("x/c isn't a source: External %+v Unresolved %q", e.External, e.Unresolved)
+	}
+	m, _ := c.Node("marketplace:o/r:.")
+	var ext bool
+	for _, ch := range m.Children {
+		if ch.ID == "plugin:o/r#e" {
+			ext = ch.External
+		}
+	}
+	if !ext {
+		t.Error("the marketplace's child ref should be marked external")
+	}
+	x, _ := c.Node("repo:x/c")
+	if len(x.UsedBy) != 0 || x.UsedByRepos != 0 || len(x.Parents) != 0 {
+		t.Errorf("repo:x/c %+v", x)
+	}
+}
+
+func TestShowUsedByCountsAnythingInARepo(t *testing.T) {
+	root := checkout(t)
+	dir := filepath.Join(cacheOf(root), "catalog")
+	files := map[string]string{
+		"repos.jsonl": `{"id":"repo:a/m","type":"repo","name":"a/m","repo":"a/m"}` + "\n" + `{"id":"repo:b/s","type":"repo","name":"b/s","repo":"b/s"}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:a/m#cf","type":"plugin","name":"cf","repo":"a/m","source_repo":"b/s","entry":{"name":"cf","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:b/s:.","type":"plugin","name":"skills","repo":"b/s","path":"."}` + "\n",
+	}
+	for _, typ := range catalog.Types {
+		body := files[catalog.Files[typ]]
+		write(t, filepath.Join(dir, catalog.Files[typ]), body)
+	}
+	f := newFake(root)
+	if err := f.run("show", "repo:b/s"); err != nil {
+		t.Fatal(err)
+	}
+	if out := f.out.String(); !strings.Contains(out, "used by:") || !strings.Contains(out[strings.Index(out, "used by:"):], "plugin:a/m#cf") {
+		t.Errorf("a repo's used-by includes references to its plugins:\n%s", out)
+	}
+}
+
+func TestShowSourceHintOnlyWhenUnresolved(t *testing.T) {
+	root := checkout(t)
+	dir := filepath.Join(cacheOf(root), "catalog")
+	files := map[string]string{
+		"repos.jsonl": `{"id":"repo:a/m","type":"repo","name":"a/m","repo":"a/m","followed":true}` + "\n" +
+			`{"id":"repo:b/s","type":"repo","name":"b/s","repo":"b/s","followed":true}` + "\n" +
+			`{"id":"repo:c/x","type":"repo","name":"c/x","repo":"c/x","followed":false}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:a/m#cf","type":"plugin","name":"cf","repo":"a/m","source_repo":"b/s","entry":{"name":"cf","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:a/m#other","type":"plugin","name":"other","repo":"a/m","source_repo":"c/x","entry":{"name":"other","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:b/s:.","type":"plugin","name":"cf","repo":"b/s","path":"."}` + "\n",
+	}
+	for _, typ := range catalog.Types {
+		write(t, filepath.Join(dir, catalog.Files[typ]), files[catalog.Files[typ]])
+	}
+	f := newFake(root)
+	f.run("show", "plugin:a/m#cf")
+	if strings.Contains(f.out.String(), "ipm source add") {
+		t.Errorf("b/s is already a source:\n%s", f.out.String())
+	}
+	f.out.Reset()
+	f.run("show", "plugin:a/m#other")
+	if !strings.Contains(f.out.String(), "ipm source add plugin:a/m#other") {
+		t.Errorf("c/x isn't a source:\n%s", f.out.String())
 	}
 }

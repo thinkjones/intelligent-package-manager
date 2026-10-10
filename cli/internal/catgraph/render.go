@@ -56,6 +56,12 @@ func (g *Graph) tree(w io.Writer, id, prefix string, depth int, o Options, path 
 	if o.Depth > 0 && depth > o.Depth {
 		return
 	}
+	// An external entry leads to another repo; show where, without
+	// expanding it, so a tree stays inside its repo.
+	if target, ok := g.RefTarget(id); ok && !o.Up {
+		fmt.Fprintf(w, "%s└─ ↗ %s  (%s)\n", prefix, g.Label(target), target)
+		return
+	}
 	kids, more := g.shown(id, o)
 	for i, k := range kids {
 		last := i == len(kids)-1 && more == 0

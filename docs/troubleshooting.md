@@ -42,6 +42,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `the search server is not running — run ipm serve`, `no search server set up` | Run `ipm serve`. |
 | `Docker is not running`, `ipm serve runs Typesense in Docker` | Start or install Docker (or OrbStack). |
 | `the search index is empty — run ipm load` | Run `ipm load`. |
+| `the search index is from an older ipm — run ipm load` | The index was built before this version of `ipm`. Run `ipm load` to rebuild it. |
 | `the search server rejected the API key` | Another Typesense is using port 8108. Check `docker ps` and stop it. |
 | A result you expect is missing | Run `ipm load` after `ipm sync`; the index doesn't update itself. Try `--keyword` to see exact matches only. |
 

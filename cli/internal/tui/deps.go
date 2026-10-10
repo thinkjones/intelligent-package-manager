@@ -19,6 +19,10 @@ type Hit struct {
 	Plugins                           []string
 	// Score is the SCORE ipm search prints; "" in local mode.
 	Score string
+	// UsedBy is how many other repos reference this artifact's repo.
+	UsedBy int
+	// External marks a marketplace entry for a plugin in another repo.
+	External bool
 }
 
 // Results is a page of hits and how many matched in all.
@@ -39,14 +43,30 @@ type Searcher interface {
 	Recheck()
 }
 
-// Ref is an artifact related to another: a parent or a child.
-type Ref struct{ ID, Type, Name, Description string }
+// Ref is an artifact related to another: a parent, a child, or a reference.
+type Ref struct {
+	ID, Type, Name, Description string
+	// Repo is the repo the artifact lives in.
+	Repo string
+	// External marks a marketplace entry for a plugin in another repo.
+	External bool
+	// UsedBy is how many other repos reference this artifact directly.
+	UsedBy int
+}
 
 // Node is one artifact with its parents and children.
 type Node struct {
 	ID, Type, Name, Repo, Path, Description string
 	Stars                                   int
 	Parents, Children                       []Ref
+	// External is what an external entry references; Unresolved is its
+	// source repo when that repo isn't among the user's sources.
+	External   *Ref
+	Unresolved string
+	// UsedBy is the external entries in other repos that reference this
+	// node; UsedByRepos is how many other repos reference its repo.
+	UsedBy      []Ref
+	UsedByRepos int
 }
 
 // Catalog describes artifacts.

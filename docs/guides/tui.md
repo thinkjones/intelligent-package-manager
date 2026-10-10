@@ -49,7 +49,7 @@ skill dotnet-backend-patterns · agent csharp-pro · command accessibility-audit
 ```
 
 - **Header:** a breadcrumb of where the tree is (repo › marketplace › plugin › artifact), and `● hybrid` (the search server) or `○ local` (keyword search over the catalog).
-- **Results panel, top:** score, type, `✓` when the item is already in the active pack, name, repo and stars. Under 100 columns, repo and stars drop out.
+- **Results panel, top:** score, type, `✓` when the item is already in the active pack, name, repo, `↗N` (how many other repos use its repo) and stars. Under 100 columns, repo, `↗N` and stars drop out. A name starting `↗` is an external entry (see below).
 - **Tree panel, bottom:** the artifact in context — the path from its repo down to its parent, its siblings, and its children. Every node shows a one-line description, lined up in one column; the current node has an arrow to its description, which runs to three lines. When an artifact belongs to more than one plugin, `also in:` lists the others. Long lists scroll, with `↑ N more` / `↓ N more` rows.
 - **Tray:** the active pack, its item count, `• not built` once you've changed it since the last build, and its items.
 - **Colour:** each type has its own colour everywhere (repo blue, marketplace purple, plugin amber, skill teal, agent pink, command green, hook and MCP server grey); the panel with focus has an amber border. Set `NO_COLOR` to turn colour off.
@@ -72,6 +72,7 @@ Below 60×15 the TUI asks you to enlarge the terminal; in a short terminal the t
 | `p` | switch pack, or `n` for a new one |
 | `b` (or `i`) | build every pack (`ipm install`) |
 | `D` | deploy the active pack to Claude Code |
+| `e` | external references: the other repos that use this repo |
 | `ctrl+r` | check the search server again |
 | `?` | every key |
 | `q`, `ctrl+c` | quit |
@@ -87,6 +88,18 @@ In the search box every letter is part of the query, so the other keys work once
 | `enter` | on an `also in` row: follow that plugin instead |
 | `a` / `d` | add / remove the node — for example a whole plugin |
 | `tab`, `esc` | back to search mode; the tree returns to the selected result |
+
+## External references
+
+A marketplace can list a plugin that lives in another repo: `anthropics/claude-plugins-official` lists `cloudflare`, which lives in `cloudflare/skills`. ipm calls that an **external entry**, and keeps repos as the roots of their own trees:
+
+- **In the marketplace's tree**, the entry is drawn `↗cloudflare`, and its description starts with where it points: `↗ cloudflare/skills — Skills for the Cloudflare…`.
+- **`→` on it jumps** into `cloudflare/skills`' own tree, on the plugin it points at. A second root sits above the tree, `↩ anthropics/claude-plugins-official — back to cloudflare`: `↑` to it and `enter` takes you back. Jumps stack (up to 20); moving to another search result forgets them.
+- **In `cloudflare/skills`' own tree**, the root is `cloudflare/skills`. Who uses it is extra information, not ancestry: the current node says `↗ used by N` (other repos using its repo), and nodes that other repos point at directly say it too.
+- **`e`** lists every external reference to the current repo, grouped by the repo it comes from, with stars and marketplace. `enter` jumps there, with the back root to return.
+- An external entry whose repo isn't one of your sources says `↗ <repo> (not a source — ipm source add <id>)`; add it and `ipm sync` to follow it.
+
+Being used by other repos is a strong sign a repo is useful, so search also prefers it when results are otherwise equal.
 
 ## Build and deploy
 

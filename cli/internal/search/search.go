@@ -44,6 +44,9 @@ func Schema() map[string]any {
 		// Keep # and + inside words, so c#, f# and c++ are searchable
 		// rather than collapsing to c and f.
 		"symbols_to_index": []string{"#", "+"},
+		// Split names on these too, so "cloudflare" finds cloudflare/skills
+		// and "tdd" finds tdd-guard.
+		"token_separators": []string{"/", "-", "_"},
 		"fields": []map[string]any{
 			f("type", "string", "facet", true),
 			f("name", "string"),
@@ -52,6 +55,8 @@ func Schema() map[string]any {
 			f("repo", "string", "facet", true),
 			f("plugin_names", "string[]"),
 			f("stars", "int32", "sort", true),
+			f("used_by", "int32", "sort", true),
+			f("external", "bool"),
 			f("plugins", "string[]", "index", false, "optional", true),
 			f("source_repo", "string", "index", false, "optional", true),
 			f("path", "string", "index", false, "optional", true),
@@ -86,6 +91,7 @@ func Documents(catalogDir string) ([]map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
+	refs := catalog.BuildRefs(recs)
 	var docs []map[string]any
 	for _, typ := range catalog.Types {
 		for _, r := range recs[typ] {
@@ -101,6 +107,14 @@ func Documents(catalogDir string) ([]map[string]any, error) {
 				d["source_repo"] = src
 				starsFrom = src
 			}
+			// used_by: how many other repos reference this repo (for an
+			// external entry, the repo it points at).
+			d["external"] = refs.External[str(r, "id")]
+			usedFrom := str(r, "repo")
+			if d["external"] == true {
+				usedFrom = str(r, "source_repo")
+			}
+			d["used_by"] = len(refs.UsedBy[catalog.NormRepo(usedFrom)])
 			st, known := stats[pack.NormalizeRepo(starsFrom)]
 			if known {
 				d["stars"] = st.Stars
@@ -169,14 +183,14 @@ func (q Query) Params() url.Values {
 	p := url.Values{}
 	p.Set("q", q.Text)
 	if q.Keyword {
-		p.Set("query_by", "name,description,tags,plugin_names")
-		p.Set("query_by_weights", "4,2,2,1")
+		p.Set("query_by", "name,repo,plugin_names,description,tags")
+		p.Set("query_by_weights", "4,3,3,2,2")
 	} else {
-		p.Set("query_by", "name,description,tags,plugin_names,embedding")
-		p.Set("query_by_weights", "4,2,2,1,0")
+		p.Set("query_by", "name,repo,plugin_names,description,tags,embedding")
+		p.Set("query_by_weights", "4,3,3,2,2,0")
 	}
 	p.Set("exclude_fields", "embedding")
-	p.Set("sort_by", "_text_match:desc,stars:desc")
+	p.Set("sort_by", "_text_match:desc,used_by:desc,stars:desc")
 	p.Set("facet_by", "type")
 	p.Set("num_typos", "2")
 	limit := q.Limit
@@ -282,8 +296,8 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 		header = append(header, "KW", "SEM")
 		caps = append(caps, 2, 4)
 	}
-	header = append(header, "TYPE", "NAME", "REPO", "★", "PLUGINS", "DESCRIPTION")
-	caps = append(caps, 14, 32, 30, 6, 24)
+	header = append(header, "TYPE", "NAME", "REPO", "↗", "★", "PLUGINS", "DESCRIPTION")
+	caps = append(caps, 14, 32, 30, 4, 6, 24)
 	rows := [][]string{header}
 	ids := []string{""}
 	for _, h := range res.Hits {
@@ -307,14 +321,21 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 			}
 			row = append(row, kw, sem)
 		}
-		rows = append(rows, append(row, str(d, "type"), str(d, "name"), str(d, "repo"), Stars(stars), plugins, str(d, "description")))
+		name, used := str(d, "name"), ""
+		if ext, _ := d["external"].(bool); ext {
+			name = "↗ " + name
+		}
+		if n, ok := d["used_by"].(float64); ok && n > 0 {
+			used = "↗" + strconv.Itoa(int(n))
+		}
+		rows = append(rows, append(row, str(d, "type"), name, str(d, "repo"), used, Stars(stars), plugins, str(d, "description")))
 		ids = append(ids, str(d, "id"))
 	}
 	// Fit the terminal: columns keep their caps, the description takes what
 	// is left, and when even that doesn't fit, DESCRIPTION, PLUGINS and then
 	// REPO (also inside the ID) are dropped. Width 0 cuts nothing.
 	n := len(header)
-	desc, plugins, repo, name := n-1, n-2, n-4, n-5
+	desc, plugins, repo, name := n-1, n-2, n-5, n-6
 	widths := make([]int, n)
 	for _, r := range rows {
 		for i := range n - 1 {
@@ -354,7 +375,7 @@ func Table(w io.Writer, res typesense.Result, o TableOptions) {
 		}
 	}
 	indent := 0
-	for i := range n - 6 { // SCORE, and KW and SEM with --explain
+	for i := range n - 7 { // SCORE, and KW and SEM with --explain
 		indent += widths[i] + 2
 	}
 	// Each hit's ID goes on its own line under TYPE, never cut, so it can be

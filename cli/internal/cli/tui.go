@@ -151,6 +151,10 @@ func (s *tuiSearcher) Search(_ context.Context, q string, f tui.Filter) (tui.Res
 		if n, ok := d["stars"].(float64); ok {
 			hit.Stars = int(n)
 		}
+		if n, ok := d["used_by"].(float64); ok {
+			hit.UsedBy = int(n)
+		}
+		hit.External, _ = d["external"].(bool)
 		out.Hits = append(out.Hits, hit)
 	}
 	return out, nil
@@ -173,17 +177,26 @@ func (s *tuiSearcher) local(q string, f tui.Filter) (tui.Results, error) {
 	records := s.records
 	s.mu.Unlock()
 	stars := func(string) (int, bool) { return 0, false }
+	usedBy := func(string) int { return 0 }
 	if s.g != nil {
 		stars = s.g.Stars
+		usedBy = func(repo string) int { return len(s.g.UsedBy(repo)) }
 	}
-	return localSearch(records, stars, q, f), nil
+	return localSearch(records, stars, usedBy, q, f), nil
 }
 
-// localSearch ranks catalog records by the query's words: 4 for each word in
-// the name, 1 for each in the description and in the tags, ignoring case;
-// ties go to more stars, then to the ID. It returns the best 50.
-func localSearch(records []map[string]any, stars func(repo string) (int, bool), q string, f tui.Filter) tui.Results {
+// localSearch ranks catalog records by the query's words, ignoring case: 4
+// for each word in the name, 3 in the repo, 3 in an owning plugin's name, 2
+// in the description and 2 in the tags. Ties go to the repo more other repos
+// use, then to more stars, then to the ID. It returns the best 50.
+func localSearch(records []map[string]any, stars func(repo string) (int, bool), usedBy func(repo string) int, q string, f tui.Filter) tui.Results {
 	terms := strings.Fields(strings.ToLower(q))
+	pluginNames := map[string]string{}
+	for _, r := range records {
+		if t := str(r, "type"); t == catalog.TypePlugin || t == catalog.TypeCopilotPlugin {
+			pluginNames[str(r, "id")] = strings.ToLower(str(r, "name"))
+		}
+	}
 	type scored struct {
 		hit   tui.Hit
 		score int
@@ -194,17 +207,22 @@ func localSearch(records []map[string]any, stars func(repo string) (int, bool), 
 			continue
 		}
 		name, desc := strings.ToLower(str(r, "name")), strings.ToLower(str(r, "description"))
+		repo := strings.ToLower(str(r, "repo"))
 		tags := strings.ToLower(strings.Join(strList(r["tags"]), " "))
+		var owners []string
+		for _, p := range strList(r["plugins"]) {
+			owners = append(owners, pluginNames[p])
+		}
+		plugins := strings.Join(owners, " ")
 		score := 0
 		for _, t := range terms {
-			if strings.Contains(name, t) {
-				score += 4
-			}
-			if strings.Contains(desc, t) {
-				score++
-			}
-			if strings.Contains(tags, t) {
-				score++
+			for _, field := range []struct {
+				text   string
+				weight int
+			}{{name, 4}, {repo, 3}, {plugins, 3}, {desc, 2}, {tags, 2}} {
+				if strings.Contains(field.text, t) {
+					score += field.weight
+				}
 			}
 		}
 		if score == 0 {
@@ -212,12 +230,16 @@ func localSearch(records []map[string]any, stars func(repo string) (int, bool), 
 		}
 		hit := tui.Hit{ID: str(r, "id"), Type: str(r, "type"), Name: str(r, "name"), Repo: str(r, "repo"), Description: str(r, "description")}
 		hit.Stars, _ = stars(hit.Repo)
+		hit.UsedBy = usedBy(hit.Repo)
 		all = append(all, scored{hit, score})
 	}
 	sort.Slice(all, func(i, j int) bool {
 		a, b := all[i], all[j]
 		if a.score != b.score {
 			return a.score > b.score
+		}
+		if a.hit.UsedBy != b.hit.UsedBy {
+			return a.hit.UsedBy > b.hit.UsedBy
 		}
 		if a.hit.Stars != b.hit.Stars {
 			return a.hit.Stars > b.hit.Stars
@@ -242,15 +264,34 @@ func (c tuiCatalog) Node(id string) (tui.Node, error) {
 	out := tui.Node{ID: id, Type: str(n, "type"), Name: str(n, "name"), Repo: str(n, "repo"), Path: str(n, "path"),
 		Description: str(n, "description")}
 	out.Stars, _ = c.g.Stars(out.Repo)
-	out.Parents, out.Children = c.refs(id, true), c.refs(id, false)
+	out.Parents, out.Children = c.refs(c.g.Children(id, true)), c.refs(c.g.Children(id, false))
+	if target, ok := c.g.RefTarget(id); ok {
+		r := c.refs([]string{target})[0]
+		out.External = &r
+	} else if c.g.External(id) {
+		out.Unresolved = str(n, "source_repo")
+	}
+	out.UsedBy = c.refs(c.g.RefsTo(id))
+	if out.Type == catalog.TypeRepo {
+		out.UsedBy = c.refs(c.g.RefsInto(out.Repo))
+	}
+	out.UsedByRepos = len(c.g.UsedBy(out.Repo))
 	return out, nil
 }
 
-func (c tuiCatalog) refs(id string, up bool) []tui.Ref {
+// refs describes ids as tree rows: name, description, repo, whether each is
+// an external entry, and how many repos reference it directly.
+func (c tuiCatalog) refs(ids []string) []tui.Ref {
 	var out []tui.Ref
-	for _, nid := range c.g.Children(id, up) {
+	for _, nid := range ids {
 		n, _ := c.g.Node(nid)
-		out = append(out, tui.Ref{ID: nid, Type: str(n, "type"), Name: str(n, "name"), Description: str(n, "description")})
+		repos := map[string]bool{}
+		for _, e := range c.g.RefsTo(nid) {
+			en, _ := c.g.Node(e)
+			repos[str(en, "repo")] = true
+		}
+		out = append(out, tui.Ref{ID: nid, Type: str(n, "type"), Name: str(n, "name"), Description: str(n, "description"),
+			Repo: str(n, "repo"), External: c.g.External(nid), UsedBy: len(repos)})
 	}
 	return out
 }

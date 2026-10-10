@@ -73,6 +73,8 @@ func tsClient(sys System) (*typesense.Client, error) {
 // tsError turns a client error into what the user should do next.
 func tsError(err error) error {
 	switch {
+	case errors.Is(err, typesense.ErrMissingField):
+		return errors.New("the search index is from an older ipm — run ipm load")
 	case errors.Is(err, typesense.ErrUnreachable):
 		return fmt.Errorf("the search server is not running — run `ipm serve`")
 	case errors.Is(err, typesense.ErrUnauthorized):

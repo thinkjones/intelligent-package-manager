@@ -46,10 +46,11 @@ type Model struct {
 	height   int
 	debounce time.Duration
 
-	cursor  string            // the tree's centre node
-	chosen  map[string]string // the parent picked for a node in tree mode
-	tree    treeView
-	treeSel int // the selected row among tree.selectable() in tree mode
+	cursor    string            // the tree's centre node
+	chosen    map[string]string // the parent picked for a node in tree mode
+	tree      treeView
+	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
+	backStack []string // external entries jumped from, newest last
 
 	packs    []Pack
 	active   string // the active pack's name
@@ -60,6 +61,7 @@ type Model struct {
 
 	inst   *install     // the install or deploy output modal, while open
 	deploy *deployModal // the deploy modal before it runs
+	ext    *extModal    // the e modal: external references
 	help   bool         // the ? overlay
 	plain  bool         // NO_COLOR: draw without colour
 }
@@ -169,6 +171,10 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	if m.deploy != nil {
 		return m.deployKey(msg)
 	}
+	if m.ext != nil {
+		m.extKey(k)
+		return nil
+	}
 	if m.picker != nil {
 		m.pickerKey(msg)
 		return nil
@@ -188,6 +194,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return m.startInstall()
 		case "D":
 			m.openDeploy()
+			return nil
+		case "e":
+			m.openExternal()
 			return nil
 		case "t":
 			m.setFocus(focusTray)
@@ -260,8 +269,16 @@ func (m *Model) treeKey(k string) {
 	case "left", "h":
 		m.treeUp()
 	case "right", "l":
+		if m.treeSel == backRow {
+			m.back()
+			return
+		}
 		m.treeDown()
 	case "enter":
+		if m.treeSel == backRow {
+			m.back()
+			return
+		}
 		if i := m.treeSel - m.tree.Cursor - 1; i >= 0 && i < len(m.tree.AlsoIn) {
 			m.chosen[m.cursor] = m.tree.AlsoIn[i].ID
 			m.setCursor(m.cursor)
@@ -279,8 +296,17 @@ func (m *Model) treeUp() {
 	}
 }
 
-// treeDown moves the tree's cursor to its first child.
+// treeDown moves the tree's cursor to its first child, or, on an external
+// entry, into the repo it points at.
 func (m *Model) treeDown() {
+	switch {
+	case m.tree.Node.External != nil:
+		m.jump()
+		return
+	case m.tree.Node.Unresolved != "":
+		m.status = m.tree.Node.Unresolved + " isn't one of your sources — ipm source add " + m.cursor
+		return
+	}
 	if len(m.tree.Children) > 0 {
 		child := m.tree.Children[0].ID
 		m.chosen[child] = m.cursor
@@ -289,8 +315,19 @@ func (m *Model) treeDown() {
 }
 
 // treeMove steps through the siblings and the 'also in' rows; a sibling
-// becomes the cursor, under the same parent.
+// becomes the cursor, under the same parent. Above the first sibling is the
+// back root, when there is one.
 func (m *Model) treeMove(by int) {
+	switch {
+	case m.treeSel == backRow && by > 0:
+		m.treeSel = m.tree.Cursor
+		return
+	case m.treeSel == backRow:
+		return
+	case m.treeSel == 0 && by < 0 && m.tree.Back != nil:
+		m.treeSel = backRow
+		return
+	}
 	rows := m.tree.selectable()
 	sel := max(0, min(len(rows)-1, m.treeSel+by))
 	also := sel > m.tree.Cursor && sel <= m.tree.Cursor+len(m.tree.AlsoIn)
@@ -397,6 +434,8 @@ func (m *Model) render() string {
 		mid = panel(stTitle.Render(m.inst.title), m.installLines(w-4, body-2), w, true)
 	case m.deploy != nil:
 		mid = panel(stTitle.Render("deploy"), m.deployLines(w-4, body-2), w, true)
+	case m.ext != nil:
+		mid = panel(stTitle.Render("external references"), m.extLines(w-4, body-2), w, true)
 	case m.help:
 		mid = panel(stTitle.Render("keys"), m.helpLines(w-4, body-2), w, true)
 	case m.picker != nil:
@@ -441,6 +480,8 @@ func (m *Model) hints() string {
 		return "y deploy  esc cancel"
 	case m.deploy != nil:
 		return "enter next  esc cancel"
+	case m.ext != nil:
+		return "↑↓ move  enter jump  esc close"
 	case m.help:
 		return "esc or ? close"
 	case m.picker != nil:
@@ -465,8 +506,9 @@ func (m *Model) countLine() string {
 	return fmt.Sprintf("%d of %d", len(m.res.Hits), m.res.Found)
 }
 
-// followSelection centres the tree on the selected result.
+// followSelection centres the tree on the selected result, forgetting jumps.
 func (m *Model) followSelection() {
+	m.backStack = nil
 	if m.sel < len(m.res.Hits) {
 		m.setCursor(m.res.Hits[m.sel].ID)
 		return
@@ -480,7 +522,38 @@ func (m *Model) setCursor(id string) {
 	if err != nil {
 		m.status = err.Error()
 	}
+	if n := len(m.backStack); n > 0 {
+		if e, err := m.d.Catalog.Node(m.backStack[n-1]); err == nil {
+			back := refOf(e)
+			tv.Back = &back
+		}
+	}
 	m.cursor, m.tree, m.treeSel = id, tv, tv.Cursor
+}
+
+// maxBack is how many jumps the back stack remembers.
+const maxBack = 20
+
+// jump moves from an external entry to what it references, in its own repo,
+// remembering the entry so back can return.
+func (m *Model) jump() {
+	target := m.tree.Node.External.ID
+	m.backStack = append(m.backStack, m.cursor)
+	if len(m.backStack) > maxBack {
+		m.backStack = m.backStack[len(m.backStack)-maxBack:]
+	}
+	m.setCursor(target)
+}
+
+// back returns to the external entry the last jump left.
+func (m *Model) back() {
+	n := len(m.backStack)
+	if n == 0 {
+		return
+	}
+	entry := m.backStack[n-1]
+	m.backStack = m.backStack[:n-1]
+	m.setCursor(entry)
 }
 
 // breadcrumb is the cursor's path, "repo › … › node", cut from the left to w.

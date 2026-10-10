@@ -24,6 +24,9 @@ var (
 	ErrUnauthorized = errors.New("typesense rejected the API key")
 	// ErrTimeout is a server that took too long to answer — busy, not gone.
 	ErrTimeout = errors.New("typesense did not answer in time")
+	// ErrMissingField is a search naming a field the collection doesn't have
+	// (an index built by an older ipm).
+	ErrMissingField = errors.New("typesense collection lacks a field")
 	// ErrNoCollection is a request for a collection that does not exist.
 	ErrNoCollection = errors.New("typesense has no such collection")
 )
@@ -69,6 +72,8 @@ func (c *Client) do(method, path string, query url.Values, body io.Reader, timeo
 	switch {
 	case resp.StatusCode == 401 || resp.StatusCode == 403:
 		return nil, ErrUnauthorized
+	case resp.StatusCode == 404 && strings.Contains(string(data), "Could not find a field named"):
+		return nil, fmt.Errorf("%w: %s", ErrMissingField, strings.TrimSpace(string(data)))
 	case resp.StatusCode == 404 && strings.HasPrefix(path, "/collections/"):
 		return nil, ErrNoCollection
 	case resp.StatusCode >= 300:

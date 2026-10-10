@@ -929,3 +929,231 @@ func TestDeployShowsCleanedTarget(t *testing.T) {
 		t.Errorf("deployed %v:\n%s", f.d.deployed, view(m))
 	}
 }
+
+// withExternal gives the fake catalog repo a/m whose marketplace lists a local
+// plugin and an external entry for b/s's plugin cf, and b/s itself.
+func withExternal(f fakes) {
+	ref := func(id, typ, name, repo string) Ref { return Ref{ID: id, Type: typ, Name: name, Repo: repo} }
+	d := f.c.details
+	d["repo:a/m"] = Node{ID: "repo:a/m", Type: "repo", Name: "a/m", Repo: "a/m", Children: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	entry := ref("plugin:a/m#cf", "plugin", "cf", "a/m")
+	entry.External = true
+	d["marketplace:a/m:."] = Node{ID: "marketplace:a/m:.", Type: "marketplace", Name: "m", Repo: "a/m",
+		Parents: []Ref{ref("repo:a/m", "repo", "a/m", "a/m")}, Children: []Ref{entry, ref("plugin:a/m:local", "plugin", "local", "a/m")}}
+	target := ref("plugin:b/s:cf", "plugin", "cf", "b/s")
+	d["plugin:a/m#cf"] = Node{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: &target,
+		Parents: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	d["plugin:a/m:local"] = Node{ID: "plugin:a/m:local", Type: "plugin", Name: "local", Repo: "a/m", Parents: []Ref{ref("marketplace:a/m:.", "marketplace", "m", "a/m")}}
+	d["repo:b/s"] = Node{ID: "repo:b/s", Type: "repo", Name: "b/s", Repo: "b/s", Children: []Ref{ref("marketplace:b/s:.", "marketplace", "m", "b/s")}}
+	d["marketplace:b/s:."] = Node{ID: "marketplace:b/s:.", Type: "marketplace", Name: "m", Repo: "b/s",
+		Parents: []Ref{ref("repo:b/s", "repo", "b/s", "b/s")}, Children: []Ref{target}}
+	d["plugin:b/s:cf"] = Node{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s", Parents: []Ref{ref("marketplace:b/s:.", "marketplace", "m", "b/s")}}
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: true}}, Found: 1}
+}
+
+func externalTest(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	m, f := newTestWith(t, withExternal)
+	typeText(t, m, "cf")
+	press(t, m, "down")
+	return m, f
+}
+
+func TestJumpIntoExternal(t *testing.T) {
+	m, _ := externalTest(t)
+	press(t, m, "tab", "right")
+	if m.cursor != "plugin:b/s:cf" || len(m.tree.Path) == 0 || m.tree.Path[0].ID != "repo:b/s" {
+		t.Fatalf("cursor %q path %v", m.cursor, m.tree.Path)
+	}
+	if len(m.backStack) != 1 || m.backStack[0] != "plugin:a/m#cf" {
+		t.Errorf("back stack %v", m.backStack)
+	}
+	tree := panels(view(m))[1]
+	if !strings.Contains(ansiStrip(tree[1]), "↩ a/m — back to cf") {
+		t.Errorf("the first tree row should be the back root:\n%s", strings.Join(tree, "\n"))
+	}
+}
+
+func TestBackRootReturns(t *testing.T) {
+	m, _ := externalTest(t)
+	press(t, m, "tab", "right", "up")
+	if m.treeSel != backRow {
+		t.Fatalf("up from the first sibling selects the back root, treeSel %d", m.treeSel)
+	}
+	press(t, m, "enter")
+	if m.cursor != "plugin:a/m#cf" || len(m.backStack) != 0 || strings.Contains(view(m), "↩") {
+		t.Errorf("cursor %q stack %v", m.cursor, m.backStack)
+	}
+}
+
+func TestJumpUnresolved(t *testing.T) {
+	m, f := newTestWith(t, withExternal)
+	e := f.c.details["plugin:a/m#cf"]
+	e.External, e.Unresolved = nil, "c/missing"
+	f.c.details["plugin:a/m#cf"] = e
+	typeText(t, m, "cf")
+	press(t, m, "down", "right")
+	if m.cursor != "plugin:a/m#cf" || !strings.Contains(m.status, "ipm source add plugin:a/m#cf") {
+		t.Errorf("cursor %q status %q", m.cursor, m.status)
+	}
+}
+
+func TestJumpCycleBackStack(t *testing.T) {
+	m, f := newTest(t)
+	d := f.c.details
+	toB := Ref{ID: "plugin:b:x", Type: "plugin", Name: "x", Repo: "b"}
+	toA := Ref{ID: "plugin:a:y", Type: "plugin", Name: "y", Repo: "a"}
+	d["plugin:a#tob"] = Node{ID: "plugin:a#tob", Type: "plugin", Name: "tob", Repo: "a", External: &toB}
+	d["plugin:b#toa"] = Node{ID: "plugin:b#toa", Type: "plugin", Name: "toa", Repo: "b", External: &toA}
+	m.setCursor("plugin:a#tob")
+	m.treeDown()
+	m.setCursor("plugin:b#toa")
+	m.treeDown()
+	if m.cursor != "plugin:a:y" || len(m.backStack) != 2 {
+		t.Fatalf("cursor %q stack %v", m.cursor, m.backStack)
+	}
+	m.back()
+	m.back()
+	if m.cursor != "plugin:a#tob" || len(m.backStack) != 0 {
+		t.Errorf("two backs: cursor %q stack %v", m.cursor, m.backStack)
+	}
+	for range 21 {
+		m.setCursor("plugin:a#tob")
+		m.treeDown()
+	}
+	if len(m.backStack) != 20 {
+		t.Errorf("the back stack holds 20, has %d", len(m.backStack))
+	}
+}
+
+func TestMovingResultClearsBackStack(t *testing.T) {
+	m, _ := newTestWith(t, func(f fakes) {
+		withExternal(f)
+		r := f.s.results["cf"]
+		r.Hits, r.Found = append(r.Hits, Hit{ID: "plugin:a/m:local", Type: "plugin", Name: "local", Repo: "a/m"}), 2
+		f.s.results["cf"] = r
+	})
+	typeText(t, m, "cf")
+	press(t, m, "down", "right")
+	if len(m.backStack) != 1 {
+		t.Fatalf("search-mode → on an external entry jumps too: %v", m.backStack)
+	}
+	press(t, m, "down")
+	if len(m.backStack) != 0 {
+		t.Errorf("moving the result clears the back stack: %v", m.backStack)
+	}
+}
+
+func ansiStrip(s string) string { return ansi.Strip(s) }
+
+// withRefs gives b/s's repo node references from a/m (twice) and c/n.
+func withRefs(f fakes) {
+	withExternal(f)
+	d := f.c.details
+	b := d["repo:b/s"]
+	b.UsedByRepos = 2
+	b.UsedBy = []Ref{
+		{ID: "plugin:a/m#cf", Type: "plugin", Name: "cf", Repo: "a/m", External: true},
+		{ID: "plugin:c/n#cloud", Type: "plugin", Name: "cloud", Repo: "c/n", External: true},
+		{ID: "plugin:a/m#cf2", Type: "plugin", Name: "cf2", Repo: "a/m", External: true},
+	}
+	d["repo:b/s"] = b
+	a := d["repo:a/m"]
+	a.Stars = 37600
+	d["repo:a/m"] = a
+	d["repo:c/n"] = Node{ID: "repo:c/n", Type: "repo", Name: "c/n", Repo: "c/n", Stars: 120}
+	d["plugin:c/n#cloud"] = Node{ID: "plugin:c/n#cloud", Type: "plugin", Name: "cloud", Repo: "c/n",
+		Parents: []Ref{{ID: "marketplace:c/n:.", Type: "marketplace", Name: "plugins", Repo: "c/n"}}}
+	d["plugin:a/m#cf2"] = Node{ID: "plugin:a/m#cf2", Type: "plugin", Name: "cf2", Repo: "a/m",
+		Parents: []Ref{{ID: "marketplace:a/m:.", Type: "marketplace", Name: "m", Repo: "a/m"}}}
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+}
+
+func TestExternalModal(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	v := view(m)
+	for _, want := range []string{"External references to b/s — used by 2 repos", "a/m", "★37.6k", "cf", "c/n", "cloud", "enter jump · esc close"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("modal lacks %q:\n%s", want, v)
+		}
+	}
+}
+
+func TestExternalModalGroups(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	var order []string
+	for _, r := range m.ext.rows {
+		order = append(order, r.ref.Repo+" "+r.ref.Name)
+	}
+	if strings.Join(order, ";") != "a/m cf;a/m cf2;c/n cloud" {
+		t.Errorf("rows grouped by repo: %v", order)
+	}
+}
+
+func TestExternalModalJump(t *testing.T) {
+	m, _ := newTestWith(t, withRefs)
+	typeText(t, m, "cf")
+	press(t, m, "down", "e", "down", "enter")
+	if m.ext != nil || m.cursor != "plugin:a/m#cf2" || len(m.backStack) != 1 || m.backStack[0] != "plugin:b/s:cf" {
+		t.Errorf("modal %v cursor %q stack %v", m.ext, m.cursor, m.backStack)
+	}
+}
+
+func TestExternalModalEmpty(t *testing.T) {
+	m, _ := newTestWith(t, withExternal)
+	f := m.d.Searcher.(*fakeSearcher)
+	f.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	if !strings.Contains(view(m), "no other repo references b/s") {
+		t.Errorf("empty modal:\n%s", view(m))
+	}
+	press(t, m, "esc")
+	if m.ext != nil {
+		t.Error("esc should close")
+	}
+}
+
+func TestExternalModalSingular(t *testing.T) {
+	m, f := newTestWith(t, withRefs)
+	b := f.c.details["repo:b/s"]
+	b.UsedBy = b.UsedBy[:1]
+	f.c.details["repo:b/s"] = b
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	if !strings.Contains(view(m), "used by 1 repo\n") && !strings.Contains(view(m), "used by 1 repo ") {
+		t.Errorf("one repo, singular:\n%s", view(m))
+	}
+}
+
+func TestExternalModalEmptyKeys(t *testing.T) {
+	m, f := newTestWith(t, withExternal)
+	f.s.results["cf"] = Results{Hits: []Hit{{ID: "plugin:b/s:cf", Type: "plugin", Name: "cf", Repo: "b/s"}}, Found: 1}
+	typeText(t, m, "cf")
+	press(t, m, "down", "e", "down", "enter")
+	if m.cursor != "plugin:b/s:cf" {
+		t.Errorf("enter in an empty modal does nothing: cursor %q", m.cursor)
+	}
+}
+
+func TestExternalModalScrolls(t *testing.T) {
+	m, f := newTestWith(t, withRefs)
+	b := f.c.details["repo:b/s"]
+	b.UsedBy = nil
+	for i := range 30 {
+		b.UsedBy = append(b.UsedBy, Ref{ID: fmt.Sprintf("plugin:r%02d/m#x", i), Type: "plugin", Name: fmt.Sprintf("entry-%02d", i), Repo: fmt.Sprintf("r%02d/m", i), External: true})
+	}
+	f.c.details["repo:b/s"] = b
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	for range 25 {
+		press(t, m, "down")
+	}
+	if v := view(m); !strings.Contains(v, "▶ r25/m") || !strings.Contains(v, "enter jump · esc close") {
+		t.Errorf("the selected reference and the hint must stay visible:\n%s", v)
+	}
+}

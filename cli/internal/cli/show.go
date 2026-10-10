@@ -99,7 +99,18 @@ func runShow(sys System, id string, asJSON bool) error {
 	tw.Flush()
 	neighbours(sys.Stdout, g, "up:", g.Children(id, true))
 	neighbours(sys.Stdout, g, "down:", g.Children(id, false))
-	if s("type") == catalog.TypePlugin && s("source_repo") != "" {
+	refs := g.RefsTo(id)
+	if s("type") == catalog.TypeRepo {
+		refs = g.RefsInto(s("repo"))
+	}
+	if len(refs) > 0 {
+		fmt.Fprintln(sys.Stdout, "\nused by:")
+		for _, r := range refs {
+			n, _ := g.Node(r)
+			fmt.Fprintf(sys.Stdout, "  %s  in %s  (%s)\n", g.Label(r), n["repo"], r)
+		}
+	}
+	if _, resolved := g.RefTarget(id); g.External(id) && !resolved {
 		fmt.Fprintf(sys.Stdout, "\nadd its source: ipm source add %s\n", id)
 	}
 	return nil
