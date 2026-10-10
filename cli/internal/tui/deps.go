@@ -19,6 +19,10 @@ type Hit struct {
 	Plugins                           []string
 	// Score is the SCORE ipm search prints; "" in local mode.
 	Score string
+	// UsedBy is how many other repos reference this artifact's repo.
+	UsedBy int
+	// External marks a marketplace entry for a plugin in another repo.
+	External bool
 }
 
 // Results is a page of hits and how many matched in all.

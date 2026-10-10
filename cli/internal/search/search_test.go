@@ -100,15 +100,15 @@ func TestDocuments(t *testing.T) {
 func TestParamsHybridAndKeyword(t *testing.T) {
 	p := Query{Text: "c# testing"}.Params()
 	for k, want := range map[string]string{
-		"q": "c# testing", "query_by": "name,description,tags,plugin_names,embedding", "query_by_weights": "4,2,2,1,0",
-		"exclude_fields": "embedding", "sort_by": "_text_match:desc,stars:desc", "facet_by": "type", "num_typos": "2", "per_page": "20",
+		"q": "c# testing", "query_by": "name,repo,plugin_names,description,tags,embedding", "query_by_weights": "4,3,3,2,2,0",
+		"exclude_fields": "embedding", "sort_by": "_text_match:desc,used_by:desc,stars:desc", "facet_by": "type", "num_typos": "2", "per_page": "20",
 	} {
 		if p.Get(k) != want {
 			t.Errorf("%s = %q, want %q", k, p.Get(k), want)
 		}
 	}
 	k := Query{Text: "x", Keyword: true}.Params()
-	if k.Get("query_by") != "name,description,tags,plugin_names" || k.Get("query_by_weights") != "4,2,2,1" {
+	if k.Get("query_by") != "name,repo,plugin_names,description,tags" || k.Get("query_by_weights") != "4,3,3,2,2" {
 		t.Errorf("keyword %v", k)
 	}
 	if p.Has("filter_by") {
@@ -315,5 +315,52 @@ func TestTableWiderShowsMoreAndZeroCutsNothing(t *testing.T) {
 func TestScoreExported(t *testing.T) {
 	if got := Score(hit("x", 0, 0.42, -1), 0); got != "42" {
 		t.Errorf("Score = %q", got)
+	}
+}
+
+func TestSchemaReferences(t *testing.T) {
+	s := Schema()
+	fields := map[string]map[string]any{}
+	for _, f := range s["fields"].([]map[string]any) {
+		fields[f["name"].(string)] = f
+	}
+	if fields["used_by"]["type"] != "int32" || fields["used_by"]["sort"] != true || fields["external"]["type"] != "bool" {
+		t.Errorf("used_by %v external %v", fields["used_by"], fields["external"])
+	}
+	if !reflect.DeepEqual(s["token_separators"], []string{"/", "-", "_"}) {
+		t.Errorf("token_separators %v", s["token_separators"])
+	}
+}
+
+func TestDocumentsUsedBy(t *testing.T) {
+	docs, err := Documents(fixture(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, d := range docs {
+		id := d["id"].(string)
+		want, ext := 0, false
+		switch id {
+		case "repo:x/c":
+			want = 1
+		case "plugin:o/r#c":
+			want, ext = 1, true
+		}
+		if d["used_by"] != want || d["external"] != ext {
+			t.Errorf("%s: used_by %v external %v, want %d %v", id, d["used_by"], d["external"], want, ext)
+		}
+	}
+}
+
+func TestTableUsedByColumn(t *testing.T) {
+	res := typesense.Result{Found: 2, Hits: []typesense.Hit{
+		{Document: map[string]any{"id": "skill:b/s:x", "type": "skill", "name": "agents-sdk", "repo": "b/s", "stars": float64(40), "used_by": float64(3)}},
+		{Document: map[string]any{"id": "plugin:a/m#cf", "type": "plugin", "name": "cloudflare", "repo": "a/m", "stars": float64(9), "external": true}},
+	}}
+	var b bytes.Buffer
+	Table(&b, res, TableOptions{Width: 160})
+	out := b.String()
+	if !strings.Contains(out, "↗3") || !strings.Contains(out, "↗ cloudflare") {
+		t.Errorf("table:\n%s", out)
 	}
 }

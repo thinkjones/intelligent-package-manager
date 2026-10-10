@@ -31,20 +31,20 @@ func BuildRefs(records map[string][]map[string]any) Refs {
 	refs := Refs{External: map[string]bool{}, Target: map[string]string{}, By: map[string][]string{}, UsedBy: map[string][]string{}}
 	repos := map[string]string{} // normalized repo → repo record ID
 	for _, r := range records[TypeRepo] {
-		repos[normRepo(str(r, "repo"))] = str(r, "id")
+		repos[NormRepo(str(r, "repo"))] = str(r, "id")
 	}
 	plugins := map[string][]map[string]any{} // normalized repo → its plugins
 	for _, typ := range []string{TypePlugin, TypeCopilotPlugin} {
 		for _, p := range records[typ] {
 			if str(p, "source_repo") == "" {
-				repo := normRepo(str(p, "repo"))
+				repo := NormRepo(str(p, "repo"))
 				plugins[repo] = append(plugins[repo], p)
 			}
 		}
 	}
 	usedBy := map[string]map[string]bool{}
 	for _, e := range records[TypePlugin] {
-		src, own := normRepo(str(e, "source_repo")), normRepo(str(e, "repo"))
+		src, own := NormRepo(str(e, "source_repo")), NormRepo(str(e, "repo"))
 		if src == "" || src == own {
 			continue
 		}
@@ -73,8 +73,8 @@ func BuildRefs(records map[string][]map[string]any) Refs {
 	return refs
 }
 
-// normRepo is a repo as owner/name, lowercased: GitHub names ignore case.
-func normRepo(s string) string { return strings.ToLower(pack.NormalizeRepo(s)) }
+// NormRepo is a repo as owner/name, lowercased: GitHub names ignore case.
+func NormRepo(s string) string { return strings.ToLower(pack.NormalizeRepo(s)) }
 
 // resolve picks an external entry's target among its source repo's plugins.
 func resolve(entry map[string]any, plugins []map[string]any, repoID string) string {

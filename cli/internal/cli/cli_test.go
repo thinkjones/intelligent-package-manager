@@ -1575,7 +1575,7 @@ func TestLocalSearchRanking(t *testing.T) {
 	stars := func(id string) func(string) (int, bool) {
 		return func(string) (int, bool) { return 0, false }
 	}
-	res := localSearch(records, stars(""), "tdd", tui.Filter{})
+	res := localSearch(records, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{})
 	var names []string
 	for _, h := range res.Hits {
 		names = append(names, h.Name)
@@ -1591,17 +1591,17 @@ func TestLocalSearchRanking(t *testing.T) {
 		}
 		return 1, true
 	}
-	if res := localSearch(records, byStars, "tdd", tui.Filter{}); res.Hits[0].Name != "tdd-guard" {
+	if res := localSearch(records, byStars, func(string) int { return 0 }, "tdd", tui.Filter{}); res.Hits[0].Name != "tdd-guard" {
 		t.Errorf("equal scores should rank by stars: %v", res.Hits[0].Name)
 	}
-	if res := localSearch(records, stars(""), "tdd", tui.Filter{Type: "agent"}); len(res.Hits) != 0 {
+	if res := localSearch(records, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{Type: "agent"}); len(res.Hits) != 0 {
 		t.Errorf("type filter: %v", res.Hits)
 	}
 	var many []map[string]any
 	for i := range 60 {
 		many = append(many, rec(fmt.Sprintf("skill:o/r:s%02d", i), fmt.Sprintf("tdd %d", i), ""))
 	}
-	if res := localSearch(many, stars(""), "tdd", tui.Filter{}); len(res.Hits) != 50 || res.Found != 60 {
+	if res := localSearch(many, stars(""), func(string) int { return 0 }, "tdd", tui.Filter{}); len(res.Hits) != 50 || res.Found != 60 {
 		t.Errorf("cap: %d hits, found %d", len(res.Hits), res.Found)
 	}
 }
@@ -2002,5 +2002,43 @@ func TestShowUsedBy(t *testing.T) {
 	i := strings.Index(out, "used by:")
 	if i < 0 || !strings.Contains(out[i:], "plugin:o/r#e") {
 		t.Errorf("show:\n%s", out)
+	}
+}
+
+func TestSearchOldIndex(t *testing.T) {
+	root := checkout(t)
+	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		fmt.Fprint(w, "{\"message\":\"Could not find a field named `used_by` in the schema for sorting.\"}")
+	}))
+	t.Cleanup(srv.Close)
+	f := newFake(root)
+	typesenseAt(f, srv)
+	if err := f.run("search", "x"); err == nil || err.Error() != "the search index is from an older ipm — run ipm load" {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestLocalSearchNameBoost(t *testing.T) {
+	other := rec("skill:x/y:other", "other", "cloudflare tips")
+	other["repo"] = "x/y"
+	sdk := rec("skill:cloudflare/skills:sdk", "agents-sdk", "Build agents")
+	sdk["repo"] = "cloudflare/skills"
+	none := func(string) (int, bool) { return 0, false }
+	res := localSearch([]map[string]any{other, sdk}, none, func(string) int { return 0 }, "cloudflare", tui.Filter{})
+	if len(res.Hits) != 2 || res.Hits[0].Name != "agents-sdk" {
+		t.Errorf("a repo-name match outranks a description match: %v", res.Hits)
+	}
+	a, b := rec("skill:p/q:a", "tdd", ""), rec("skill:r/s:b", "tdd", "")
+	a["repo"], b["repo"] = "p/q", "r/s"
+	usedBy := func(repo string) int {
+		if repo == "r/s" {
+			return 5
+		}
+		return 0
+	}
+	if res := localSearch([]map[string]any{a, b}, none, usedBy, "tdd", tui.Filter{}); res.Hits[0].Repo != "r/s" || res.Hits[0].UsedBy != 5 {
+		t.Errorf("equal scores go to the more-used repo: %+v", res.Hits)
 	}
 }
