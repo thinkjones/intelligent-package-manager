@@ -115,20 +115,20 @@ func (f *fakeSearcher) Notice() string { return f.notice }
 func (f *fakeSearcher) Recheck()       { f.checks++ }
 
 type fakeCatalog struct {
-	details map[string]Detail
+	details map[string]Node
 	asked   []string
 	err     error
 }
 
-func (f *fakeCatalog) Detail(id string) (Detail, error) {
+func (f *fakeCatalog) Node(id string) (Node, error) {
 	f.asked = append(f.asked, id)
 	if f.err != nil {
-		return Detail{}, f.err
+		return Node{}, f.err
 	}
 	if d, ok := f.details[id]; ok {
 		return d, nil
 	}
-	return Detail{ID: id, Name: id}, nil
+	return Node{ID: id, Name: id}, nil
 }
 
 type fakePacks struct {
@@ -227,7 +227,7 @@ func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
 		s: &fakeSearcher{mode: "hybrid", results: map[string]Results{
 			"tdd": {Hits: hits("tdd", "tdd-guard"), Found: 100},
 		}, errs: map[string]error{}},
-		c: &fakeCatalog{details: map[string]Detail{}},
+		c: &fakeCatalog{details: map[string]Node{}},
 		p: &fakePacks{scope: "project /work"},
 		i: &fakeInstaller{},
 	}
@@ -342,70 +342,39 @@ func TestQuit(t *testing.T) {
 	}
 }
 
+// withDetails gives the tdd result a plugin and repo above it and a child.
 func withDetails(f fakes) {
-	f.c.details["skill:o/r:skills/tdd"] = Detail{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd", Repo: "o/r", Stars: 31234,
+	f.c.details["skill:o/r:skills/tdd"] = Node{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd", Repo: "o/r", Stars: 31234,
 		Description: "Test first.",
-		Up:          []Neighbour{{ID: "plugin:o/r:p", Type: "plugin", Name: "p"}, {ID: "repo:o/r", Type: "repo", Name: "o/r"}},
-		Down:        []Neighbour{{ID: "agent:o/r:agents/helper.md", Type: "agent", Name: "helper"}}}
-	f.c.details["skill:o/r:skills/tdd-guard"] = Detail{ID: "skill:o/r:skills/tdd-guard", Type: "skill", Name: "tdd-guard", Repo: "o/r"}
+		Parents:     []Ref{{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Description: "The p plugin"}},
+		Children:    []Ref{{ID: "agent:o/r:agents/helper.md", Type: "agent", Name: "helper", Description: "Helps"}}}
+	f.c.details["plugin:o/r:p"] = Node{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Description: "The p plugin",
+		Parents:  []Ref{{ID: "repo:o/r", Type: "repo", Name: "o/r", Description: "The repo"}},
+		Children: []Ref{{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd", Description: "Test first."}, {ID: "skill:o/r:skills/tdd-guard", Type: "skill", Name: "tdd-guard"}}}
+	f.c.details["repo:o/r"] = Node{ID: "repo:o/r", Type: "repo", Name: "o/r", Description: "The repo",
+		Children: []Ref{{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Description: "The p plugin"}}}
+	f.c.details["agent:o/r:agents/helper.md"] = Node{ID: "agent:o/r:agents/helper.md", Type: "agent", Name: "helper", Description: "Helps",
+		Parents: []Ref{{ID: "skill:o/r:skills/tdd", Type: "skill", Name: "tdd"}}}
+	f.c.details["skill:o/r:skills/tdd-guard"] = Node{ID: "skill:o/r:skills/tdd-guard", Type: "skill", Name: "tdd-guard", Repo: "o/r",
+		Parents: []Ref{{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Description: "The p plugin"}}}
 }
 
-func TestDetailFollowsSelection(t *testing.T) {
+func TestTreeFollowsSelection(t *testing.T) {
 	m, f := newTest(t)
 	withDetails(f)
 	typeText(t, m, "tdd")
-	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd" {
-		t.Fatalf("detail asked for %q", last)
+	if m.cursor != "skill:o/r:skills/tdd" {
+		t.Fatalf("cursor %q", m.cursor)
 	}
 	v := view(m)
-	for _, want := range []string{"skill:o/r:skills/tdd", "31.2k", "Test first.", "plugin", "p", "helper"} {
+	for _, want := range []string{"o/r", "The p plugin", "▶tdd", "Test first.", "helper"} {
 		if !strings.Contains(v, want) {
-			t.Errorf("detail lacks %q:\n%s", want, v)
+			t.Errorf("tree lacks %q:\n%s", want, v)
 		}
 	}
 	press(t, m, "down", "j")
-	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd-guard" {
-		t.Errorf("moving should show the new selection, asked %q", last)
-	}
-}
-
-func TestWalkNeighbours(t *testing.T) {
-	m, f := newTest(t)
-	withDetails(f)
-	typeText(t, m, "tdd")
-	press(t, m, "down", "right")
-	if m.focus != focusDetail {
-		t.Fatalf("right should focus the detail pane")
-	}
-	press(t, m, "down", "enter")
-	if last := f.c.asked[len(f.c.asked)-1]; last != "repo:o/r" {
-		t.Fatalf("enter should open the second neighbour, asked %q", last)
-	}
-	press(t, m, "backspace")
-	if last := f.c.asked[len(f.c.asked)-1]; last != "skill:o/r:skills/tdd" || m.detail.ID != "skill:o/r:skills/tdd" {
-		t.Errorf("backspace should go back, asked %q", last)
-	}
-	press(t, m, "left")
-	if m.focus != focusResults {
-		t.Errorf("left should return to the results")
-	}
-}
-
-func TestNarrowHidesDetail(t *testing.T) {
-	m, f := newTest(t)
-	withDetails(f)
-	m.Update(tea.WindowSizeMsg{Width: 90, Height: 30})
-	typeText(t, m, "tdd")
-	if strings.Contains(view(m), "Test first.") {
-		t.Fatalf("a 90-column terminal should not show the detail pane:\n%s", view(m))
-	}
-	press(t, m, "down", "enter")
-	if !strings.Contains(view(m), "Test first.") || strings.Contains(view(m), "tdd-guard") {
-		t.Errorf("enter should show the detail full-width:\n%s", view(m))
-	}
-	press(t, m, "esc")
-	if strings.Contains(view(m), "Test first.") || m.focus != focusResults {
-		t.Errorf("esc should return to the results:\n%s", view(m))
+	if m.cursor != "skill:o/r:skills/tdd-guard" {
+		t.Errorf("moving should move the tree to the new result, cursor %q", m.cursor)
 	}
 }
 
@@ -424,7 +393,7 @@ func TestTooSmall(t *testing.T) {
 	}
 }
 
-func TestDetailError(t *testing.T) {
+func TestTreeError(t *testing.T) {
 	m, f := newTest(t)
 	f.c.err = errors.New("catalog record broken")
 	typeText(t, m, "tdd")
@@ -459,16 +428,6 @@ func TestAddAndMark(t *testing.T) {
 	v := view(m)
 	if !strings.Contains(v, "✓ tdd") || !strings.Contains(v, "a (1) • not built") {
 		t.Errorf("want the ✓ mark and the not-built tray:\n%s", v)
-	}
-}
-
-func TestAddFromDetail(t *testing.T) {
-	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
-	withDetails(f)
-	typeText(t, m, "tdd")
-	press(t, m, "down", "right", "a")
-	if strings.Join(f.p.calls, ";") != "add a plugin:o/r:p" {
-		t.Errorf("a in the detail pane adds the selected neighbour: %v", f.p.calls)
 	}
 }
 
@@ -659,15 +618,6 @@ func TestPickerWithNoPacks(t *testing.T) {
 	}
 }
 
-func TestDetailWithoutNeighbours(t *testing.T) {
-	m, _ := newTestWith(t, withPacks(Pack{Name: "a"}))
-	typeText(t, m, "tdd") // the fake catalog's default detail has no neighbours
-	press(t, m, "down", "right", "down", "j", "enter", "a", "d")
-	if m.detail.ID != tddID {
-		t.Errorf("detail %q", m.detail.ID)
-	}
-}
-
 func TestTraySelectionStaysVisible(t *testing.T) {
 	var items []string
 	for i := range 15 {
@@ -683,23 +633,6 @@ func TestTraySelectionStaysVisible(t *testing.T) {
 	}
 	if v := view(m); !strings.Contains(v, "▶skill item-number-o-with-a-long-name") {
 		t.Errorf("the selected tray item must be visible:\n%s", v)
-	}
-}
-
-func TestDetailNeighboursScroll(t *testing.T) {
-	m, f := newTest(t)
-	var down []Neighbour
-	for i := range 40 {
-		down = append(down, Neighbour{ID: fmt.Sprintf("plugin:o/r#p%02d", i), Type: "plugin", Name: fmt.Sprintf("plugin-%02d", i)})
-	}
-	f.c.details[tddID] = Detail{ID: tddID, Type: "skill", Name: "tdd", Down: down}
-	typeText(t, m, "tdd")
-	press(t, m, "down", "right")
-	for range 35 {
-		press(t, m, "down")
-	}
-	if v := view(m); !strings.Contains(v, "▶down  plugin         plugin-35") {
-		t.Errorf("the selected neighbour must be visible:\n%s", v)
 	}
 }
 

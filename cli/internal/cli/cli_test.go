@@ -1678,29 +1678,6 @@ func TestTuiPacks(t *testing.T) {
 	}
 }
 
-func TestTuiCatalogDetail(t *testing.T) {
-	root := checkout(t)
-	withGraphCatalog(t, root)
-	g, err := catgraph.Load(filepath.Join(cacheOf(root), "catalog"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	d, err := tuiCatalog{g}.Detail("skill:o/r:p/skills/s1")
-	if err != nil || d.Name != "s1" || d.Repo != "o/r" || d.Description != "Test first" {
-		t.Fatalf("%+v %v", d, err)
-	}
-	var up []string
-	for _, n := range d.Up {
-		up = append(up, n.ID+"="+n.Type)
-	}
-	if !slices.Contains(up, "plugin:o/r:p=plugin") {
-		t.Errorf("up %v", up)
-	}
-	if _, err := (tuiCatalog{g}).Detail("skill:gone"); err == nil {
-		t.Error("an unknown ID is an error")
-	}
-}
-
 func TestTuiInstallerStreams(t *testing.T) {
 	f, _ := installFake(t)
 	var out bytes.Buffer
@@ -1919,5 +1896,28 @@ func TestDeployPackRequired(t *testing.T) {
 	var usage *UsageError
 	if err := f.run("deploy"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "name a pack") {
 		t.Errorf("got %v", err)
+	}
+}
+
+func TestTuiCatalogNode(t *testing.T) {
+	root := checkout(t)
+	withGraphCatalog(t, root)
+	g, err := catgraph.Load(filepath.Join(cacheOf(root), "catalog"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	n, err := tuiCatalog{g}.Node("skill:o/r:p/skills/s1")
+	if err != nil || n.Name != "s1" || n.Description != "Test first" {
+		t.Fatalf("%+v %v", n, err)
+	}
+	var parents []string
+	for _, p := range n.Parents {
+		parents = append(parents, p.ID+"="+p.Type)
+	}
+	if !slices.Contains(parents, "plugin:o/r:p=plugin") {
+		t.Errorf("parents %v", parents)
+	}
+	if _, err := (tuiCatalog{g}).Node("skill:gone"); err == nil {
+		t.Error("an unknown ID is an error")
 	}
 }

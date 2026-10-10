@@ -1,13 +1,13 @@
 ipm ─ search: tdd                                                                                               ● hybrid
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-▶50   skill          ✓ tdd                             │ skill  tdd                                                     
- 50   skill            tdd-guard                       │ o/r ★ 31.2k                                                    
-                                                       │ skill:o/r:skills/tdd                                           
-                                                       │ Test first.                                                    
+▶50   skill          ✓ tdd                             │ repo   o/r                              The repo               
+ 50   skill            tdd-guard                       │ └ plugin p                              The p plugin           
+                                                       │   ├ skill ▶tdd ───────────────────────▶ Test first.            
+                                                       │   │ └ agent  helper                     Helps                  
+                                                       │   └ skill  tdd-guard                                           
                                                        │                                                                
-                                                       │  up    plugin         p                                        
-                                                       │  up    repo           o/r                                      
-                                                       │  down  agent          helper                                   
+                                                       │                                                                
+                                                       │                                                                
                                                        │                                                                
                                                        │                                                                
                                                        │                                                                

@@ -233,23 +233,23 @@ func localSearch(records []map[string]any, stars func(repo string) (int, bool), 
 // tuiCatalog describes artifacts from the catalog graph.
 type tuiCatalog struct{ g *catgraph.Graph }
 
-func (c tuiCatalog) Detail(id string) (tui.Detail, error) {
+func (c tuiCatalog) Node(id string) (tui.Node, error) {
 	n, ok := c.g.Node(id)
 	if !ok {
-		return tui.Detail{}, fmt.Errorf("no artifact %s in the catalog", id)
+		return tui.Node{}, fmt.Errorf("no artifact %s in the catalog", id)
 	}
-	d := tui.Detail{ID: id, Type: str(n, "type"), Name: str(n, "name"), Repo: str(n, "repo"), Path: str(n, "path"),
-		Commit: str(n, "commit"), Description: str(n, "description")}
-	d.Stars, _ = c.g.Stars(d.Repo)
-	d.Up, d.Down = c.neighbours(id, true), c.neighbours(id, false)
-	return d, nil
+	out := tui.Node{ID: id, Type: str(n, "type"), Name: str(n, "name"), Repo: str(n, "repo"), Path: str(n, "path"),
+		Description: str(n, "description")}
+	out.Stars, _ = c.g.Stars(out.Repo)
+	out.Parents, out.Children = c.refs(id, true), c.refs(id, false)
+	return out, nil
 }
 
-func (c tuiCatalog) neighbours(id string, up bool) []tui.Neighbour {
-	var out []tui.Neighbour
+func (c tuiCatalog) refs(id string, up bool) []tui.Ref {
+	var out []tui.Ref
 	for _, nid := range c.g.Children(id, up) {
 		n, _ := c.g.Node(nid)
-		out = append(out, tui.Neighbour{ID: nid, Type: str(n, "type"), Name: str(n, "name")})
+		out = append(out, tui.Ref{ID: nid, Type: str(n, "type"), Name: str(n, "name"), Description: str(n, "description")})
 	}
 	return out
 }

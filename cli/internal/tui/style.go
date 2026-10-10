@@ -15,6 +15,12 @@ var (
 	colTeal   = lipgloss.Color("#5CC8A8")
 	colRed    = lipgloss.Color("#F77E7E")
 
+	// Types, the same in results, the tree and the breadcrumb.
+	colRepo    = lipgloss.Color("#7AA2F7")
+	colMarket  = lipgloss.Color("#BB9AF7")
+	colAgent   = lipgloss.Color("#F7768E")
+	colCommand = lipgloss.Color("#9ECE6A")
+
 	stTitle    = lipgloss.NewStyle().Foreground(colText).Bold(true)
 	stText     = lipgloss.NewStyle().Foreground(colSoft)
 	stMuted    = lipgloss.NewStyle().Foreground(colMuted)

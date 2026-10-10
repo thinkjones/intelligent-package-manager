@@ -15,7 +15,6 @@ type focus int
 const (
 	focusSearch focus = iota
 	focusResults
-	focusDetail
 	focusTray
 )
 
@@ -44,11 +43,9 @@ type Model struct {
 	height   int
 	debounce time.Duration
 
-	detail Detail
-	nbSel  int      // selected neighbour in the detail pane
-	nbOff  int      // first neighbour shown
-	back   []string // detail IDs to return to with backspace
-	full   bool     // narrow terminal: the detail is shown full-width
+	cursor string            // the tree's centre node
+	chosen map[string]string // the parent picked for a node in tree mode
+	tree   treeView
 
 	packs    []Pack
 	active   string // the active pack's name
@@ -184,13 +181,6 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		}
 	}
-	if m.focus == focusDetail {
-		if k == "q" {
-			return tea.Quit
-		}
-		m.detailKey(k)
-		return nil
-	}
 	if m.focus == focusTray {
 		m.trayKey(k)
 		if k == "q" {
@@ -224,16 +214,6 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.move(1)
 	case "up", "k":
 		m.move(-1)
-	case "right", "l":
-		if m.detail.ID != "" {
-			m.full = !m.wide()
-			m.setFocus(focusDetail)
-		}
-	case "enter":
-		if !m.wide() && m.detail.ID != "" {
-			m.full = true
-			m.setFocus(focusDetail)
-		}
 	case "tab":
 		m.setFocus(focusTray)
 	}
@@ -360,20 +340,35 @@ func (m *Model) countLine() string {
 	return fmt.Sprintf("%d of %d", len(m.res.Hits), m.res.Found)
 }
 
-// bodyLines is the results and detail panes side by side, or one of them in
-// a narrow terminal.
+// bodyLines is the results and the tree side by side, or the results alone
+// in a narrow terminal.
 func (m *Model) bodyLines(w, rows int) []string {
-	switch {
-	case m.full:
-		return m.detailLines(w, rows)
-	case !m.wide():
+	if !m.wide() {
 		return m.resultLines(w, rows)
 	}
 	left := w * 45 / 100
-	res, det := m.resultLines(left, rows), m.detailLines(w-left-3, rows)
+	res, det := m.resultLines(left, rows), m.tree.lines(w-left-3, rows, -1, false)
 	out := make([]string, rows)
 	for i := range out {
 		out[i] = res[i] + stRule.Render(" │ ") + det[i]
 	}
 	return out
+}
+
+// followSelection centres the tree on the selected result.
+func (m *Model) followSelection() {
+	if m.sel < len(m.res.Hits) {
+		m.setCursor(m.res.Hits[m.sel].ID)
+		return
+	}
+	m.cursor, m.tree = "", treeView{}
+}
+
+// setCursor centres the tree on id.
+func (m *Model) setCursor(id string) {
+	tv, err := buildTree(m.d.Catalog, id, m.chosen)
+	if err != nil {
+		m.status = err.Error()
+	}
+	m.cursor, m.tree = id, tv
 }

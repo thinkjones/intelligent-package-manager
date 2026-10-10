@@ -39,20 +39,19 @@ type Searcher interface {
 	Recheck()
 }
 
-// Neighbour is an artifact related to the one shown.
-type Neighbour struct{ ID, Type, Name string }
+// Ref is an artifact related to another: a parent or a child.
+type Ref struct{ ID, Type, Name, Description string }
 
-// Detail is everything the detail pane shows for one artifact.
-type Detail struct {
-	ID, Type, Name, Repo, Path, Commit, Description string
-	Stars                                           int
-	// Up is what contains the artifact; Down is what it contains.
-	Up, Down []Neighbour
+// Node is one artifact with its parents and children.
+type Node struct {
+	ID, Type, Name, Repo, Path, Description string
+	Stars                                   int
+	Parents, Children                       []Ref
 }
 
 // Catalog describes artifacts.
 type Catalog interface {
-	Detail(id string) (Detail, error)
+	Node(id string) (Node, error)
 }
 
 // Pack is one pack in the scope's ipm.toml.
