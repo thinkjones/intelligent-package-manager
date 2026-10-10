@@ -92,6 +92,12 @@ func TestGoldenViews(t *testing.T) {
 			press(t, m, "down")
 			return m
 		},
+		"deploy-confirm": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			typeText(t, m, "tdd")
+			press(t, m, "down", "D", "enter", "enter")
+			return m
+		},
 		"picker": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
 			typeText(t, m, "tdd")

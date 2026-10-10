@@ -1780,7 +1780,7 @@ func cmdLines(cmds []claudeCmd) []string {
 func TestPlanDeployFirstTime(t *testing.T) {
 	f, root := deployFake(t)
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "kit", deployTarget{Scope: "project", Path: root})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope project",
 		root + " | claude plugin install kit@work-ipm --scope project",
@@ -1795,7 +1795,7 @@ func TestPlanDeployAgain(t *testing.T) {
 	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
 	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "kit", deployTarget{Scope: "project", Path: root})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope project",
 		root + " | claude plugin marketplace update work-ipm",
@@ -1811,7 +1811,7 @@ func TestPlanDeployUserScope(t *testing.T) {
 	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
 	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "kit", deployTarget{Scope: "user"})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "user"})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope user",
 		root + " | claude plugin marketplace update work-ipm",
@@ -1825,7 +1825,7 @@ func TestPlanDeployUserScope(t *testing.T) {
 func TestPlanDeployUnreadableClaudeJSON(t *testing.T) {
 	f, root := deployFake(t)
 	f.full["claude plugin list --json"] = result{"not json", nil}
-	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "kit", deployTarget{Scope: "project", Path: root})
+	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
 	if err == nil || !strings.Contains(err.Error(), "claude plugin list --json") {
 		t.Errorf("got %v", err)
 	}
@@ -1919,5 +1919,27 @@ func TestTuiCatalogNode(t *testing.T) {
 	}
 	if _, err := (tuiCatalog{g}).Node("skill:gone"); err == nil {
 		t.Error("an unknown ID is an error")
+	}
+}
+
+func TestTuiDeployerPlan(t *testing.T) {
+	f, root := installFake(t) // not built yet: the plan must not need .ipm/
+	f.onPath["claude"] = true
+	f.full = map[string]result{
+		"claude plugin marketplace list --json": {"[]", nil},
+		"claude plugin list --json":             {"[]", nil},
+	}
+	d := tuiDeployer{sys: f.system(), scope: project.Scope{Root: root}}
+	if got := d.Default("kit"); got.Scope != "project" || got.Path != root {
+		t.Errorf("default %+v", got)
+	}
+	plan, err := d.Plan("kit", tui.Target{Scope: "project", Path: root})
+	want := []string{"ipm install", "claude plugin marketplace add " + filepath.Join(root, ".ipm") + " --scope project", "claude plugin install kit@work-ipm --scope project"}
+	if err != nil || !reflect.DeepEqual(plan, want) {
+		t.Errorf("plan %v %v\nwant %v", plan, err, want)
+	}
+	f.onPath["claude"] = false
+	if _, err := d.Plan("kit", tui.Target{Scope: "user"}); err == nil || !strings.Contains(err.Error(), "claude") {
+		t.Errorf("no claude: %v", err)
 	}
 }

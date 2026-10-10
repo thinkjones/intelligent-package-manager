@@ -155,10 +155,7 @@ func runInstall(sys System, global, update, noValidate bool) error {
 	if err := os.Rename(staging, plugins); err != nil {
 		return err
 	}
-	name := "ipm-global"
-	if !scope.Global {
-		name = strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(scope.Root)), "-"), "-.") + "-ipm"
-	}
+	name := marketName(scope)
 	m := marketplace.Build(entries, names, marketplace.Options{Name: name, Owner: owner, Description: "ipm packs: " + strings.Join(names, ", ")})
 	if err := marketplace.Write(filepath.Join(dir, ".claude-plugin", "marketplace.json"), m); err != nil {
 		return err
@@ -194,4 +191,13 @@ func writeJSON(path string, v any) error {
 		return err
 	}
 	return os.WriteFile(path, append(data, '\n'), 0o644)
+}
+
+// marketName is the name of the marketplace ipm install builds for scope:
+// <project folder>-ipm, or ipm-global for the user scope.
+func marketName(scope project.Scope) string {
+	if scope.Global {
+		return "ipm-global"
+	}
+	return strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(scope.Root)), "-"), "-.") + "-ipm"
 }

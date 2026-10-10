@@ -207,11 +207,33 @@ func hits(names ...string) []Hit {
 	return out
 }
 
+type fakeDeployer struct {
+	def      Target
+	plan     []string
+	planErr  error
+	lines    []string
+	err      error
+	deployed []string
+}
+
+func (f *fakeDeployer) Default(pack string) Target { return f.def }
+func (f *fakeDeployer) Plan(pack string, t Target) ([]string, error) {
+	return f.plan, f.planErr
+}
+func (f *fakeDeployer) Deploy(_ context.Context, pack string, t Target, out io.Writer) error {
+	f.deployed = append(f.deployed, fmt.Sprintf("%s %s %s", pack, t.Scope, t.Path))
+	for _, l := range f.lines {
+		fmt.Fprintln(out, l)
+	}
+	return f.err
+}
+
 type fakes struct {
 	s *fakeSearcher
 	c *fakeCatalog
 	p *fakePacks
 	i *fakeInstaller
+	d *fakeDeployer
 }
 
 func newTest(t *testing.T) (*Model, fakes) {
@@ -230,11 +252,13 @@ func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
 		c: &fakeCatalog{details: map[string]Node{}},
 		p: &fakePacks{scope: "project /work"},
 		i: &fakeInstaller{},
+		d: &fakeDeployer{def: Target{Scope: "project", Path: "/work"},
+			plan: []string{"ipm install", "claude plugin marketplace add /work/.ipm --scope project", "claude plugin install kit@work-ipm --scope project"}},
 	}
 	if setup != nil {
 		setup(f)
 	}
-	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Installer: f.i})
+	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Installer: f.i, Deployer: f.d})
 	m.debounce = 0
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m, f
@@ -776,4 +800,113 @@ func TestBreadcrumb(t *testing.T) {
 	if !strings.Contains(view(m), "o/r › p › tdd") {
 		t.Errorf("breadcrumb:\n%s", view(m))
 	}
+}
+
+func deployTest(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	m, f := newTestWith(t, withPacks(Pack{Name: "kit", Items: []string{tddID}}))
+	typeText(t, m, "tdd")
+	press(t, m, "down")
+	return m, f
+}
+
+func TestBuildKey(t *testing.T) {
+	for _, k := range []string{"b", "i"} {
+		m, _ := deployTest(t)
+		press(t, m, k)
+		if m.inst == nil {
+			t.Errorf("%s should build", k)
+		}
+	}
+}
+
+func TestDeployFlow(t *testing.T) {
+	m, f := deployTest(t)
+	f.d.lines = []string{"$ claude plugin install kit@work-ipm --scope project"}
+	press(t, m, "D")
+	if m.deploy == nil || !strings.Contains(view(m), "▶project") {
+		t.Fatalf("D should open the target step on the default:\n%s", view(m))
+	}
+	press(t, m, "enter")
+	if m.deploy.path.Value() != "/work" {
+		t.Fatalf("path step prefilled %q", m.deploy.path.Value())
+	}
+	press(t, m, "enter")
+	v := view(m)
+	for _, want := range append([]string{"Deploy kit to Claude Code — project scope in /work", "y deploy · esc cancel"}, f.d.plan...) {
+		if !strings.Contains(v, want) {
+			t.Errorf("confirm lacks %q:\n%s", want, v)
+		}
+	}
+	press(t, m, "y")
+	v = view(m)
+	if strings.Join(f.d.deployed, ";") != "kit project /work" || !strings.Contains(v, "$ claude plugin install") || !strings.Contains(v, "✓ deployed kit (project /work)") {
+		t.Errorf("deployed %v:\n%s", f.d.deployed, v)
+	}
+	press(t, m, "esc")
+	if m.inst != nil || m.deploy != nil {
+		t.Error("esc should close the finished deploy")
+	}
+}
+
+func TestDeployUserSkipsPath(t *testing.T) {
+	m, _ := deployTest(t)
+	press(t, m, "D", "up", "enter")
+	if !strings.Contains(view(m), "Deploy kit to Claude Code — user scope") || strings.Contains(view(m), "user scope in") {
+		t.Errorf("user scope should go straight to confirm:\n%s", view(m))
+	}
+}
+
+func TestDeployBadPath(t *testing.T) {
+	m, f := deployTest(t)
+	f.d.planErr = errors.New("/nope is not a folder")
+	press(t, m, "D", "enter", "enter")
+	if m.deploy == nil || m.deploy.step != stepPath || !strings.Contains(m.status, "/nope is not a folder") {
+		t.Errorf("step %v status %q", m.deploy, m.status)
+	}
+}
+
+func TestDeployFailure(t *testing.T) {
+	m, f := deployTest(t)
+	f.d.err = errors.New("`claude plugin install kit@work-ipm --scope project` failed: exit status 1")
+	press(t, m, "D", "enter", "enter", "y")
+	if !strings.Contains(view(m), "✗ `claude plugin install") {
+		t.Errorf("modal:\n%s", view(m))
+	}
+	press(t, m, "esc")
+	if m.inst != nil {
+		t.Error("esc should close")
+	}
+}
+
+func TestDeployCancel(t *testing.T) {
+	for _, keys := range [][]string{{"D", "esc"}, {"D", "enter", "esc"}, {"D", "enter", "enter", "esc"}} {
+		m, f := deployTest(t)
+		press(t, m, keys...)
+		if m.deploy != nil || len(f.d.deployed) != 0 {
+			t.Errorf("%v: modal %v deployed %v", keys, m.deploy, f.d.deployed)
+		}
+	}
+}
+
+func TestDeployWithoutPack(t *testing.T) {
+	m, _ := newTest(t)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "D")
+	if m.deploy != nil || !strings.Contains(m.status, "no pack to deploy — press p to create one") {
+		t.Errorf("modal %v status %q", m.deploy, m.status)
+	}
+}
+
+func TestDeployIgnoredWhileRunning(t *testing.T) {
+	m, f := deployTest(t)
+	f.i.gate = make(chan struct{})
+	_, cmd := m.Update(key("b"))
+	for _, k := range []string{"D", "b"} {
+		if _, c := m.Update(key(k)); c != nil || m.deploy != nil || !strings.Contains(m.status, "running") {
+			t.Errorf("%s while building: cmd %v deploy %v status %q", k, c, m.deploy, m.status)
+		}
+	}
+	close(f.i.gate)
+	drain(t, m, cmd)
 }

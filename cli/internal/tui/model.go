@@ -58,9 +58,10 @@ type Model struct {
 	picker   *picker
 	statusOK bool // status is a note, not an error
 
-	inst  *install // the install modal, while open
-	help  bool     // the ? overlay
-	plain bool     // NO_COLOR: draw without colour
+	inst   *install     // the install or deploy output modal, while open
+	deploy *deployModal // the deploy modal before it runs
+	help   bool         // the ? overlay
+	plain  bool         // NO_COLOR: draw without colour
 }
 
 type keyMsg = tea.KeyPressMsg
@@ -165,6 +166,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	}
+	if m.deploy != nil {
+		return m.deployKey(msg)
+	}
 	if m.picker != nil {
 		m.pickerKey(msg)
 		return nil
@@ -182,6 +186,9 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		case "i", "b":
 			return m.startInstall()
+		case "D":
+			m.openDeploy()
+			return nil
 		case "t":
 			m.setFocus(focusTray)
 			return nil
@@ -387,7 +394,9 @@ func (m *Model) render() string {
 	var mid []string
 	switch {
 	case m.inst != nil:
-		mid = panel(stTitle.Render("install"), m.installLines(w-4, body-2), w, true)
+		mid = panel(stTitle.Render(m.inst.title), m.installLines(w-4, body-2), w, true)
+	case m.deploy != nil:
+		mid = panel(stTitle.Render("deploy"), m.deployLines(w-4, body-2), w, true)
 	case m.help:
 		mid = panel(stTitle.Render("keys"), m.helpLines(w-4, body-2), w, true)
 	case m.picker != nil:
@@ -428,6 +437,10 @@ func (m *Model) hints() string {
 	switch {
 	case m.inst != nil:
 		return "esc close (when finished)"
+	case m.deploy != nil && m.deploy.step == stepConfirm:
+		return "y deploy  esc cancel"
+	case m.deploy != nil:
+		return "enter next  esc cancel"
 	case m.help:
 		return "esc or ? close"
 	case m.picker != nil:

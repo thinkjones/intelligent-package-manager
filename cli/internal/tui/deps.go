@@ -75,10 +75,25 @@ type Installer interface {
 	Install(ctx context.Context, out io.Writer) error
 }
 
+// Target is where a pack is deployed in Claude Code: Scope is "user",
+// "project" or "local"; Path is the folder for project and local scope.
+type Target struct{ Scope, Path string }
+
+// Deployer installs a built pack into Claude Code.
+type Deployer interface {
+	// Default is the target a pack deploys to unless the user picks another.
+	Default(pack string) Target
+	// Plan is the commands Deploy will run, for the user to confirm.
+	Plan(pack string, t Target) ([]string, error)
+	// Deploy builds and installs pack at t, writing its output to out.
+	Deploy(ctx context.Context, pack string, t Target, out io.Writer) error
+}
+
 // Deps is what the TUI works with.
 type Deps struct {
 	Searcher  Searcher
 	Catalog   Catalog
 	Packs     Packs
 	Installer Installer
+	Deployer  Deployer
 }

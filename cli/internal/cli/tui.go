@@ -53,6 +53,7 @@ func runTui(sys System, global bool) error {
 		Catalog:   tuiCatalog{g},
 		Packs:     tuiPacks{sys: sys, scope: scope, global: global},
 		Installer: tuiInstaller{sys: sys, global: global},
+		Deployer:  tuiDeployer{sys: sys, scope: scope, global: global},
 	})
 	_, err = tea.NewProgram(m).Run()
 	return err
@@ -326,4 +327,39 @@ func strList(v any) []string {
 		}
 	}
 	return out
+}
+
+// tuiDeployer deploys the scope's packs with the code behind ipm deploy.
+type tuiDeployer struct {
+	sys    System
+	scope  project.Scope
+	global bool
+}
+
+func (d tuiDeployer) Default(string) tui.Target {
+	t := deployDefaults(d.scope, deployTarget{})
+	return tui.Target{Scope: t.Scope, Path: t.Path}
+}
+
+func (d tuiDeployer) Plan(pack string, t tui.Target) ([]string, error) {
+	if err := needClaude(d.sys); err != nil {
+		return nil, err
+	}
+	target, err := cleanTarget(deployTarget{Scope: t.Scope, Path: t.Path}, workDir(d.sys, d.scope), d.sys.Getenv("HOME"))
+	if err != nil {
+		return nil, err
+	}
+	cmds, err := planDeploy(d.sys, d.scope.IPMDir(), marketName(d.scope), pack, target)
+	if err != nil {
+		return nil, err
+	}
+	out := []string{"ipm install"}
+	for _, c := range cmds {
+		out = append(out, c.String())
+	}
+	return out, nil
+}
+
+func (d tuiDeployer) Deploy(_ context.Context, pack string, t tui.Target, out io.Writer) error {
+	return runDeploy(d.sys, d.global, pack, deployTarget{Scope: t.Scope, Path: t.Path}, out)
 }

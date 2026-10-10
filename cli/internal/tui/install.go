@@ -17,6 +17,8 @@ type (
 
 // install is the state of the install modal.
 type install struct {
+	title   string // "install" or "deploy"
+	success string // the line shown when it finishes without error
 	lines   []string
 	done    bool
 	err     error
@@ -28,12 +30,20 @@ type install struct {
 // startInstall runs the installer in the background, its output piped into
 // the modal line by line.
 func (m *Model) startInstall() tea.Cmd {
+	return m.stream("install", "✓ installed", func(w io.Writer) error {
+		return m.d.Installer.Install(context.Background(), w)
+	})
+}
+
+// stream runs work in the background with its output piped into the modal
+// line by line.
+func (m *Model) stream(title, success string, work func(io.Writer) error) tea.Cmd {
 	pr, pw := io.Pipe()
-	in := &install{scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
+	in := &install{title: title, success: success, scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
 	in.scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	m.inst = in
 	go func() {
-		err := m.d.Installer.Install(context.Background(), pw)
+		err := work(pw)
 		pw.Close()
 		in.result <- err
 	}()
@@ -59,7 +69,7 @@ func (in *install) next() tea.Msg {
 // installKey handles keys while the modal is open.
 func (m *Model) installKey(k string) tea.Cmd {
 	if !m.inst.done {
-		m.status = "install is running — wait for it to finish"
+		m.status = m.inst.title + " is running — wait for it to finish"
 		return nil
 	}
 	switch k {
@@ -80,9 +90,9 @@ func (m *Model) installLines(w, rows int) []string {
 	case in.done && in.err != nil:
 		result = stError.Render("✗ "+in.err.Error()) + stMuted.Render("  · esc close")
 	case in.done:
-		result = stTeal.Render("✓ installed") + stMuted.Render("  · esc close")
+		result = stTeal.Render(in.success) + stMuted.Render("  · esc close")
 	}
-	head := []string{stTitle.Render("ipm install"), ""}
+	head := []string{stTitle.Render("ipm " + in.title), ""}
 	room := max(0, rows-len(head)-2)
 	shown := in.lines
 	if len(shown) > room {

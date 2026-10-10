@@ -82,15 +82,11 @@ func cleanTarget(t deployTarget, cwd, home string) (deployTarget, error) {
 }
 
 // planDeploy is the claude commands that install pack from the marketplace
-// built in ipmDir at target t: always declare the marketplace at the
+// mp built in ipmDir at target t: always declare the marketplace at the
 // target's scope (claude accepts a repeat), refresh it when claude already
 // knows it, then install the pack, or update it when it is already
-// installed there.
-func planDeploy(sys System, ipmDir, pack string, t deployTarget) ([]claudeCmd, error) {
-	mp, err := marketplaceName(ipmDir)
-	if err != nil {
-		return nil, err
-	}
+// installed there. It runs before the build, so it needs no built files.
+func planDeploy(sys System, ipmDir, mp, pack string, t deployTarget) ([]claudeCmd, error) {
 	dir := t.Path
 	if dir == "" {
 		dir = filepath.Dir(ipmDir)
@@ -140,20 +136,6 @@ func claudeJSON(sys System, dir string, v any, args ...string) error {
 	return nil
 }
 
-func marketplaceName(ipmDir string) (string, error) {
-	data, err := os.ReadFile(filepath.Join(ipmDir, ".claude-plugin", "marketplace.json"))
-	if err != nil {
-		return "", fmt.Errorf("no built marketplace in %s — run `ipm install`: %v", ipmDir, err)
-	}
-	var m struct {
-		Name string `json:"name"`
-	}
-	if err := json.Unmarshal(data, &m); err != nil || m.Name == "" {
-		return "", fmt.Errorf("%s/.claude-plugin/marketplace.json has no name", ipmDir)
-	}
-	return m.Name, nil
-}
-
 // samePath reports whether two folder paths are the same folder, following
 // symlinks (/tmp and /private/tmp on macOS).
 func samePath(a, b string) bool {
@@ -168,8 +150,8 @@ func samePath(a, b string) bool {
 // runDeploy builds the scope's packs, then installs pack into Claude Code at
 // t, writing everything it does to out.
 func runDeploy(sys System, global bool, pack string, t deployTarget, out io.Writer) error {
-	if _, err := sys.LookPath("claude"); err != nil {
-		return errors.New("ipm deploy needs claude (Claude Code) on PATH")
+	if err := needClaude(sys); err != nil {
+		return err
 	}
 	scope, err := currentScope(sys, global)
 	if err != nil {
@@ -179,13 +161,7 @@ func runDeploy(sys System, global bool, pack string, t deployTarget, out io.Writ
 		return err
 	}
 	t = deployDefaults(scope, t)
-	cwd := scope.Root
-	if sys.Getwd != nil {
-		if wd, err := sys.Getwd(); err == nil {
-			cwd = wd
-		}
-	}
-	if t, err = cleanTarget(t, cwd, sys.Getenv("HOME")); err != nil {
+	if t, err = cleanTarget(t, workDir(sys, scope), sys.Getenv("HOME")); err != nil {
 		return err
 	}
 	build := sys
@@ -193,7 +169,7 @@ func runDeploy(sys System, global bool, pack string, t deployTarget, out io.Writ
 	if err := runInstall(build, global, false, false); err != nil {
 		return err
 	}
-	cmds, err := planDeploy(sys, scope.IPMDir(), pack, t)
+	cmds, err := planDeploy(sys, scope.IPMDir(), marketName(scope), pack, t)
 	if err != nil {
 		return err
 	}
@@ -253,4 +229,22 @@ func describeTarget(t deployTarget) string {
 		return "user"
 	}
 	return t.Scope + " " + t.Path
+}
+
+func needClaude(sys System) error {
+	if _, err := sys.LookPath("claude"); err != nil {
+		return errors.New("ipm deploy needs claude (Claude Code) on PATH")
+	}
+	return nil
+}
+
+// workDir is where relative deploy paths start: the working directory, or
+// the scope's root.
+func workDir(sys System, scope project.Scope) string {
+	if sys.Getwd != nil {
+		if wd, err := sys.Getwd(); err == nil {
+			return wd
+		}
+	}
+	return scope.Root
 }
