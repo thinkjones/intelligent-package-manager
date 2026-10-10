@@ -1,0 +1,32 @@
+[
+  {
+    "id": "kit-stripe@work-ipm",
+    "version": "0.10.3",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "{{CONFIG}}/plugins/cache/work-ipm/kit-stripe/0.10.3",
+    "installedAt": "2026-10-10T18:25:23.345Z",
+    "lastUpdated": "2026-10-10T18:25:23.345Z",
+    "projectPath": "{{ROOT}}",
+    "mcpServers": {
+      "stripe": {
+        "type": "http",
+        "url": "https://mcp.stripe.com"
+      }
+    },
+    "projectEnabled": true
+  },
+  {
+    "id": "kit@work-ipm",
+    "version": "0.0.0-ipm",
+    "scope": "project",
+    "enabled": true,
+    "installPath": "{{CONFIG}}/plugins/cache/work-ipm/kit/0.0.0-ipm",
+    "readFromFolder": "{{ROOT}}/.ipm/plugins/kit",
+    "folderVersion": "0.0.0-ipm",
+    "installedAt": "2026-10-10T18:25:21.638Z",
+    "lastUpdated": "2026-10-10T18:25:21.638Z",
+    "projectPath": "{{ROOT}}",
+    "projectEnabled": true
+  }
+]

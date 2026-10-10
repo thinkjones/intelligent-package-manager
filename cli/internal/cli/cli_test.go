@@ -39,10 +39,14 @@ type fake struct {
 	errOut  bytes.Buffer
 	onPath  map[string]bool
 	results map[string]result
-	mu      sync.Mutex
-	calls   []string
-	http    *http.Client
-	cwd     string
+	// full answers by the whole command line, before results; dirs records
+	// each call's working directory, in the same order as calls.
+	full  map[string]result
+	dirs  []string
+	mu    sync.Mutex
+	calls []string
+	http  *http.Client
+	cwd   string
 }
 
 type result struct {
@@ -89,7 +93,12 @@ func (f *fake) system() System {
 			}
 			f.mu.Lock()
 			defer f.mu.Unlock()
-			f.calls = append(f.calls, name+" "+strings.Join(args, " "))
+			line := name + " " + strings.Join(args, " ")
+			f.calls = append(f.calls, line)
+			f.dirs = append(f.dirs, dir)
+			if r, ok := f.full[line]; ok {
+				return r.out, r.err
+			}
 			r := f.results[key]
 			return r.out, r.err
 		},
@@ -1752,5 +1761,163 @@ func TestTuiSearcherConcurrentFirstSearches(t *testing.T) {
 	wg.Wait()
 	if len(s.records) != want {
 		t.Errorf("records loaded %d times over: %d, want %d", len(s.records)/max(1, want), len(s.records), want)
+	}
+}
+
+// deployFake is installFake with claude on PATH and empty claude listings;
+// it builds the project first so .ipm/ exists.
+func deployFake(t *testing.T) (*fake, string) {
+	t.Helper()
+	f, root := installFake(t)
+	f.onPath["claude"] = true
+	f.full = map[string]result{
+		"claude plugin marketplace list --json": {"[]", nil},
+		"claude plugin list --json":             {"[]", nil},
+	}
+	if err := f.run("install"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	f.calls, f.dirs = nil, nil
+	f.out.Reset()
+	return f, root
+}
+
+// claudeFixture is a captured claude --json listing with its paths filled in.
+func claudeFixture(t *testing.T, name, root string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.NewReplacer("{{ROOT}}", root, "{{CONFIG}}", "/cfg").Replace(string(data))
+}
+
+func cmdLines(cmds []claudeCmd) []string {
+	var out []string
+	for _, c := range cmds {
+		out = append(out, c.Dir+" | "+c.String())
+	}
+	return out
+}
+
+func TestPlanDeployFirstTime(t *testing.T) {
+	f, root := deployFake(t)
+	ipm := filepath.Join(root, ".ipm")
+	cmds, err := planDeploy(f.system(), ipm, "kit", deployTarget{Scope: "project", Path: root})
+	want := []string{
+		root + " | claude plugin marketplace add " + ipm + " --scope project",
+		root + " | claude plugin install kit@work-ipm --scope project",
+	}
+	if err != nil || !reflect.DeepEqual(cmdLines(cmds), want) {
+		t.Errorf("got %v %v\nwant %v", cmdLines(cmds), err, want)
+	}
+}
+
+func TestPlanDeployAgain(t *testing.T) {
+	f, root := deployFake(t)
+	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
+	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
+	ipm := filepath.Join(root, ".ipm")
+	cmds, err := planDeploy(f.system(), ipm, "kit", deployTarget{Scope: "project", Path: root})
+	want := []string{
+		root + " | claude plugin marketplace add " + ipm + " --scope project",
+		root + " | claude plugin marketplace update work-ipm",
+		root + " | claude plugin update kit@work-ipm --scope project",
+	}
+	if err != nil || !reflect.DeepEqual(cmdLines(cmds), want) {
+		t.Errorf("got %v %v\nwant %v", cmdLines(cmds), err, want)
+	}
+}
+
+func TestPlanDeployUserScope(t *testing.T) {
+	f, root := deployFake(t)
+	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
+	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
+	ipm := filepath.Join(root, ".ipm")
+	cmds, err := planDeploy(f.system(), ipm, "kit", deployTarget{Scope: "user"})
+	want := []string{
+		root + " | claude plugin marketplace add " + ipm + " --scope user",
+		root + " | claude plugin marketplace update work-ipm",
+		root + " | claude plugin install kit@work-ipm --scope user", // installed only at project scope
+	}
+	if err != nil || !reflect.DeepEqual(cmdLines(cmds), want) {
+		t.Errorf("got %v %v\nwant %v", cmdLines(cmds), err, want)
+	}
+}
+
+func TestPlanDeployUnreadableClaudeJSON(t *testing.T) {
+	f, root := deployFake(t)
+	f.full["claude plugin list --json"] = result{"not json", nil}
+	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "kit", deployTarget{Scope: "project", Path: root})
+	if err == nil || !strings.Contains(err.Error(), "claude plugin list --json") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestDeployTargetPathExpanded(t *testing.T) {
+	home := t.TempDir()
+	os.MkdirAll(filepath.Join(home, "work"), 0o755)
+	os.WriteFile(filepath.Join(home, "file"), []byte("x"), 0o644)
+	got, err := cleanTarget(deployTarget{Scope: "project", Path: "~/work/"}, "/elsewhere", home)
+	if err != nil || got.Path != filepath.Join(home, "work") {
+		t.Errorf("~ expansion: %+v %v", got, err)
+	}
+	if got, err := cleanTarget(deployTarget{Scope: "local", Path: "work"}, home, home); err != nil || got.Path != filepath.Join(home, "work") {
+		t.Errorf("relative path: %+v %v", got, err)
+	}
+	for _, bad := range []deployTarget{{Scope: "project", Path: "~/file"}, {Scope: "project", Path: "~/missing"}, {Scope: "team"}, {Scope: "project"}} {
+		if _, err := cleanTarget(bad, home, home); err == nil {
+			t.Errorf("%+v accepted", bad)
+		}
+	}
+	if got, err := cleanTarget(deployTarget{Scope: "user", Path: "~/work"}, home, home); err != nil || got.Path != "" {
+		t.Errorf("user scope keeps no path: %+v %v", got, err)
+	}
+}
+
+func TestRunDeployBuildsThenRuns(t *testing.T) {
+	f, root := deployFake(t)
+	if err := f.run("deploy", "kit"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	var order []string
+	for _, c := range f.calls {
+		switch {
+		case strings.HasPrefix(c, "pnpm install"), strings.HasPrefix(c, "claude plugin marketplace add"), strings.HasPrefix(c, "claude plugin install"):
+			order = append(order, strings.Join(strings.Fields(c)[:3], " "))
+		}
+	}
+	if strings.Join(order, ";") != "pnpm install --no-frozen-lockfile;claude plugin marketplace;claude plugin install" {
+		t.Errorf("order %v", order)
+	}
+	out := f.out.String()
+	if !strings.Contains(out, "$ claude plugin install kit@work-ipm --scope project") || !strings.Contains(out, "✓ deployed kit (project "+root+")") {
+		t.Errorf("output:\n%s", out)
+	}
+}
+
+func TestRunDeployStopsOnFailure(t *testing.T) {
+	f, root := deployFake(t)
+	f.full["claude plugin install kit@work-ipm --scope project"] = result{"boom", errors.New("exit status 1")}
+	err := f.run("deploy", "kit", "--path", root)
+	if err == nil || !strings.Contains(err.Error(), "claude plugin install kit@work-ipm") || strings.Contains(f.out.String(), "✓ deployed") {
+		t.Errorf("err %v\n%s", err, f.out.String())
+	}
+}
+
+func TestDeployNeedsClaude(t *testing.T) {
+	f, _ := deployFake(t)
+	f.onPath["claude"] = false
+	if err := f.run("deploy", "kit"); err == nil || !strings.Contains(err.Error(), "claude") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestDeployPackRequired(t *testing.T) {
+	f, _ := deployFake(t)
+	f.run("pack", "new", "second")
+	var usage *UsageError
+	if err := f.run("deploy"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "name a pack") {
+		t.Errorf("got %v", err)
 	}
 }
