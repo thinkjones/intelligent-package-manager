@@ -395,7 +395,19 @@ func TestTreeFollowsSelection(t *testing.T) {
 		t.Fatalf("cursor %q", m.cursor)
 	}
 	v := view(m)
-	for _, want := range []string{"o/r", "The p plugin", "▶tdd", "Test first.", "helper"} {
+	if row := caretRow(panels(m.View().Content)[1]); !strings.Contains(row, "tdd") {
+		// panels keep the border; strip it before looking for the caret
+		found := false
+		for _, l := range panels(view(m))[1] {
+			if strings.HasPrefix(strings.TrimPrefix(l, "│ "), "▶ ") && strings.Contains(l, "tdd") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("the tree's caret row should be tdd:\n%s", view(m))
+		}
+	}
+	for _, want := range []string{"o/r", "The p plugin", "tdd", "Test first.", "helper"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("tree lacks %q:\n%s", want, v)
 		}

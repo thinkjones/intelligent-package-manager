@@ -57,6 +57,16 @@ func sample() mapCatalog {
 	return c
 }
 
+// caretRow is the tree line carrying the caret, without styling.
+func caretRow(lines []string) string {
+	for _, l := range lines {
+		if p := ansi.Strip(l); strings.HasPrefix(p, "▶ ") {
+			return p
+		}
+	}
+	return ""
+}
+
 func ids(refs []Ref) string {
 	var out []string
 	for _, r := range refs {
@@ -136,7 +146,7 @@ func TestTreeLines(t *testing.T) {
 		}
 	}
 	text := ansi.Strip(strings.Join(lines, "\n"))
-	for _, want := range []string{"repo    o/r", "market  m", "plugin  p", "skill   a", "skill  ▶b", "also in: plugin p2"} {
+	for _, want := range []string{"repo    o/r", "market  m", "plugin  p", "skill   a", "also in: plugin p2"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("tree lacks %q:\n%s", want, text)
 		}
@@ -149,14 +159,8 @@ func TestTreeLines(t *testing.T) {
 			}
 		}
 	}
-	var cursor string
-	for _, l := range lines {
-		if strings.Contains(ansi.Strip(l), "▶b") {
-			cursor = ansi.Strip(l)
-		}
-	}
-	if !strings.Contains(cursor, "─▶ Skill b") {
-		t.Errorf("the cursor row should point at its description: %q", cursor)
+	if cursor := caretRow(lines); !strings.Contains(cursor, "skill   b") || !strings.Contains(cursor, "Skill b") || strings.Contains(cursor, "─▶") {
+		t.Errorf("the caret row is the cursor, with its description and no inline arrow: %q", cursor)
 	}
 	wrapped := 0
 	for _, l := range lines {
@@ -181,7 +185,7 @@ func TestTreeScrollsLongSiblingLists(t *testing.T) {
 	tv, _ := buildTree(c, "agent:a60", nil)
 	lines := tv.lines(80, 14, -1, false)
 	text := ansi.Strip(strings.Join(lines, "\n"))
-	if len(lines) != 14 || !strings.Contains(text, "▶a60") || !strings.Contains(text, "↑ ") || !strings.Contains(text, "↓ ") || !strings.Contains(text, " more") {
+	if len(lines) != 14 || !strings.Contains(caretRow(lines), "a60") || !strings.Contains(text, "↑ ") || !strings.Contains(text, "↓ ") || !strings.Contains(text, " more") {
 		t.Errorf("want the cursor between ↑/↓ more rows:\n%s", text)
 	}
 }
@@ -244,8 +248,9 @@ func TestTreeKeepsSiblingsAroundBigCursor(t *testing.T) {
 	}
 	tv, _ := buildTree(c, "plugin:p40", nil)
 	for _, rows := range []int{10, 12, 14} {
-		text := ansi.Strip(strings.Join(tv.lines(76, rows, -1, false), "\n"))
-		if !strings.Contains(text, "▶p40") || !strings.Contains(text, "↑ ") || !strings.Contains(text, "more") || !(strings.Contains(text, "p39") || strings.Contains(text, "p41")) {
+		ls := tv.lines(76, rows, -1, false)
+		text := ansi.Strip(strings.Join(ls, "\n"))
+		if !strings.Contains(caretRow(ls), "p40") || !strings.Contains(text, "↑ ") || !strings.Contains(text, "more") || !(strings.Contains(text, "p39") || strings.Contains(text, "p41")) {
 			t.Errorf("rows %d: want the cursor, a sibling and the scroll rows:\n%s", rows, text)
 		}
 		if strings.Count(text, "↓ ") < 1 {
@@ -276,8 +281,9 @@ func external() mapCatalog {
 
 func TestTreeExternalRow(t *testing.T) {
 	tv, _ := buildTree(external(), "plugin:a/m#cloudflare", nil)
-	text := ansi.Strip(strings.Join(tv.lines(110, 12, -1, false), "\n"))
-	if !strings.Contains(text, "▶↗cloudflare") || !strings.Contains(text, "↗ cloudflare/skills — Skills for Cloudflare") {
+	ls := tv.lines(110, 12, -1, false)
+	text := ansi.Strip(strings.Join(ls, "\n"))
+	if !strings.Contains(caretRow(ls), "↗cloudflare") || !strings.Contains(text, "↗ cloudflare/skills — Skills for Cloudflare") {
 		t.Errorf("cursor external row:\n%s", text)
 	}
 	tv, _ = buildTree(external(), "plugin:a/m:local", nil)

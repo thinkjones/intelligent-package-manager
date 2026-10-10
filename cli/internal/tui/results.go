@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"github.com/charmbracelet/x/ansi"
 	"strconv"
 
 	"charm.land/lipgloss/v2"
@@ -18,11 +19,13 @@ func (m *Model) resultLines(w, rows int) []string {
 		m.offset = m.sel - rows + 1
 	}
 	lines := make([]string, 0, rows)
+	inner := w - caretWidth
 	wideRows := w >= wideWidth-4
-	nameW := max(10, w-6-labelWidth-4)
+	nameW := max(10, inner-6-labelWidth-4)
 	if wideRows {
-		nameW = max(10, min(32, w-6-labelWidth-4-39))
+		nameW = max(10, min(32, inner-6-labelWidth-4-39))
 	}
+	active := m.focus == focusResults || m.focus == focusSearch
 	for i := m.offset; i < len(m.res.Hits) && len(lines) < rows; i++ {
 		h := m.res.Hits[i]
 		mark := " "
@@ -35,18 +38,11 @@ func (m *Model) resultLines(w, rows int) []string {
 			label = "↗" + label
 		}
 		name := fit(label, nameW)
-		switch {
-		case i == m.sel && m.focus == focusResults:
-			name = stSelected.Render(name)
-			row = stAmber.Render("▶") + row
-		case i == m.sel:
-			name = stTitle.Render(name)
-			row = stMuted.Render("›") + row
-		default:
-			name = stText.Render(name)
-			row = " " + row
+		if i == m.sel && active {
+			row += stSelected.Render(name)
+		} else {
+			row += stText.Render(name)
 		}
-		row += name
 		if wideRows {
 			star := ""
 			if h.Stars > 0 {
@@ -57,8 +53,15 @@ func (m *Model) resultLines(w, rows int) []string {
 				used = "↗" + strconv.Itoa(h.UsedBy)
 			}
 			row += " " + stMuted.Render(fit(h.Repo, 26)) + " " + stAmber.Render(fit(used, 4)) + " " + starStyle(h.Stars).Render(fit(star, 7))
+			if left := inner - lipgloss.Width(row) - 1; left > 0 {
+				row += " " + stMuted.Render(ansi.Truncate(firstLine(h.Description), left, "…"))
+			}
 		}
-		lines = append(lines, fit(row, w))
+		if i == m.sel {
+			lines = append(lines, selectedRow(row, w, active))
+		} else {
+			lines = append(lines, plainRow(row, w))
+		}
 	}
 	for len(lines) < rows {
 		lines = append(lines, spaces(w))

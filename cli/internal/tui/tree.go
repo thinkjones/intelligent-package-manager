@@ -152,6 +152,8 @@ func (tv treeView) selectable() []Ref {
 // lines draws the tree: exactly rows lines of width w. sel is the selected
 // row among selectable() in tree mode, -1 in search mode.
 func (tv treeView) lines(w, rows, sel int, focused bool) []string {
+	full := w
+	w -= caretWidth // the caret column, added to every row at the end
 	depth := len(tv.Path)
 	var head []treeRow
 	for d, r := range tv.Path {
@@ -297,12 +299,22 @@ func (tv treeView) lines(w, rows, sel int, focused bool) []string {
 		window[len(window)-1] = treeRow{kind: rowMore, guide: sibGuide(true), text: fmt.Sprintf("↓ %d more", len(body)-end+1), sel: -1}
 	}
 
+	// The selected row carries the caret: in tree mode, the row tree mode
+	// is on; otherwise the cursor's row, as the inactive selection.
 	out := make([]string, 0, rows)
 	for _, r := range append(head, window...) {
-		out = append(out, fit(tv.render(r, col, descW, sel, focused), w))
+		line := tv.render(r, col, descW, sel, focused)
+		switch {
+		case focused && r.sel == sel && r.sel != -1:
+			out = append(out, selectedRow(line, full, true))
+		case !focused && r.kind == rowCursor:
+			out = append(out, selectedRow(line, full, false))
+		default:
+			out = append(out, plainRow(line, full))
+		}
 	}
 	for len(out) < rows {
-		out = append(out, spaces(w))
+		out = append(out, spaces(full))
 	}
 	return out
 }
@@ -340,8 +352,7 @@ func (tv treeView) render(r treeRow, col, descW, sel int, focused bool) string {
 		if focused && r.sel == sel {
 			nameStyle = stSelected
 		}
-		fill := max(1, col-lead-3)
-		line := prefix + stAmber.Render("▶") + nameStyle.Render(name) + " " + stAmber.Render(strings.Repeat("─", fill)+"▶") + " "
+		line := prefix + " " + nameStyle.Render(name) + spaces(max(1, col-lead))
 		if descW > 0 {
 			line += stText.Render(r.text)
 		}
