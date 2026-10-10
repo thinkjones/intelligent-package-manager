@@ -38,6 +38,10 @@ Under the hood your sources are a single pnpm project with one git dependency pe
 
 The catalog is rebuilt from the pinned commits, so the same pins always give the same catalog. It lives in your cache folder and can be deleted at any time; `ipm index` rebuilds it.
 
+## Repos are roots; references are extra
+
+Every artifact belongs to the repo it lives in, and its tree starts there. A marketplace can also list a plugin that lives in another repo — an **external entry**. That's a reference, not ancestry: the entry points at the other repo, and the other repo shows it is **used by** the first. How many other repos use a repo is shown in search results (`↗N`), the TUI's tree and its `e` list, and breaks ties in search ranking.
+
 ## IDs
 
 Every artifact has an ID:

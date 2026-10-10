@@ -124,7 +124,7 @@ Hybrid keyword and semantic search. Needs `ipm serve` and `ipm load`. Each hit's
 ipm show [--json] <id>
 ```
 
-An artifact's fields, its repo's GitHub stats, and its neighbours. Reads the catalog; no search server needed.
+An artifact's fields, its repo's GitHub stats, and its neighbours: `up:` (what contains it, within its repo), `down:` (what it contains) and `used by:` (external entries in other repos that reference it — for a repo, anything in it). Reads the catalog; no search server needed.
 
 | Flag | Does |
 | --- | --- |
