@@ -2070,3 +2070,24 @@ func TestTuiCatalogNodeReferences(t *testing.T) {
 		t.Errorf("repo:x/c %+v", x)
 	}
 }
+
+func TestShowUsedByCountsAnythingInARepo(t *testing.T) {
+	root := checkout(t)
+	dir := filepath.Join(cacheOf(root), "catalog")
+	files := map[string]string{
+		"repos.jsonl": `{"id":"repo:a/m","type":"repo","name":"a/m","repo":"a/m"}` + "\n" + `{"id":"repo:b/s","type":"repo","name":"b/s","repo":"b/s"}` + "\n",
+		"plugins.jsonl": `{"id":"plugin:a/m#cf","type":"plugin","name":"cf","repo":"a/m","source_repo":"b/s","entry":{"name":"cf","source":{"source":"url","url":"u"}}}` + "\n" +
+			`{"id":"plugin:b/s:.","type":"plugin","name":"skills","repo":"b/s","path":"."}` + "\n",
+	}
+	for _, typ := range catalog.Types {
+		body := files[catalog.Files[typ]]
+		write(t, filepath.Join(dir, catalog.Files[typ]), body)
+	}
+	f := newFake(root)
+	if err := f.run("show", "repo:b/s"); err != nil {
+		t.Fatal(err)
+	}
+	if out := f.out.String(); !strings.Contains(out, "used by:") || !strings.Contains(out[strings.Index(out, "used by:"):], "plugin:a/m#cf") {
+		t.Errorf("a repo's used-by includes references to its plugins:\n%s", out)
+	}
+}

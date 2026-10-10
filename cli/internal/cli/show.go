@@ -99,7 +99,11 @@ func runShow(sys System, id string, asJSON bool) error {
 	tw.Flush()
 	neighbours(sys.Stdout, g, "up:", g.Children(id, true))
 	neighbours(sys.Stdout, g, "down:", g.Children(id, false))
-	if refs := g.RefsTo(id); len(refs) > 0 {
+	refs := g.RefsTo(id)
+	if s("type") == catalog.TypeRepo {
+		refs = g.RefsInto(s("repo"))
+	}
+	if len(refs) > 0 {
 		fmt.Fprintln(sys.Stdout, "\nused by:")
 		for _, r := range refs {
 			n, _ := g.Node(r)
