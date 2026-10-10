@@ -1117,3 +1117,15 @@ func TestExternalModalEmpty(t *testing.T) {
 		t.Error("esc should close")
 	}
 }
+
+func TestExternalModalSingular(t *testing.T) {
+	m, f := newTestWith(t, withRefs)
+	b := f.c.details["repo:b/s"]
+	b.UsedBy = b.UsedBy[:1]
+	f.c.details["repo:b/s"] = b
+	typeText(t, m, "cf")
+	press(t, m, "down", "e")
+	if !strings.Contains(view(m), "used by 1 repo\n") && !strings.Contains(view(m), "used by 1 repo ") {
+		t.Errorf("one repo, singular:\n%s", view(m))
+	}
+}

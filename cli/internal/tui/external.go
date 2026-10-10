@@ -85,7 +85,11 @@ func (m *Model) extLines(w, rows int) []string {
 	if len(em.rows) == 0 {
 		lines = append(lines, stTitle.Render("no other repo references "+em.repo), "", stMuted.Render("esc close"))
 	} else {
-		lines = append(lines, stTitle.Render(fmt.Sprintf("External references to %s — used by %d repos", em.repo, em.repos)), "")
+		noun := "repos"
+		if em.repos == 1 {
+			noun = "repo"
+		}
+		lines = append(lines, stTitle.Render(fmt.Sprintf("External references to %s — used by %d %s", em.repo, em.repos, noun)), "")
 		for i, r := range em.rows {
 			star := ""
 			if r.stars > 0 {
