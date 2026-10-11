@@ -38,6 +38,7 @@ $IPM_CACHE_DIR/
   catalog/*.jsonl             the catalog, one file per type
   catalog/github.jsonl        GitHub stats
   typesense/                  the search server's data and API key
+  curated/                    the curated lists ipm onboard fetched, for offline use
 ```
 
 ## In a project

@@ -8,8 +8,9 @@ Router for agents working in [thinkjones/intelligent-package-manager](https://gi
 
 | Path | What it is |
 | --- | --- |
-| [`cli/`](cli/README.md) | `ipm`, the Go CLI. Every command is in `cli/internal/cli`; the TUI's model is `cli/internal/tui` (Bubble Tea, behind four interfaces that `cli/internal/cli/tui.go` implements). |
-| `bin/ipm` | Shim that builds `cli/bin/ipm` when a Go source changes and runs it; `direnv allow` puts `bin/` on PATH. |
+| [`cli/`](cli/README.md) | `ipm`, the Go CLI. Every command is in `cli/internal/cli`; the TUI's model is `cli/internal/tui` (Bubble Tea, behind four interfaces that `cli/internal/cli/tui.go` implements), which also holds `ipm onboard`'s checklist (`checklist.go`); `cli/internal/curated` reads the curated source lists `ipm onboard` offers. |
+| `bin/ipm` | Shim that builds `cli/bin/ipm` when a Go source changes and runs it: `bin/ipm <command>` runs a development build. It isn't on PATH; `.envrc` no longer adds it. |
+| `install.sh` | Installs `ipm` into `~/.local/bin` (or `$IPM_BIN_DIR`): builds `cli/` from a checkout, or runs `go install …@latest` when piped from curl; then starts `ipm onboard` in a terminal. |
 | [`docs/`](docs/) | The user documentation, published to GitHub Pages at <https://thinkjones.github.io/intelligent-package-manager/> (Jekyll, Just the Docs theme, `docs/_config.yml`): [getting started](docs/getting-started.md), [concepts](docs/concepts.md), `guides/`, `reference/` ([commands](docs/reference/commands.md), [sources](docs/reference/sources.md), [files](docs/reference/files.md)), [troubleshooting](docs/troubleshooting.md), [how it works](docs/architecture.md). |
 | `docs/assets/brand/` | The hero, workflow and logo SVGs, shared by the README and the site. The palette (`#11151C` background, `#F3EFE6` text, `#F0A847` pins, `#5CC8A8` verified) is also in `docs/_sass/custom/setup.scss`; change both together. |
 | `docs/plans/` | Early notes. Historical, and excluded from the site. |
@@ -25,6 +26,7 @@ Router for agents working in [thinkjones/intelligent-package-manager](https://gi
 | `$IPM_HOME/global/` | User scope (`-g`): `ipm.toml` and `.ipm/`, laid out as in a project. |
 | `$IPM_CACHE_DIR/catalog/*.jsonl` | The catalog, written by `ipm index` (`github.jsonl` by `ipm stats`). Rebuildable; never committed. See [the catalog spec](docs/superpowers/specs/2026-10-08-artifact-catalog-design.md). |
 | `$IPM_CACHE_DIR/typesense/` | The local search server's data and API key. Disposable; `ipm load` rebuilds the index. |
+| `$IPM_CACHE_DIR/curated/` | The last copy of each curated list `ipm onboard` fetched, used when offline. |
 
 In a project (the nearest ancestor of the working directory holding `ipm.toml`):
 

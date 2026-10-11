@@ -53,7 +53,7 @@ Paths are resolved in `internal/paths`, following pnpm's conventions. Both roots
 | Home | `IPM_HOME` | `~/Library/ipm` | `$XDG_DATA_HOME/ipm`, else `~/.local/share/ipm` | `%LOCALAPPDATA%\ipm` |
 | Cache | `IPM_CACHE_DIR` | `~/Library/Caches/ipm` | `$XDG_CACHE_HOME/ipm`, else `~/.cache/ipm` | `%LOCALAPPDATA%\ipm\cache` |
 
-`XDG_DATA_HOME` and `XDG_CACHE_HOME` are honoured on every OS. The home holds what a user would lose — `sources/` (`package.json`, `pnpm-lock.yaml`, `node_modules/`, the generated `.pnpmfile.cjs`) and `store/`, a pnpm store dedicated to `ipm` (pnpm's docs say a store is for mutually trusted users and processes). The cache holds what `ipm` can rebuild: `catalog/` and `typesense/`.
+`XDG_DATA_HOME` and `XDG_CACHE_HOME` are honoured on every OS. The home holds what a user would lose — `sources/` (`package.json`, `pnpm-lock.yaml`, `node_modules/`, the generated `.pnpmfile.cjs`) and `store/`, a pnpm store dedicated to `ipm` (pnpm's docs say a store is for mutually trusted users and processes). The cache holds what `ipm` can rebuild: `catalog/`, `typesense/` and `curated/` (the last curated list `ipm onboard` fetched).
 
 Nothing is kept in the directory `ipm` runs from, so every command works anywhere. Packs live with the project that uses them (next section); user-scope packs live in `$IPM_HOME/global/`.
 
@@ -172,6 +172,12 @@ Two runs give byte-identical output, and items removed from a pack leave no file
 
 `catalog.BuildRefs` finds every **external entry** — a marketplace entry whose `source_repo` is another repo — and resolves what it references: the source repo's plugin at the entry's source path, else the one with its name, else the repo's only plugin, else the repo record. A source repo that isn't one of the user's sources only has a placeholder record (`followed: false`), which is never a target, so the entry is unresolved. `catgraph` keeps these apart from containment: repos never have parents, `RefTarget`, `RefsTo`, `RefsInto` and `UsedBy` answer the reference questions, and `ipm tree` stops at an external entry with a `↗ <target>` line. `internal/search` uses the same function for each document's `used_by` and `external` fields. In the TUI, `→` on an external entry jumps to its target with a back stack drawn as a second root, and `e` lists a repo's references.
 
+## `ipm onboard` and `ipm uninstall`
+
+`ipm onboard` (`internal/cli/onboard.go`) chains existing commands. It first looks for data — sources in `sources/package.json` or a catalog — and keeps it or backs it up by renaming home, then cache, to `<dir>.backup-YYYYMMDD-HHMM`; if the second rename fails the first is undone. `internal/curated` fetches the curated list (a URL is cached under `<cache>/curated/` and reused when offline; a path is read as is) and groups its `[[repos]]` rows into lists. The picks come from `--lists`, `--yes` (the default lists) or the checklist (`internal/tui/checklist.go`, its own Bubble Tea model, where sources already followed are locked). Then it calls `sources.AddSkippingExisting`, `runSync`, `runStats` (skipped without a logged-in `gh`), and `runServe` with `runLoad` (skipped without Docker), stopping at the first failure with the command to rerun.
+
+`ipm uninstall` (`internal/cli/uninstall.go`) checks everything before removing anything: it refuses a development build (the binary's folder is `bin` and an ancestor holds `.git` and `cli/go.mod`) without `--force`, and with `--purge` asks for the home path. Then it removes the `ipm-typesense` container, the binary, and with `--purge` the home and cache.
+
 ## `ipm doctor`
 
 One row each for `home`, `cache`, `pnpm` (the version, and whether it runs through `npx`), `sources` (count; a warning if not all are synced), `catalog` (record count; a warning if not built), `docker`, `typesense` and `claude` (a warning if not on PATH). A missing home or pnpm is a problem and exits 1; warnings do not.
@@ -196,10 +202,11 @@ cli/
     ├── pack/                  naming rules; reading an aihs-era manifest.toml for source import
     ├── copilot/               the skills a Copilot plugin.json lists
     ├── marketplace/           marketplace.json entries (ipm's own or upstream entry maps) and atomic Write
-    └── tui/                   the Bubble Tea model behind ipm tui (tree.go, deploy.go), over five interfaces (deps.go)
+    ├── curated/               read curated source lists ([[repos]] TOML) for ipm onboard; fetch with a cached fallback
+    └── tui/                   the Bubble Tea model behind ipm tui (tree.go, deploy.go), over five interfaces (deps.go); checklist.go, ipm onboard's picker
 ```
 
-Commands reach the outside world only through `cli.System` (stdout, stderr, environment, `LookPath`, an `Output` runner for pnpm, docker, gh and claude, an HTTP client and a clock). `go install …/cli/cmd/ipm` builds the same binary. In a clone, `bin/ipm` at the root is a shell shim: it rebuilds `cli/bin/ipm` when a Go source changes and execs it; `.envrc` puts `bin/` on PATH.
+Commands reach the outside world only through `cli.System` (stdout, stderr, environment, `LookPath`, an `Output` runner for pnpm, docker, gh and claude, an HTTP client and a clock). `go install …/cli/cmd/ipm` builds the same binary. In a clone, `bin/ipm` at the root is a shell shim: it rebuilds `cli/bin/ipm` when a Go source changes and execs it; `install.sh` at the root builds the checkout into `~/.local/bin/ipm` (or `$IPM_BIN_DIR`), or, piped from curl, runs `go install …@latest` there; `.envrc` no longer touches `PATH`, so the `ipm` on `PATH` is the installed one and `bin/ipm <command>` runs the development build.
 
 ## Decisions
 

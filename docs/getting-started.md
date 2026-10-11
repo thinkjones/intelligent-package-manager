@@ -6,7 +6,7 @@ nav_order: 2
 # Getting started
 {: .no_toc }
 
-Install `ipm`, follow a couple of repos, search them and build your first plugin. It takes about ten minutes, most of it waiting for the first fetch.
+Install `ipm`, pick the repos to follow, search them and build your first plugin. It takes about ten minutes, most of it waiting for the first fetch.
 {: .fs-6 .fw-300 }
 
 1. TOC
@@ -26,14 +26,11 @@ Install `ipm`, follow a couple of repos, search them and build your first plugin
 
 ## Install
 
-### With `go install`
-
 ```bash
-go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest
-ipm version
+curl -fsSL https://raw.githubusercontent.com/thinkjones/intelligent-package-manager/main/install.sh | bash
 ```
 
-This puts `ipm` in `$(go env GOPATH)/bin`; make sure that folder is on your `PATH`.
+The script runs `go install` for the latest `ipm` into `~/.local/bin` (set `IPM_BIN_DIR` to choose another folder). It needs Go. If that folder isn't on your `PATH`, it prints the `export PATH=…` line to add to your shell's startup file; if another `ipm` comes first on your `PATH`, it says which. In a terminal it then starts `ipm onboard`; otherwise it prints `next: ipm onboard`.
 
 For tab completion of commands and flags, install the script for your shell, for example zsh: `ipm completion zsh > "${fpath[1]}/_ipm"`. `ipm completion --help` lists the shells.
 
@@ -44,10 +41,41 @@ If you want to work on `ipm`, or track `main` closely:
 ```bash
 git clone https://github.com/thinkjones/intelligent-package-manager.git
 cd intelligent-package-manager
-direnv allow        # puts bin/ on PATH; bin/ipm rebuilds the CLI whenever its source changes
+./install.sh        # builds this checkout into ~/.local/bin/ipm
 ```
 
-Without [direnv](https://direnv.net), build once with `cd cli && go build -o bin/ipm ./cmd/ipm` and put `cli/bin` on your `PATH`.
+From a checkout, `install.sh` builds `cli/` instead of fetching the published module. To run your working copy without installing it, use `bin/ipm <command>`: it rebuilds the CLI whenever its source changes.
+
+### With `go install`
+
+```bash
+go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest
+```
+
+This puts `ipm` in `$(go env GOPATH)/bin`; make sure that folder is on your `PATH`. Then run `ipm onboard`, or follow the manual steps below.
+
+## Onboard
+
+```bash
+ipm onboard
+```
+
+`ipm onboard` takes you from nothing to a searchable library. It loads a curated list of repos, shows them grouped into lists, and lets you tick the ones to follow. Two lists, "AI · Agentic Engineering Methods" and "AI · Skills, Plugins & Registries", are ticked for you on a fresh start.
+
+| Key | Does |
+| --- | --- |
+| `space` | Tick or untick a repo, or a whole list |
+| `→` / `←` | Expand or collapse a list |
+| `/` | Filter by repo, description or topic (`esc` clears) |
+| `a` / `n` | Tick all or none of the current list |
+| `enter`, then `y` | Continue with the ticked repos |
+| `q` | Quit without adding any sources |
+
+Each repo shows its stars, language and how long ago it was last pushed (these two at 100 columns or wider), and its description. Then `ipm onboard` adds the repos as sources and runs `ipm sync`, `ipm stats` and `ipm serve` with `ipm load`, printing `✓` or `✗` for each step. Stats are skipped when `gh` is missing or logged out, and search when Docker isn't running; it says so and what to run later. It ends with `✓ library ready — N sources, M artifacts` and a few searches to try.
+
+If `ipm` already has data, `ipm onboard` says what it found and asks whether to use it or back it up and start fresh. Using it keeps your sources: they show `✓` in the checklist and nothing is ticked for you. Backing up renames the home and cache folders to `<folder>.backup-YYYYMMDD-HHMM` and prints how to restore them. If a step fails, it prints the command to rerun; running `ipm onboard` again picks up where you left off.
+
+To use your own curated list, pass `--list <path or URL>`; the format is in [Curated lists](guides/sources.md#curated-lists). Every flag is in the [commands reference](reference/commands.md#ipm-onboard).
 
 ## Check your setup
 
@@ -60,6 +88,8 @@ ipm doctor
 `ipm` keeps its data in your user folders, never in the directory you run it from. See [Files and paths](reference/files.md) to move them.
 
 ## 1. Follow some repos
+
+`ipm onboard` does this step and the next for you. To do them by hand:
 
 ```bash
 ipm source add obra/superpowers anthropics/skills

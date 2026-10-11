@@ -72,11 +72,14 @@ In Claude Code the skill, agent and command load as `csharp-sdlc:<name>`, and th
 You need Go 1.26+, pnpm 12+ or Node (`ipm` then runs pnpm 12 through `npx`), and Docker for search.
 
 ```bash
-go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest
-ipm doctor
+curl -fsSL https://raw.githubusercontent.com/thinkjones/intelligent-package-manager/main/install.sh | bash
 ```
 
+The script installs `ipm` into `~/.local/bin` and starts `ipm onboard`, which lets you tick repos from a curated list, then fetches, catalogs and indexes them for search. Prefer to do it yourself? `go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest`, then follow the steps below.
+
 ## Build your first plugin
+
+Skip the first three lines if you ran `ipm onboard`.
 
 ```bash
 ipm source add obra/superpowers anthropics/skills
@@ -97,6 +100,7 @@ The [build your own plugin](https://thinkjones.github.io/intelligent-package-man
 
 | Command | Does |
 | --- | --- |
+| `ipm onboard` | Pick repos from a curated list and build a searchable library |
 | `ipm source add\|remove\|list` | Edit the repos you follow |
 | `ipm sync [--upgrade]` | Fetch and pin every repo with pnpm, then rebuild the catalog |
 | `ipm serve`, `ipm load`, `ipm search` | Run local search, index the catalog, search it |
@@ -106,6 +110,7 @@ The [build your own plugin](https://thinkjones.github.io/intelligent-package-man
 | `ipm deploy [pack] [--scope] [--path]` | Build, then install a pack into Claude Code |
 | `ipm tui [-g]` | Search, see the tree, collect, build and deploy, in one screen |
 | `ipm doctor` | Check everything `ipm` depends on |
+| `ipm uninstall [--purge]` | Remove `ipm` and its search container (`--purge` also deletes your data) |
 
 Every flag is in the [commands reference](https://thinkjones.github.io/intelligent-package-manager/reference/commands.html).
 
@@ -125,7 +130,8 @@ The [documentation site](https://thinkjones.github.io/intelligent-package-manage
 ```bash
 git clone https://github.com/thinkjones/intelligent-package-manager.git
 cd intelligent-package-manager
-direnv allow          # puts bin/ on PATH; bin/ipm rebuilds the CLI when its source changes
+./install.sh          # builds this checkout into ~/.local/bin/ipm
+bin/ipm doctor        # bin/ipm runs a development build, rebuilt when its source changes
 mise run cli:test     # gofmt, go vet, go test: the gate for every change
 ```
 

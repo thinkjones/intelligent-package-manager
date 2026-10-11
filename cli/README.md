@@ -5,6 +5,8 @@ The Go CLI. Every command is Go code in this module; it keeps its data in `IPM_H
 ## Usage
 
 ```text
+ipm onboard [--list <path|url>] [--lists <name>]… [--keep|--fresh] [--yes]
+                               pick sources from a curated list, then add, sync, stats, serve and load
 ipm source add <repo>…         add sources: owner/repo[@ref], a git URL[#ref], or an external plugin ID
 ipm source remove <repo>…      remove sources
 ipm source list                alias, repo, ref and pinned commit of every source
@@ -30,6 +32,7 @@ ipm install [-g] [--update] [--no-validate]   build each pack into .ipm/plugins/
                                then claude plugin validate --strict; --update re-pins to the current catalog
 ipm scan [--paths] [repo...]   report the plugin, skills, hooks and agents folders in synced sources
 ipm doctor                     check home, cache, pnpm, sources, catalog, docker, typesense, claude
+ipm uninstall [--purge] [--yes] [--force]   remove the search container and the binary; --purge also deletes home and cache
 ipm version
 ipm help [command]             usage, or one command's flags (or ipm <command> --help)
 ipm completion zsh|bash|fish|powershell   shell completion script
@@ -40,11 +43,11 @@ Exit codes: `0` success; `1` failure (bad source, pnpm missing or failed, unsync
 ## Setup
 
 ```bash
-direnv allow     # once: .envrc puts the repo's bin/ on PATH
-ipm doctor
+./install.sh     # from the repo root: builds cli/ into ~/.local/bin/ipm (or $IPM_BIN_DIR), then runs ipm onboard
+bin/ipm doctor   # a development build of this checkout
 ```
 
-Users install the same binary with `go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest`.
+Users install the same binary with `curl -fsSL https://raw.githubusercontent.com/thinkjones/intelligent-package-manager/main/install.sh | bash`, which runs `go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest`. `.envrc` doesn't put `bin/` on PATH, so `ipm` is the installed binary and `bin/ipm` the development one; `ipm uninstall` refuses to delete a development build without `--force`.
 
 `bin/ipm` is a shell shim: it builds `cli/bin/ipm` on first use and whenever a Go source in `cli/` changes, then execs the binary. The binary reads `IPM_HOME` and `IPM_CACHE_DIR` (and `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `HOME`, `LOCALAPPDATA`) to find its data, so it works from any directory.
 
@@ -68,7 +71,8 @@ internal/assemble/         resolve picks (lock, then catalog), plan each pack's 
 internal/pack/             naming rules, and reading an aihs-era manifest.toml for source import
 internal/copilot/          which skills a Copilot plugin.json lists
 internal/marketplace/      marketplace.json entries (including upstream entry maps) and atomic Write
-internal/tui/              the Bubble Tea model behind ipm tui: search, detail, tray, picker, install modal; depends only on its four interfaces (deps.go)
+internal/curated/          curated source lists for ipm onboard: parse [[repos]] TOML, fetch with a cached copy for offline
+internal/tui/              the Bubble Tea model behind ipm tui: search, detail, tray, picker, install modal; depends only on its four interfaces (deps.go); checklist.go is ipm onboard's picker
 ```
 
 Commands reach the outside world only through `cli.System` — stdout, stderr, environment, `LookPath`, an `Output` runner used for pnpm, docker, gh and claude, an HTTP client for Typesense, and a clock — so tests drive them in-process with a fake.
