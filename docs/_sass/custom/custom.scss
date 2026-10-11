@@ -7,19 +7,39 @@ h3,
 .text-gamma {
   font-family: $ipm-serif;
   font-weight: 600;
-  letter-spacing: -0.03em;
   color: $ipm-fg;
 }
 
+// The scale's tracking: tightest on the page title, easing off below it.
+// Word spacing keeps the words apart at that tracking.
 h1,
 .text-alpha {
   font-weight: 700;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.05em;
+  word-spacing: 0.12em;
+}
+
+h2,
+.text-beta {
+  letter-spacing: -0.05em;
+  word-spacing: 0.08em;
+}
+
+h3,
+.text-gamma {
+  letter-spacing: -0.02em;
 }
 
 .main-content {
   h2 {
     margin-top: 3rem;
+  }
+
+  // Sections are set apart by space, not rules.
+  hr {
+    height: 0;
+    margin: 2.5rem 0;
+    background: none;
   }
 
   // Text links read as text with an orange underline; orange on hover.
@@ -57,6 +77,7 @@ h1,
 // Buttons: square corners, dark slate for the primary action, no gradients.
 .btn {
   border: 1px solid $ipm-border;
+  padding: 0.75rem 1.5rem;
   border-radius: 2px;
   box-shadow: none;
   font-weight: 500;
@@ -137,10 +158,6 @@ img[src*="assets/brand/"] {
 }
 
 // Sidebar: slate links; where you are is marked in orange.
-.side-bar {
-  border-right: 1px solid $ipm-border;
-}
-
 .site-nav .nav-list .nav-list-item .nav-list-link {
   color: $ipm-text;
   font-weight: 500;
@@ -184,6 +201,11 @@ img[src*="assets/brand/"] {
   letter-spacing: 0.04em;
 }
 
+// The GitHub link is a tertiary action: mono, orange, a cursor before it.
+.aux-nav .aux-nav-list-item .site-button::before {
+  content: ">\00a0";
+}
+
 // Callouts: a panel with a coloured edge, not a tinted box.
 blockquote.note,
 blockquote.warning,
@@ -220,9 +242,9 @@ p.warning {
 ol.steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 1rem;
+  gap: 2rem;
   margin: 1.5rem 0;
-  padding: 1.5rem;
+  padding: 2rem;
   list-style: none;
   counter-reset: step;
   border-radius: 4px;

@@ -21,8 +21,7 @@
       <text x="0" y="206" font-size="20" fill="#475569">pins each repo;</text>
       <text x="0" y="232" font-size="20" fill="#475569">ipm catalogs it</text>
       <g transform="translate(0 252)">
-        <rect width="104" height="30" rx="2" fill="none" stroke="#e85d26" stroke-width="1.5"/>
-        <text x="52" y="21" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e85d26">@46891e7</text>
+        <text x="0" y="21" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e85d26">@46891e7</text>
       </g>
     </g>
     <g transform="translate(492 0)">
