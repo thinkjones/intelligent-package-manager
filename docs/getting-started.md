@@ -44,7 +44,7 @@ cd intelligent-package-manager
 ./install.sh        # builds this checkout into ~/.local/bin/ipm
 ```
 
-From a checkout, `install.sh` builds `cli/` instead of fetching the published module. To run your working copy without installing it, use `bin/ipm <command>`: it rebuilds the CLI whenever its source changes.
+From a checkout, `install.sh` builds `cli/` instead of fetching the published module. If you plan to commit, run `mise run setup` once to install the git hooks, and `mise run verify` before a pull request. To run your working copy without installing it, use `bin/ipm <command>`: it rebuilds the CLI whenever its source changes.
 
 ### With `go install`
 

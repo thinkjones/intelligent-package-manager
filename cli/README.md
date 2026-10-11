@@ -84,8 +84,9 @@ Add `internal/cli/<name>.go` with a `new<Name>Cmd(sys System) *cobra.Command` an
 ## Testing
 
 ```bash
-mise run cli:test      # gofmt check, go vet, go test ./... — the gate for changes here
-mise run cli:build     # cli/bin/ipm (bin/ipm also does this on demand)
+mise run verify            # gofmt, shfmt and golangci-lint checks, go build, go vet, go test ./... — the gate
+mise run test:integration  # real pnpm, Node and Typesense in Docker (-tags integration)
+mise run cli:build         # cli/bin/ipm (bin/ipm also does this on demand)
 ```
 
 - `internal/paths` and `internal/sources` test path resolution on every OS, aliases, the `package.json` round trip, collisions and reading commits from a fixture `pnpm-lock.yaml`.
