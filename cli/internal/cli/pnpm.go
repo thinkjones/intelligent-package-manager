@@ -73,6 +73,9 @@ module.exports = {
     // Sources are content, not code: never install their npm dependencies.
     readPackage(pkg) {
       if (pkg.name !== ROOT) {
+        // pnpm can't write a lockfile entry for a package without a name.
+        if (!pkg.name) pkg.name = "unnamed"
+        if (!pkg.version) pkg.version = "0.0.0"
         pkg.dependencies = {}
         pkg.optionalDependencies = {}
         pkg.peerDependencies = {}
