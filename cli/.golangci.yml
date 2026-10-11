@@ -8,6 +8,8 @@ linters:
         - fmt.Fprint
         - fmt.Fprintf
         - fmt.Fprintln
+        - io.WriteString
+        - (*text/tabwriter.Writer).Flush
         # Closing a file that was only read, or on a path already returning an error.
         - (*os.File).Close
         - (io.ReadCloser).Close
@@ -22,3 +24,7 @@ linters:
       # Test setup ignores errors that the assertions after it would catch.
       - path: _test\.go
         linters: [errcheck]
+issues:
+  # Show every finding, not the first 50 of each linter.
+  max-issues-per-linter: 0
+  max-same-issues: 0

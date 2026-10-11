@@ -128,7 +128,7 @@ func build(sys System, global, update, noValidate, hints bool) error {
 	if err := os.RemoveAll(staging); err != nil {
 		return err
 	}
-	defer os.RemoveAll(staging)
+	defer func() { _ = os.RemoveAll(staging) }()
 	var entries []any
 	var names []string
 	for _, pp := range plan.Packs {
