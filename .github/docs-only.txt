@@ -1,0 +1,6 @@
+# Paths that change no check: a PR touching only these schedules no CI jobs,
+# and a release may sit on top of them. One pattern per line; ** crosses folders.
+# Never list mise.toml, scripts, hooks or anything under .github/.
+docs/**
+*.md
+LICENSE

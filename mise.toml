@@ -62,11 +62,16 @@ run = [
 ]
 
 [tasks."ci:shell"]
-description = "CI job shell: shellcheck, and actionlint once there are workflows"
+description = "CI job shell: shellcheck, actionlint and the plan tests"
 run = [
   "shellcheck $(scripts/shell-files)",
-  "test ! -d .github/workflows || actionlint",
+  "actionlint",
+  "mise run ci:plan-test",
 ]
+
+[tasks."ci:plan-test"]
+description = "Table tests for the scripts that decide what CI runs and what may be released"
+run = ".github/scripts/plan_test.sh"
 
 [tools]
 actionlint = "1.7.12"
