@@ -31,7 +31,7 @@ The curated list is fetched each time and cached under the cache folder's `curat
 
 | Flag | Does |
 | --- | --- |
-| `--list L` | The curated list: a URL or a file. Default `https://thinkjones.github.io/ai-sdlc-repo-list/starred_repos.toml`. The format is in [Curated lists](../guides/sources.md#curated-lists). |
+| `--list L` | The curated list: a URL or a file; a GitHub `blob/` link is read as the raw file. Default `https://raw.githubusercontent.com/thinkjones/agentic-tools/main/starred_repos.toml`. The format is in [Curated lists](../guides/sources.md#curated-lists). |
 | `--lists NAME` | Follow every repo in this list, by exact name (repeatable). Skips the checklist. |
 | `--yes` | Follow the pre-ticked lists without showing the checklist. |
 | `--keep` | Use existing ipm data without asking. |

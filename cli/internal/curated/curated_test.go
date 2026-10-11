@@ -183,3 +183,16 @@ func TestFetchPath(t *testing.T) {
 		t.Errorf("cache dir has %d entries, want none", len(entries))
 	}
 }
+
+func TestRawURL(t *testing.T) {
+	for _, tc := range []struct{ in, want string }{
+		{"https://github.com/thinkjones/agentic-tools/blob/main/starred_repos.toml", "https://raw.githubusercontent.com/thinkjones/agentic-tools/main/starred_repos.toml"},
+		{"https://github.com/o/r/blob/v1.2/lists/a.toml?plain=1", "https://raw.githubusercontent.com/o/r/v1.2/lists/a.toml"},
+		{"https://example.com/blob/x.toml", "https://example.com/blob/x.toml"},
+		{DefaultURL, DefaultURL},
+	} {
+		if got := rawURL(tc.in); got != tc.want {
+			t.Errorf("rawURL(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
