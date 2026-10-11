@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# ipm shim — .envrc puts this directory on PATH, so `ipm` works in any shell
-# after `direnv allow`. The shim (re)builds cli/bin/ipm whenever a Go source
-# is newer than the binary, then replaces itself with it. ipm keeps its data
+# ipm shim — runs a development build of this checkout: bin/ipm <command>.
+# It (re)builds cli/bin/ipm whenever a Go source is newer than the binary,
+# then replaces itself with it. ./install.sh installs ipm on PATH. ipm keeps its data
 # in your user folders (IPM_HOME, IPM_CACHE_DIR), not in this checkout.
 set -euo pipefail
 

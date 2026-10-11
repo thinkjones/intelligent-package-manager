@@ -1,6 +1,6 @@
-# This repo is the source of ipm (cli/), a Go CLI. `direnv allow` puts its
-# bin/ipm shim on PATH; ipm keeps its data in your user folders. See
-# cli/README.md.
+# This repo is the source of ipm (cli/), a Go CLI. ./install.sh installs it;
+# bin/ipm runs a development build; ipm keeps its data in your user folders.
+# See cli/README.md.
 
 [tasks."cli:build"]
 description = "Build ipm into cli/bin/ (bin/ipm also does this on demand)"
