@@ -227,14 +227,16 @@ Commands reach the outside world only through `cli.System` (stdout, stderr, envi
 
 ## Testing
 
-`mise run cli:test` runs `gofmt`, `go vet` and `go test ./...`:
+`mise run verify` runs the format and lint checks, `go build`, `go vet` and `go test ./...`:
 
 - `internal/paths` resolves defaults and overrides for macOS, Linux and Windows, and refuses relative paths and a missing home.
 - `internal/sources` tests aliases, the `package.json` round trip, duplicate and colliding repos, and reading commits from a fixture `pnpm-lock.yaml`, including unsynced cases.
 - `internal/project` tests the scope walk and the `ipm.toml` and lock round trips; `internal/assemble` tests resolving from lock then catalog, name clashes, Copilot plugins, whole-plugin entries, hard link falling back to copy, and stale files removed.
 - `internal/catalog`, `internal/catgraph`, `internal/search` and `internal/typesense` test the catalog, the graph and search against fixtures and an `httptest` server.
 - `internal/cli` drives every command in-process with a fake `System` and temp `IPM_HOME`/`IPM_CACHE_DIR`: the exact pnpm arguments, the generated `.pnpmfile.cjs`, the `npx` fallback for an old pnpm, a failed pnpm leaving the catalog intact, doctor rows, `ipm pack` refusals and scopes, and `ipm install` pins, determinism, installing from the lock alone and validation.
-- `cmd/ipm` builds the real binary and checks exit codes; when pnpm is installed it also runs `source add`, `sync` and `index` against a local git repo over `file://`.
+- `cmd/ipm` builds the real binary and checks exit codes.
+
+`mise run test:integration` adds the tests behind the `integration` build tag, also in `cmd/ipm`: with real pnpm and Node, `source add`, `sync`, `sync --upgrade` and `ipm install` against local git repos over `file://`; with Docker as well, `ipm serve`, `ipm load` and `ipm search` against a real Typesense. CI runs them; locally the search test refuses to run beside an existing `ipm-typesense` container.
 
 ## Extending
 

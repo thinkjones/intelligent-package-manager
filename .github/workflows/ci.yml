@@ -1,0 +1,135 @@
+name: CI
+
+# What each job runs is a mise task (mise run ci:<job> reproduces it); this
+# file only orchestrates. What a run schedules is decided by
+# .github/scripts/plan.sh from the QUALITY_MODE repo variable: see AGENTS.md.
+
+on:
+  pull_request:
+    # edited: retargeting a pull request changes its diff, so it is planned again.
+    types: [opened, synchronize, reopened, ready_for_review, edited]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: full = Tier 1 + Tier 2; fast = Tier 1 only
+        type: choice
+        options: [full, fast]
+        default: full
+
+# A newer run on the same pull request or branch cancels the older one. The
+# event is in the key so a merge's push run never cancels a manual full run.
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The mise the ci:* tasks were verified with.
+  MISE_VERSION: 2026.10.8
+
+jobs:
+  plan:
+    # Draft pull requests run nothing.
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      gate: ${{ steps.plan.outputs.gate }}
+      tier1: ${{ steps.plan.outputs.tier1 }}
+      full: ${{ steps.plan.outputs.full }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: plan
+        env:
+          MODE: ${{ vars.QUALITY_MODE }}
+          EVENT: ${{ github.event_name }}
+          SUITE: ${{ inputs.suite }}
+          PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$EVENT" = pull_request ]; then
+            # Both names of a renamed file, so code moved into docs/ is still code.
+            CHANGED="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')"
+            export CHANGED
+          fi
+          # No pipe: a pipe would hide plan.sh failing, and the gate would pass on nothing.
+          .github/scripts/plan.sh >plan.out
+          cat plan.out >>"$GITHUB_OUTPUT"
+          cat plan.out
+
+  unit: # Tier 1
+    needs: plan
+    if: needs.plan.outputs.tier1 == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        with:
+          version: ${{ env.MISE_VERSION }}
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            ~/.cache/golangci-lint
+          key: go-${{ runner.os }}-${{ hashFiles('cli/go.sum', 'mise.toml') }}
+      - run: mise run ci:unit
+
+  shell: # Tier 1
+    needs: plan
+    if: needs.plan.outputs.tier1 == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        with:
+          version: ${{ env.MISE_VERSION }}
+      - run: mise run ci:shell
+
+  integration: # Tier 2: real pnpm, Node and Typesense in Docker
+    needs: [plan, unit]
+    if: needs.plan.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        with:
+          version: ${{ env.MISE_VERSION }}
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('cli/go.sum', 'mise.toml') }}
+      - run: mise run ci:integration
+
+  gate:
+    name: "CI Gate: all required checks passed"
+    needs: [plan, unit, shell, integration]
+    # Not on a fast-mode push to main (nothing was scheduled), never on a
+    # cancelled run. A failed plan has empty outputs, so the gate runs and fails.
+    if: ${{ !cancelled() && needs.plan.outputs.gate != 'false' }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: echo "$RESULTS" | jq -e 'all(.[]; . == "success" or . == "skipped")'
+
+  full-gate:
+    name: "CI Gate (full suite)"
+    needs: [plan, unit, shell, integration]
+    if: ${{ !cancelled() && needs.plan.outputs.full == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: echo "$RESULTS" | jq -e 'all(.[]; . == "success")'

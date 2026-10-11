@@ -4,15 +4,15 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/testtool"
 )
 
 // pnpm 12 can't write a lockfile entry for a package without a name
 // (OpenBMB/ChatDev's package.json holds only devDependencies), so the hook
 // gives one to manifests that lack it.
 func TestPnpmfileNamesNamelessPackages(t *testing.T) {
-	if _, err := exec.LookPath("node"); err != nil {
-		t.Skip("node is not installed")
-	}
+	testtool.Need(t, "node")
 	path, err := writePnpmfile(t.TempDir(), "ipm-sources-x")
 	if err != nil {
 		t.Fatal(err)

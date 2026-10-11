@@ -1,0 +1,46 @@
+name: Release
+
+# The deploy: tags cli/vX.Y.Z on main, which is what `go install …@latest`
+# and install.sh give users. Refuses a commit whose full suite is not green.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version to release, as X.Y.Z (tagged cli/vX.Y.Z)
+        required: true
+        type: string
+
+# One release at a time, and never cancelled halfway.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  checks: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Assert the full-suite gate, then tag
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::releases are cut from main, not $GITHUB_REF"; exit 1
+          fi
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::version must be X.Y.Z (got '$VERSION')"; exit 1
+          fi
+          .github/scripts/assert-full-gate.sh "$GITHUB_SHA"
+          tag="cli/v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag already exists"; exit 1
+          fi
+          gh release create "$tag" --target "$GITHUB_SHA" --title "ipm v$VERSION" --generate-notes

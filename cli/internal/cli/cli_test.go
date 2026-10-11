@@ -1599,9 +1599,8 @@ func TestLocalSearchRanking(t *testing.T) {
 	if strings.Join(names, ",") != "tdd,tdd-guard,pdf" || res.Found != 3 {
 		t.Errorf("ranking %v found %d", names, res.Found)
 	}
-	byStars := func(repo string) (int, bool) { return 0, true }
 	records[1]["repo"], records[2]["repo"] = "big/one", "small/one"
-	byStars = func(repo string) (int, bool) {
+	byStars := func(repo string) (int, bool) {
 		if repo == "big/one" {
 			return 900, true
 		}

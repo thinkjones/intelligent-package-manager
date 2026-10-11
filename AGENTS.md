@@ -49,4 +49,21 @@ Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.lo
 - **Prose in Markdown is not hard-wrapped**: one line per paragraph or list item.
 - **User docs change with the code.** A change to a command, flag, message or file format updates `docs/reference/commands.md`, the guide that uses it and `docs/troubleshooting.md` in the same commit. Each site page has Just the Docs front matter (`title`, `nav_order`, `parent` under `guides/` and `reference/`); link between pages with relative `.md` links, which work on GitHub and on the site. Don't link to `docs/superpowers/` with a relative link from a site page (it isn't published); use its GitHub URL.
 
+## Quality gate
+
+- **The gate is `mise run verify`**: gofmt and shfmt checks, golangci-lint, `go build`, `go vet` and the unit tests, over the whole repo. Run it, not a subset. `mise run fmt` fixes formatting. Tool versions are pinned in `mise.toml`.
+- **Git hooks**: `mise run setup` installs them, once per clone (a shell with mise activated does it on entering the checkout). `pre-commit` formats the staged files and runs the gate; it refuses a file that is staged and then edited again. `pre-push` refuses any push to `main`.
+- **CI** (`.github/workflows/ci.yml`) runs mise tasks, so `mise run ci:<job>` reproduces a job: `ci:unit` (the gate), `ci:shell` (shellcheck, actionlint, the tests of the CI scripts), `ci:integration` (real pnpm, Node and Typesense in Docker). `.github/scripts/plan.sh` decides what a run schedules.
+- **The mode is fast** (repo variable `QUALITY_MODE`; CI fails without it). A pull request runs `unit` and `shell`; a merge to `main` runs nothing. So a break in the integration suite only shows when someone runs the full suite: `gh workflow run ci.yml --ref main`. Switch with `gh variable set QUALITY_MODE --body prod`, which runs the full suite on every pull request and merge.
+- **Open a pull request with** `gh pr create --fill && gh pr merge --auto --squash`. It merges by itself when `CI Gate: all required checks passed` is green, and does not have to be up to date with `main`. Two green pull requests can still combine into a red `main`; when that happens, stop merging until a fix is green.
+- **A pull request that only touches docs** (`.github/docs-only.txt`: `docs/**`, `*.md`, `LICENSE`) schedules no jobs and still gets a green gate. Draft pull requests schedule nothing.
+- **Releasing**: `gh workflow run release.yml -f version=X.Y.Z` tags `cli/vX.Y.Z` on `main`. It refuses a commit without a green `CI Gate (full suite)`, so run the full suite first. Once a release exists, `go install …/cli/cmd/ipm@latest` and `install.sh` give users the newest release; until then they give `main`. To roll back, release a new patch version from a good commit; a user can pin one with `go install …/cli/cmd/ipm@vX.Y.Z`.
+- **The docs site is not gated**: GitHub Pages publishes `docs/` on every merge to `main`.
+
+| Guard | Where | Can it be bypassed? |
+| --- | --- | --- |
+| `pre-commit`, `pre-push` hooks | Your clone | Yes, with `--no-verify` |
+| Ruleset on `main`: pull request and merge gate required, no force-push, no deletion | GitHub | No |
+| The release workflow refuses a commit without a green full suite | GitHub | Yes: nothing stops someone with write access pushing a `cli/v*` tag by hand. Release only through the workflow |
+
 [`CLAUDE.md`](CLAUDE.md) has the commands and the sharp edges.

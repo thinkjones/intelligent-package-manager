@@ -7,11 +7,85 @@ description = "Build ipm into cli/bin/ (bin/ipm also does this on demand)"
 dir = "cli"
 run = "go build -o bin/ipm ./cmd/ipm"
 
-[tasks."cli:test"]
-description = "gofmt check, go vet, go test — what a change to cli/ must pass"
+[tasks.setup]
+description = "Install the git hooks (once per clone)"
+run = "git config core.hooksPath .githooks"
+
+[tasks.fmt]
+description = "Format Go and shell files in place"
+run = [
+  "gofmt -w cli",
+  'files=$(scripts/shell-files) && shfmt -w -i 2 -ci $files',
+]
+
+[tasks.lint]
+description = "gofmt and shfmt checks, golangci-lint"
+run = [
+  'test -z "$(gofmt -l cli)" || { gofmt -l cli; echo "gofmt: the files above need mise run fmt" >&2; exit 1; }',
+  'files=$(scripts/shell-files) && shfmt -d -i 2 -ci $files',
+  "cd cli && golangci-lint run ./...",
+]
+
+[tasks."test:unit"]
+description = "go build, go vet, go test — no pnpm, Docker or network"
 dir = "cli"
 run = [
-  'test -z "$(gofmt -l .)" || { gofmt -l .; echo "gofmt: the files above need gofmt -w" >&2; exit 1; }',
+  "go build ./...",
   "go vet ./...",
   "go test ./...",
 ]
+
+[tasks."test:integration"]
+description = "Real pnpm, Node and Typesense in Docker — refuses to run beside an existing ipm-typesense container"
+dir = "cli"
+run = "go test -tags integration -count=1 ./cmd/ipm/..."
+
+[tasks.verify]
+description = "The gate: what a change must pass, and what CI's unit job runs"
+depends = ["lint", "test:unit"]
+
+[tasks."cli:test"]
+description = "The gate's old name; runs verify"
+depends = ["verify"]
+
+[tasks."ci:unit"]
+description = "CI job unit"
+depends = ["verify"]
+
+[tasks."ci:integration"]
+description = "CI job integration: asserts the tools reached the runner, then test:integration"
+run = [
+  'test "$(pnpm --version)" = 12.10.1 || { echo "ci:integration: pnpm 12.10.1 is required" >&2; exit 1; }',
+  'node --version >/dev/null || { echo "ci:integration: node is required" >&2; exit 1; }',
+  'docker info >/dev/null || { echo "ci:integration: a running Docker is required" >&2; exit 1; }',
+  "mise run test:integration",
+]
+
+[tasks."ci:shell"]
+description = "CI job shell: shellcheck, actionlint and the plan tests"
+run = [
+  'files=$(scripts/shell-files) && shellcheck $files',
+  "actionlint",
+  "mise run ci:plan-test",
+]
+
+[tasks."ci:plan-test"]
+description = "Table tests for the scripts that decide what CI runs and what may be released"
+run = ".github/scripts/plan_test.sh"
+
+[tools]
+actionlint = "1.7.12"
+go = "1.26.9"
+golangci-lint = "2.14.0"
+node = "24.21.0"
+pnpm = "12.10.1"
+shellcheck = "0.11.0"
+shfmt = "3.14.1"
+
+[env]
+# A test that needs a missing tool fails instead of skipping; only a bare `go test` skips.
+IPM_TEST_STRICT = "1"
+
+[hooks]
+# With mise activated in your shell, entering the checkout installs the git hooks.
+enter = "mise run setup"

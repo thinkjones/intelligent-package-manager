@@ -127,10 +127,11 @@ git clone https://github.com/thinkjones/intelligent-package-manager.git
 cd intelligent-package-manager
 ./install.sh          # builds this checkout into ~/.local/bin/ipm
 bin/ipm doctor        # bin/ipm runs a development build, rebuilt when its source changes
-mise run cli:test     # gofmt, go vet, go test: the gate for every change
+mise run setup        # installs the git hooks
+mise run verify       # format and lint checks, build, vet, unit tests: the gate for every change
 ```
 
-See [`cli/README.md`](cli/README.md) for the code layout. `ipm` was previously called `aihs`; design history is in [`docs/superpowers/`](docs/superpowers/).
+Changes arrive as pull requests; [`AGENTS.md`](AGENTS.md#quality-gate) describes the hooks and CI. See [`cli/README.md`](cli/README.md) for the code layout. `ipm` was previously called `aihs`; design history is in [`docs/superpowers/`](docs/superpowers/).
 
 ## License
 
