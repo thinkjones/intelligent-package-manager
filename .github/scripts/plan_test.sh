@@ -36,6 +36,36 @@ check prod push "" "docs/a.md" "gate=true tier1=true full=true"
 check "" pull_request "" "cli/x.go" FAIL
 check Fast pull_request "" "cli/x.go" FAIL
 
+# assert-full-gate.sh, with the GitHub and git lookups replaced.
+# gate <head conclusion> <parent conclusion> <files changed since the parent> <pass|fail>
+gate() {
+  local got=fail
+  # The stand-ins are called by assert_full_gate; FILES is split on purpose.
+  # shellcheck disable=SC1091,SC2329,SC2086
+  if (
+    source ./assert-full-gate.sh
+    gate_conclusion() { if [[ $1 == head ]]; then echo "$HEAD_C"; elif [[ $1 == parent ]]; then echo "$PARENT_C"; fi; }
+    ancestors() { printf 'older\nparent\noldest\n'; }
+    changed_files() { printf '%s\n' $FILES; }
+    HEAD_C=$1 PARENT_C=$2 FILES=$3 assert_full_gate head
+  ) >/dev/null 2>plan_test.err; then got=pass; fi
+  if [[ $got != "$4" ]]; then
+    echo "FAIL: gate head='$1' parent='$2' files='$3': got $got, want $4"
+    failed=1
+  elif [[ $4 == fail ]] && ! grep -q "gh workflow run ci.yml --ref main" plan_test.err; then
+    echo "FAIL: gate head='$1': the refusal should say how to run the full suite: $(cat plan_test.err)"
+    failed=1
+  fi
+}
+
+gate success "" "" pass
+gate "" "" "" fail
+gate failure success "docs/a.md" fail
+gate "" success "docs/a.md README.md" pass
+gate "" success "docs/a.md cli/x.go" fail
+gate "" success "" fail
+gate "" failure "docs/a.md" fail
+
 rm -f plan_test.err
 [[ $failed -eq 0 ]] && echo "plan_test: ok"
 exit $failed

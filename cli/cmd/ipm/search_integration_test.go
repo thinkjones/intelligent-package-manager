@@ -32,7 +32,14 @@ func TestServeLoadSearch(t *testing.T) {
 		c.Close()
 		t.Fatalf("something already listens on %s — this test needs the port; stop it, or run the test in CI", tsAddr)
 	}
-	t.Cleanup(func() { exec.Command(docker, "rm", "-f", tsContainer).Run() })
+	// Cleanups run last first, so the folders are made before the container's.
+	home, cache := t.TempDir(), t.TempDir()
+	t.Cleanup(func() {
+		// The server runs as root and its files land in cache: hand them back
+		// so the test can delete them.
+		exec.Command(docker, "exec", tsContainer, "chmod", "-R", "a+rwX", "/data").Run()
+		exec.Command(docker, "rm", "-f", tsContainer).Run()
+	})
 
 	upstream := t.TempDir()
 	os.MkdirAll(filepath.Join(upstream, "skills", "one"), 0o755)
@@ -44,7 +51,6 @@ func TestServeLoadSearch(t *testing.T) {
 		}
 	}
 
-	home, cache := t.TempDir(), t.TempDir()
 	env := []string{
 		"PATH=" + strings.Join([]string{filepath.Dir(pnpm), filepath.Dir(node), filepath.Dir(docker), "/usr/bin", "/bin"}, ":"),
 		"HOME=" + t.TempDir(), "IPM_HOME=" + home, "IPM_CACHE_DIR=" + cache,
