@@ -1,6 +1,7 @@
 // ipm is an intelligent package manager for agent skills, agents, commands
 // and plugins. Every command is Go code in internal/cli:
 //
+//	ipm onboard | uninstall      pick curated sources and build a library; remove ipm
 //	ipm source | sync | index    your repos of interest, fetched by pnpm
 //	ipm stats                    GitHub stats for the catalog
 //	ipm serve | load | search    local hybrid search over the catalog
@@ -8,9 +9,9 @@
 //	ipm scan | doctor            quick checks
 //	ipm version | help [command]
 //
-// Data lives in IPM_HOME and IPM_CACHE_DIR (see internal/paths). bin/ipm in
-// the source checkout builds this binary on demand. main only wires the
-// process into cli.Run. See cli/README.md.
+// Data lives in IPM_HOME and IPM_CACHE_DIR (see internal/paths). install.sh
+// installs this binary; bin/ipm in the source checkout builds it on demand.
+// main only wires the process into cli.Run. See cli/README.md.
 package main
 
 import (
