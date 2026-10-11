@@ -12,7 +12,9 @@ The source code of `ipm`, a Go CLI (`cli/`) that keeps a per-user list of repos 
 
 | Task | Command |
 | --- | --- |
-| Put `ipm` on PATH (once) | `direnv allow` |
+| Install `ipm` into `~/.local/bin` from this checkout (once; `$IPM_BIN_DIR` to change), then start onboarding | `./install.sh` |
+| Run a development build of this checkout (rebuilt when a Go source changes) | `bin/ipm <command>` |
+| Pick sources from a curated list, then add, sync, fetch stats and load search in one go | `ipm onboard [--list <path\|url>] [--lists <name>]… [--keep\|--fresh] [--yes]` |
 | Add, remove or list repos of interest | `ipm source add <owner/repo[@ref]\|git URL[#ref]\|plugin ID>`, `ipm source remove <repo>`, `ipm source list` |
 | Migrate an aihs-era list of repos (once) | `ipm source import <path/to/manifest.toml>` |
 | Fetch and pin every source with pnpm, then rebuild the catalog | `ipm sync` |
@@ -30,6 +32,7 @@ The source code of `ipm`, a Go CLI (`cli/`) that keeps a per-user list of repos 
 | Build, then install a pack into Claude Code (user, project or local scope) | `ipm deploy [pack] [--scope] [--path] [-g]` |
 | Report the plugin, skills, hooks and agents folders in synced sources | `ipm scan [--paths] [owner/repo...]` |
 | Check home, cache, pnpm, sources, catalog, docker, typesense, claude | `ipm doctor` |
+| Remove the search container and the binary, keeping data (`--purge` deletes home and cache; a dev build needs `--force`) | `ipm uninstall [--purge] [--yes] [--force]` |
 | Test changes to `cli/` (the gate) | `mise run cli:test` |
 | Install from the published module | `go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest` |
 

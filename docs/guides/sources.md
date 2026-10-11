@@ -28,6 +28,32 @@ An external plugin ID adds the repo that plugin lives in. It only works once the
 
 `ipm source add`, `remove` and `import` only edit your source list. Run `ipm sync` afterwards.
 
+## Curated lists
+
+`ipm onboard` offers repos from a curated list: a TOML file that groups GitHub repos into named lists. The default is [thinkjones/ai-sdlc-repo-list](https://thinkjones.github.io/ai-sdlc-repo-list/)'s `starred_repos.toml`. Anyone can publish one; pass it as a URL or a file:
+
+```bash
+ipm onboard --list https://example.com/my-list.toml
+ipm onboard --list ./my-list.toml --lists "My favourites"   # no checklist: every repo in that list
+```
+
+Each repo is one `[[repos]]` table:
+
+```toml
+[[repos]]
+repo = "obra/superpowers"                   # owner/repo on GitHub, required
+list = "AI · Agentic Engineering Methods"   # the list it appears under, required
+stars = 297229                              # optional, like everything below
+description = "An agentic skills framework & software development methodology that works."
+language = "Shell"
+last_push = 2026-10-10                      # a TOML date or date-time, or a "YYYY-MM-DD" string
+topics = ["skills", "sdlc", "superpowers"]
+```
+
+Lists appear in the order they first occur, with their repos sorted by stars. A repo can be in several lists by repeating its table with another `list`. Rows without a valid `owner/repo` or a `list` are skipped and counted. Other fields, and a `[meta]` table, are ignored.
+
+A list fetched from a URL is cached under the cache folder's `curated/`. When the URL can't be reached, `ipm onboard` uses that copy and says so; with no copy, pass a local file with `--list <path>`.
+
 ## Sync
 
 ```bash

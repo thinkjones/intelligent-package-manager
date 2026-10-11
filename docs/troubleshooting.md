@@ -19,7 +19,28 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `ipm fetches sources with pnpm 12 or later …` | Neither pnpm nor `npx` is on your `PATH`. Install pnpm 12+ or Node. |
 | `ipm needs pnpm 12 or later (found …)` | Your pnpm is too old and `npx` is missing. Upgrade pnpm, or install Node so `ipm` can run pnpm 12 through `npx`. |
 | `IPM_HOME must be an absolute path` | Set `IPM_HOME` (or `IPM_CACHE_DIR`) to an absolute path, or unset it. |
+| `ipm is built with Go — install it from https://go.dev/dl, then rerun this script` | `install.sh` needs Go. Install it and run the script again. |
+| `! … is not on your PATH — add this line to …` | The folder `install.sh` installed into (`~/.local/bin`, or `$IPM_BIN_DIR`) isn't on your `PATH`. Add the `export PATH=…` line it prints to that file, then open a new shell. |
+| `! another ipm comes first on your PATH: …` | An older `ipm` (often from `go install`, in `$(go env GOPATH)/bin`) runs instead of the one just installed. Delete it, or move `~/.local/bin` earlier in your `PATH`. `command -v ipm` shows which one runs. |
 | `ipm: command not found` after `go install` | Add `$(go env GOPATH)/bin` to your `PATH`. |
+
+## Onboard and uninstall
+
+| Message | Cause and fix |
+| --- | --- |
+| `onboard: ipm data exists — pass --keep to use it or --fresh to back it up` | Not in a terminal, so it can't ask. In a script, pass `--keep` to use your data or `--fresh` to back it up first. |
+| `onboard: pick sources with --lists <name> or --yes when not in a terminal` | The checklist needs a terminal. Pass `--lists "<name>"` (repeatable) or `--yes` for the pre-ticked lists, for example `ipm onboard --keep --yes`. |
+| `no list named "…"; the lists are: …` | `--lists` takes a list's exact name, including capitals and punctuation. Copy one from the names it prints. |
+| `! offline: using the copy of … saved earlier` | The curated list couldn't be fetched, so the copy from your last onboard is used. It may be out of date; rerun when you're online for the latest. |
+| `can't read the curated list at … — pass a local copy with --list <path>` | Offline, with no cached copy. Download the list elsewhere and pass the file with `--list`. |
+| `skipped N rows without a valid owner/repo` | Some `[[repos]]` tables in the curated list lack a `repo` of the form `owner/repo`, or a `list`. The rest load; fix the list if it's yours. |
+| `- stats skipped: gh is not installed`, `… gh is not logged in (gh auth login)` | Onboard carries on without GitHub stats. Install or log in to `gh`, then run `ipm stats` and `ipm load`. |
+| `- search skipped: start Docker, then ipm serve && ipm load` | Docker isn't running. Start it and run those two commands. |
+| `✗ <step>` then `rerun: <command>` | A step failed; the output above says why. Fix it and run the command shown. Running `ipm onboard` again also works: sources you already follow are kept. |
+| `can't back up …: … — nothing was changed` | The home or cache folder couldn't be renamed. Check its permissions; both folders are as they were. |
+| `… is a development build in a git checkout — rerun with --force to remove it` | You ran `ipm uninstall` with `bin/ipm` or a binary built inside an `ipm` checkout. Uninstall the installed one by running it by path (`~/.local/bin/ipm uninstall`), or pass `--force` to delete the development build. |
+| `uninstall: --purge needs --yes when not in a terminal` | It can't ask you to type the home path. Pass `--yes` if you mean it. |
+| `nothing deleted` | What you typed wasn't the home path exactly. Nothing was removed; run it again. |
 
 ## Sources and sync
 

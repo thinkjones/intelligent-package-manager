@@ -15,6 +15,30 @@ Every `ipm` command and flag. `ipm help <command>` prints the same from the CLI.
 
 Flags may come before or after positional arguments. Long flags take two dashes (`--update`); `-g` is short for `--global`. `ipm <command> --help` and `ipm help <command>` print a command's usage and flags, and a mistyped command gets a suggestion.
 
+## Setup
+
+### `ipm onboard`
+
+```text
+ipm onboard [--list <path|url>] [--lists <name>]… [--keep|--fresh] [--yes]
+```
+
+Takes you from nothing to a searchable library: picks sources from a curated list, adds them, then runs `ipm sync`, `ipm stats` and `ipm serve` with `ipm load`, printing `✓` or `✗` for each step. Stats are skipped when `gh` is missing or not logged in; search is skipped when Docker isn't running (`start Docker, then ipm serve && ipm load`). A failed step prints `rerun: <command>` and exits 1. It ends with `✓ library ready — N sources, M artifacts` and `try: ipm search … · ipm tui`.
+
+If `ipm` already has sources or a catalog, it prints, for example, `found existing ipm data: 26 sources · 3,280 artifacts · synced 2026-10-09` and asks `[u]se it · [b]ack it up and start fresh · [q]uit`. Backing up renames the home and cache folders to `<folder>.backup-YYYYMMDD-HHMM` and prints how to undo it: `to restore: rm -rf <home> <cache> && mv <home>.backup-… <home> && mv <cache>.backup-… <cache> && ipm serve`. If you then quit the checklist, it says `no sources added; your data was backed up to …` and prints the same line. With sources you already follow, `enter` with nothing new ticked continues with those (`0 new repos — y continue with the N you follow`), so rerunning `ipm onboard` after a failed step resumes it. While filtering, space on a list ticks only the repos shown.
+
+The curated list is fetched each time and cached under the cache folder's `curated/`; offline, the cached copy is used. In a terminal it shows a checklist of the lists, which expand into their repos; see [Getting started](../getting-started.md#onboard) for the keys. On a fresh start "AI · Agentic Engineering Methods" and "AI · Skills, Plugins & Registries" are ticked; repos you already follow show `✓` and nothing is ticked. Rerunning `ipm onboard` adds only what is new.
+
+| Flag | Does |
+| --- | --- |
+| `--list L` | The curated list: a URL or a file. Default `https://thinkjones.github.io/ai-sdlc-repo-list/starred_repos.toml`. The format is in [Curated lists](../guides/sources.md#curated-lists). |
+| `--lists NAME` | Follow every repo in this list, by exact name (repeatable). Skips the checklist. |
+| `--yes` | Follow the pre-ticked lists without showing the checklist. |
+| `--keep` | Use existing ipm data without asking. |
+| `--fresh` | Back up existing ipm data and start fresh without asking. |
+
+When not in a terminal, `--lists` or `--yes` is required, and so is `--keep` or `--fresh` if data exists. `--keep` and `--fresh` together are a usage error.
+
 ## Sources
 
 ### `ipm source`
@@ -236,6 +260,20 @@ ipm doctor
 
 Checks the home and cache folders, pnpm, sources, catalog, Docker, the search server and `claude`. `✓` is fine, `!` is a warning, `✗` is a problem; any problem makes it exit 1.
 
+### `ipm uninstall`
+
+```text
+ipm uninstall [--purge] [--yes] [--force]
+```
+
+Removes the `ipm-typesense` container (when Docker is available) and the running `ipm` binary. Your data is kept, and it says where: `ipm onboard` will offer to use it or back it up. A development build (a binary in a `bin/` folder inside an `ipm` checkout) is refused without `--force`.
+
+| Flag | Does |
+| --- | --- |
+| `--purge` | Also delete ipm's home and cache. You type the home path to confirm. |
+| `--yes` | With `--purge`, delete without asking. Required with `--purge` when not in a terminal. |
+| `--force` | Remove a development build in a git checkout too. |
+
 ### `ipm version`, `ipm help`
 
 ```text
@@ -256,7 +294,7 @@ Prints a shell completion script for commands and flags. For zsh: `ipm completio
 | Code | Means |
 | --- | --- |
 | `0` | Success |
-| `1` | Failure: a bad source, pnpm missing or failed, unsynced sources, an item not found or not pickable, validation failed, or a `doctor` problem |
+| `1` | Failure: a bad source, pnpm missing or failed, unsynced sources, an item not found or not pickable, validation failed, a failed `onboard` step, or a `doctor` problem |
 | `2` | A malformed command line |
 
 ## Environment

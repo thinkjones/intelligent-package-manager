@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/tui"
 )
 
 // System is everything a command needs from outside the process.
@@ -34,6 +36,16 @@ type System struct {
 	// Now is the current time; tests fix it.
 	Now     func() time.Time
 	Version string
+	// Stdin is where prompts read answers; nil reads nothing.
+	Stdin io.Reader
+	// Interactive reports whether stdin and stdout are both terminals; nil
+	// is false.
+	Interactive func() bool
+	// Executable is the running binary's path; nil uses os.Executable.
+	Executable func() (string, error)
+	// RunChecklist shows ipm onboard's checklist until the user confirms or
+	// quits; nil runs it as a Bubble Tea program.
+	RunChecklist func(*tui.Checklist) error
 }
 
 // ExitError ends ipm with Code and no further message: the output already
@@ -115,6 +127,8 @@ Config
 		newScanCmd(sys),
 		newTuiCmd(sys),
 		newDeployCmd(sys),
+		newOnboardCmd(sys),
+		newUninstallCmd(sys),
 		&cobra.Command{
 			Use:   "version",
 			Short: "print ipm's version",

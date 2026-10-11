@@ -1,0 +1,48 @@
+# fixture: 3 lists, 7 rows
+[meta]
+snapshot = 2026-10-10
+count = 7
+
+[[repos]]
+list = "Beta"
+repo = "b/low"
+stars = 10
+forks = 2
+license = "MIT"
+description = "low"
+last_push = 2026-10-10
+
+[[repos]]
+list = "Beta"
+repo = "b/high"
+stars = 900
+language = "Go"
+topics = ["tdd", "hooks"]
+description = "high"
+last_push = 2026-10-10T08:00:00Z
+
+[[repos]]
+list = "Alpha"
+repo = "a/one"
+stars = 5
+last_push = "2026-10-10"
+
+[[repos]]
+list = "Beta"
+repo = "not a repo"
+stars = 1
+
+[[repos]]
+list = "Alpha"
+repo = "shared/both"
+stars = 50
+
+[[repos]]
+list = "Gamma"
+repo = "shared/both"
+stars = 50
+
+[[repos]]
+list = "Gamma"
+repo = "g/x"
+stars = 7
