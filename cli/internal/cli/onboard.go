@@ -288,56 +288,82 @@ func runOnboard(sys System, o onboardOpts) error {
 }
 
 // onboardPipeline adds picks as sources, syncs, fetches stats and loads
-// search, stopping at the first step that fails.
+// search, stopping at the first step that fails. In a terminal the steps'
+// own output feeds one progress line and is shown only when a step fails.
 func onboardPipeline(sys System, p paths.Paths, lists []curated.List, picks []string) error {
-	fail := func(step string, err error, rerun string) error {
+	pr := newProgress(sys, 5)
+	defer pr.close()
+	step := sys // what the steps run with
+	if pr != nil {
+		step.Stdout, step.Progress = pr, pr.count
+	}
+	// say prints one of onboard's own lines; beside the bar they need no
+	// blank lines to set them off from a step's output.
+	say := func(format string, a ...any) {
+		s := fmt.Sprintf(format, a...)
+		if pr == nil {
+			fmt.Fprint(sys.Stdout, s)
+			return
+		}
+		pr.print(strings.Trim(s, "\n") + "\n")
+	}
+	fail := func(name string, err error, rerun string) error {
+		out := pr.output()
+		pr.close()
+		fmt.Fprint(sys.Stdout, out)
 		var exit *ExitError
 		if errors.As(err, &exit) {
-			fmt.Fprintf(sys.Stdout, "%s %s\n", bad, step)
+			fmt.Fprintf(sys.Stdout, "%s %s\n", bad, name)
 		} else {
-			fmt.Fprintf(sys.Stdout, "%s %s: %v\n", bad, step, err)
+			fmt.Fprintf(sys.Stdout, "%s %s: %v\n", bad, name, err)
 		}
 		fmt.Fprintf(sys.Stdout, "rerun: %s\n", rerun)
 		return &ExitError{Code: 1}
 	}
+	pr.begin(1, "sources")
 	added, skipped, err := sources.AddSkippingExisting(p.Sources(), picks)
 	if err != nil {
 		return fail("add sources", err, "ipm onboard")
 	}
-	fmt.Fprintf(sys.Stdout, "%s added %d %s (%d already followed)\n\n", ok, len(added), plural(len(added), "source"), len(skipped))
+	say("%s added %d %s (%d already followed)\n\n", ok, len(added), plural(len(added), "source"), len(skipped))
 
-	if err := runSync(sys, false); err != nil {
+	pr.begin(2, "sync")
+	if err := runSync(step, false); err != nil {
 		return fail("sync", err, "ipm sync")
 	}
-	fmt.Fprintf(sys.Stdout, "%s sync\n\n", ok)
+	say("%s sync%s\n\n", ok, pr.summary())
 
+	pr.begin(3, "stats")
 	if reason := ghMissing(sys); reason != "" {
-		fmt.Fprintf(sys.Stdout, "- stats skipped: %s\n", reason)
-	} else if err := runStats(sys); err != nil {
+		say("- stats skipped: %s\n", reason)
+	} else if err := runStats(step); err != nil {
 		return fail("stats", err, "ipm stats")
 	} else {
-		fmt.Fprintf(sys.Stdout, "%s stats\n\n", ok)
+		say("%s stats%s\n\n", ok, pr.summary())
 	}
 
+	pr.begin(4, "search server")
 	if dockerReady(sys) != nil {
-		fmt.Fprintln(sys.Stdout, "- search skipped: start Docker, then ipm serve && ipm load")
+		say("- search skipped: start Docker, then ipm serve && ipm load\n")
 	} else {
-		if err := runServe(sys, false); err != nil {
+		if err := runServe(step, false); err != nil {
 			return fail("search", err, "ipm serve && ipm load")
 		}
-		if err := runLoad(sys); err != nil {
+		pr.begin(5, "search index")
+		if err := runLoad(step); err != nil {
 			return fail("search", err, "ipm load")
 		}
-		fmt.Fprintf(sys.Stdout, "%s search\n", ok)
+		say("%s search%s\n", ok, pr.summary())
 	}
+	pr.close()
 
 	e, _, _ := detect(p)
-	fmt.Fprintf(sys.Stdout, "\n%s library ready — %s %s, %s %s\n", ok, thousands(e.Sources), plural(e.Sources, "source"), thousands(e.Artifacts), plural(e.Artifacts, "artifact"))
+	say("\n%s library ready — %s %s, %s %s\n", ok, thousands(e.Sources), plural(e.Sources, "source"), thousands(e.Artifacts), plural(e.Artifacts, "artifact"))
 	var try []string
 	for _, t := range topTopics(lists, picks, 3) {
 		try = append(try, "ipm search "+t)
 	}
-	fmt.Fprintf(sys.Stdout, "try: %s\n", strings.Join(append(try, "ipm tui"), " · "))
+	say("try: %s\n", strings.Join(append(try, "ipm tui"), " · "))
 	return nil
 }
 

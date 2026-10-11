@@ -46,6 +46,16 @@ type System struct {
 	// RunChecklist shows ipm onboard's checklist until the user confirms or
 	// quits; nil runs it as a Bubble Tea program.
 	RunChecklist func(*tui.Checklist) error
+	// Progress is told how far a long step has got: done of total, what
+	// being the latest. ipm onboard sets it to move its bar; nil is silent.
+	// It may be called from several goroutines.
+	Progress func(done, total int, what string)
+}
+
+func (s System) progress(done, total int, what string) {
+	if s.Progress != nil {
+		s.Progress(done, total, what)
+	}
 }
 
 // ExitError ends ipm with Code and no further message: the output already

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/github"
@@ -65,11 +66,13 @@ func runStats(sys System) error {
 	errs := make([]error, len(targets))
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 4)
+	var done atomic.Int32
 	for i, t := range targets {
 		wg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			results[i], errs[i] = github.Fetch(gh, t, sys.Now())
+			sys.progress(int(done.Add(1)), len(targets), t)
 		})
 	}
 	wg.Wait()

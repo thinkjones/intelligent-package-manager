@@ -39,6 +39,14 @@ The curated list is fetched each time and cached under the cache folder's `curat
 
 When not in a terminal, `--lists` or `--yes` is required, and so is `--keep` or `--fresh` if data exists. `--keep` and `--fresh` together are a usage error.
 
+It then runs five steps: add the sources, `ipm sync`, `ipm stats`, `ipm serve` and `ipm load`. In a terminal, one line is redrawn while they run:
+
+```text
+[████████░░░░░░░░░░░░] 3/5 stats · 17/42 anthropics/skills · 0:48
+```
+
+The bar covers all five steps and moves inside `stats` (per repo) and `load` (per 500 documents); after the step comes the last line it printed or its count, then the time since the steps began. The steps' own output is not shown. Each finished step leaves one line, such as `✓ sync · catalog: 3280 record(s), 2 warning(s)`; run `ipm index` to read the warnings. If a step fails, everything it printed is shown, then `✗ <step>` and `rerun: <command>`. When stdout is not a terminal there is no bar and each step prints what it prints on its own.
+
 ## Sources
 
 ### `ipm source`
