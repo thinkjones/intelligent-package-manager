@@ -334,9 +334,6 @@ func (c *Checklist) render() string {
 	if w < 100 {
 		foot = "space tick · ←→ expand · / filter · a/n all/none · enter go · q quit"
 	}
-	if w < 100 {
-		foot = "space tick · ←→ expand · / filter · a/n all/none · enter go · q quit"
-	}
 	if c.confirming {
 		foot = fmt.Sprintf("%d repos to follow — y continue · esc back", len(c.Picked()))
 		lines = append(lines, fit(stAmber.Render(foot), w))
