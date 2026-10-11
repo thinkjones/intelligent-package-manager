@@ -47,6 +47,13 @@ type fake struct {
 	calls []string
 	http  *http.Client
 	cwd   string
+	// stdin is what Stdin reads; interactive is what Interactive reports;
+	// exe is the running binary; checklist stands in for the Bubble Tea
+	// program (nil: quit without confirming).
+	stdin       string
+	interactive bool
+	exe         string
+	checklist   func(*tui.Checklist) error
 }
 
 type result struct {
@@ -109,8 +116,17 @@ func (f *fake) system() System {
 			}
 			return filepath.Dir(f.env["IPM_HOME"]), nil
 		},
-		Now:     func() time.Time { return time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC) },
-		Version: "test",
+		Now:         func() time.Time { return time.Date(2026, 10, 9, 0, 0, 0, 0, time.UTC) },
+		Version:     "test",
+		Stdin:       strings.NewReader(f.stdin),
+		Interactive: func() bool { return f.interactive },
+		Executable:  func() (string, error) { return f.exe, nil },
+		RunChecklist: func(c *tui.Checklist) error {
+			if f.checklist == nil {
+				return nil
+			}
+			return f.checklist(c)
+		},
 	}
 }
 

@@ -53,6 +53,11 @@ func run() int {
 		Getwd:   os.Getwd,
 		Now:     time.Now,
 		Version: version,
+		Stdin:   os.Stdin,
+		Interactive: func() bool {
+			return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
+		},
+		Executable: os.Executable,
 	})
 	var exit *cli.ExitError
 	var usage *cli.UsageError
