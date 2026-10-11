@@ -18,8 +18,12 @@ if ! command -v go >/dev/null 2>&1; then
 fi
 
 mkdir -p "$bin_dir"
-here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
-if [[ -n $here && -f $here/cli/go.mod ]]; then
+# Piped from curl, BASH_SOURCE is empty: there is no checkout to build.
+here=""
+if [[ -f ${BASH_SOURCE[0]:-} ]]; then
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+if [[ -n $here && -f $here/cli/cmd/ipm/main.go ]]; then
   echo "building ipm from $here/cli"
   (cd "$here/cli" && go build -o "$target" ./cmd/ipm)
 else
@@ -45,7 +49,8 @@ if [[ -n $found && $found != "$target" ]]; then
   echo "! another ipm comes first on your PATH: $found"
 fi
 
-if [[ -t 0 && -t 1 ]]; then
-  exec "$target" onboard
+# Piped from curl, stdin is the script: onboard reads the terminal instead.
+if [[ -t 1 ]] && { : </dev/tty; } 2>/dev/null; then
+  exec "$target" onboard </dev/tty
 fi
 echo "next: ipm onboard"

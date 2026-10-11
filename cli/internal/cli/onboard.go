@@ -125,21 +125,20 @@ func backupName(dir string, now time.Time) string {
 	}
 }
 
-// restoreHint says how to put backed-up folders back.
+// restoreHint says how to put backed-up folders back: remove what ipm made
+// since (mv would otherwise nest the backup inside it), move the backups
+// back, and restart the search server on the restored data.
 func restoreHint(p paths.Paths, moved []string) string {
-	var b strings.Builder
-	b.WriteString("to restore: ipm uninstall, then")
-	for i, m := range moved {
+	var origs, mvs []string
+	for _, m := range moved {
 		orig := p.Cache
 		if strings.HasPrefix(m, p.Home+".backup-") {
 			orig = p.Home
 		}
-		if i > 0 {
-			b.WriteString(" &&")
-		}
-		fmt.Fprintf(&b, " mv %s %s", m, orig)
+		origs = append(origs, orig)
+		mvs = append(mvs, "mv "+m+" "+orig)
 	}
-	return b.String()
+	return "to restore: rm -rf " + strings.Join(origs, " ") + " && " + strings.Join(mvs, " && ") + " && ipm serve"
 }
 
 // defaultLists are pre-ticked when onboarding starts from nothing.
@@ -273,15 +272,14 @@ func runOnboard(sys System, o onboardOpts) error {
 		if run == nil {
 			run = func(c *tui.Checklist) error { _, err := tea.NewProgram(c).Run(); return err }
 		}
-		if err := run(c); err != nil {
-			return err
-		}
-		if !c.Confirmed() {
-			fmt.Fprintln(sys.Stdout, "nothing changed")
+		err = run(c)
+		if err != nil || !c.Confirmed() {
 			if len(moved) > 0 {
-				fmt.Fprintln(sys.Stdout, restoreHint(p, moved))
+				fmt.Fprintf(sys.Stdout, "no sources added; your data was backed up to %s\n%s\n", strings.Join(moved, " and "), restoreHint(p, moved))
+			} else {
+				fmt.Fprintln(sys.Stdout, "nothing changed")
 			}
-			return nil
+			return err
 		}
 		picks = c.Picked()
 	}

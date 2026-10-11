@@ -47,6 +47,13 @@ func runUninstall(sys System, purge, yes, force bool) error {
 	if devBuild(bin) && !force {
 		return fmt.Errorf("%s is a development build in a git checkout — rerun with --force to remove it", bin)
 	}
+	if purge {
+		for _, dir := range []string{p.Home, p.Cache} {
+			if err := purgeRefusal(dir, sys.Getenv("HOME")); err != nil {
+				return err
+			}
+		}
+	}
 	interactive := sys.Interactive != nil && sys.Interactive()
 	if purge && !yes && !interactive {
 		return usagef("uninstall: --purge needs --yes when not in a terminal")
@@ -108,4 +115,18 @@ func devBuild(bin string) bool {
 			return false
 		}
 	}
+}
+
+// purgeRefusal refuses to delete dir when it is the filesystem root, the
+// user's home folder or a folder above it — an IPM_HOME or IPM_CACHE_DIR
+// pointed somewhere it shouldn't be.
+func purgeRefusal(dir, userHome string) error {
+	d := filepath.Clean(dir)
+	if d == string(filepath.Separator) || filepath.Dir(d) == d {
+		return fmt.Errorf("refusing to delete %s: it is the root of the filesystem", dir)
+	}
+	if userHome != "" && inside(filepath.Clean(userHome), d) {
+		return fmt.Errorf("refusing to delete %s: it holds your home folder %s — check IPM_HOME and IPM_CACHE_DIR", dir, userHome)
+	}
+	return nil
 }

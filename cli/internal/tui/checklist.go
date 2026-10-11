@@ -133,10 +133,11 @@ func (c *Checklist) current() (ckRow, bool) {
 	return rows[c.cursor], true
 }
 
-// setList ticks (or unticks) every unlocked repo in list i.
+// setList ticks (or unticks) every unlocked repo in list i — only those
+// the filter shows, while filtering.
 func (c *Checklist) setList(i int, on bool) {
 	for _, r := range c.lists[i].Repos {
-		if k := ckKey(r); !c.locked[k] {
+		if k := ckKey(r); !c.locked[k] && c.matches(r) {
 			c.ticked[k] = on
 		}
 	}
@@ -158,6 +159,38 @@ func (c *Checklist) listState(i int) string {
 		return "x"
 	}
 	return "~"
+}
+
+// shownState is listState over the repos the filter shows; space on a
+// list row toggles those.
+func (c *Checklist) shownState(i int) string {
+	n, all := 0, 0
+	for _, r := range c.lists[i].Repos {
+		if !c.matches(r) {
+			continue
+		}
+		all++
+		if k := ckKey(r); c.ticked[k] || c.locked[k] {
+			n++
+		}
+	}
+	if all > 0 && n == all {
+		return "x"
+	}
+	return " "
+}
+
+// lockedCount is how many distinct repos are locked (already followed).
+func (c *Checklist) lockedCount() int {
+	seen := map[string]bool{}
+	for _, l := range c.lists {
+		for _, r := range l.Repos {
+			if k := ckKey(r); c.locked[k] {
+				seen[k] = true
+			}
+		}
+	}
+	return len(seen)
 }
 
 func (c *Checklist) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -234,7 +267,7 @@ func (c *Checklist) key(msg tea.KeyPressMsg) tea.Cmd {
 			break
 		}
 		if row.repo < 0 {
-			c.setList(row.list, c.listState(row.list) != "x")
+			c.setList(row.list, c.shownState(row.list) != "x")
 		} else if k := ckKey(c.lists[row.list].Repos[row.repo]); !c.locked[k] {
 			c.ticked[k] = !c.ticked[k]
 		}
@@ -248,7 +281,7 @@ func (c *Checklist) key(msg tea.KeyPressMsg) tea.Cmd {
 		c.filter = ""
 		c.cursor = 0
 	case "enter":
-		if len(c.Picked()) == 0 {
+		if len(c.Picked()) == 0 && c.lockedCount() == 0 {
 			c.notice = "tick at least one repo"
 		} else {
 			c.confirming = true
@@ -336,6 +369,9 @@ func (c *Checklist) render() string {
 	}
 	if c.confirming {
 		foot = fmt.Sprintf("%d repos to follow — y continue · esc back", len(c.Picked()))
+		if len(c.Picked()) == 0 {
+			foot = fmt.Sprintf("0 new repos — y continue with the %d you follow · esc back", c.lockedCount())
+		}
 		lines = append(lines, fit(stAmber.Render(foot), w))
 	} else {
 		lines = append(lines, fit(stMuted.Render(foot), w))

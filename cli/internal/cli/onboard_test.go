@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -80,7 +81,10 @@ func TestBackupRenamesBoth(t *testing.T) {
 		t.Error("home and cache should now live at the backup paths only")
 	}
 	hint := restoreHint(p, moved)
-	if !strings.Contains(hint, "ipm uninstall") || !strings.Contains(hint, "mv "+want[0]+" "+p.Home) || !strings.Contains(hint, "mv "+want[1]+" "+p.Cache) {
+	if want := "to restore: rm -rf " + p.Home + " " + p.Cache + " && mv " + want[0] + " " + p.Home + " && mv " + want[1] + " " + p.Cache + " && ipm serve"; hint != want {
+		t.Errorf("restore hint = %q, want %q", hint, want)
+	}
+	if strings.Contains(hint, "uninstall") {
 		t.Errorf("restore hint = %q", hint)
 	}
 }
@@ -224,7 +228,7 @@ func TestOnboardAsksWhenDataExists(t *testing.T) {
 	if !exists(filepath.Join(home+".backup-20261009-0000", "sources", "package.json")) {
 		t.Errorf("home not backed up:\n%s", out)
 	}
-	if !strings.Contains(out, "to restore: ipm uninstall, then mv "+home+".backup-20261009-0000 "+home) {
+	if !strings.Contains(out, "to restore: rm -rf "+home) || !strings.Contains(out, "mv "+home+".backup-20261009-0000 "+home) {
 		t.Errorf("want the restore hint:\n%s", out)
 	}
 }
@@ -301,9 +305,9 @@ func TestOnboardQuitAfterBackupReprintsRestore(t *testing.T) {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	out := f.out.String()
-	tail := out[strings.LastIndex(out, "nothing changed"):]
-	if !strings.Contains(out, "nothing changed") || !strings.Contains(tail, "to restore:") {
-		t.Errorf("want 'nothing changed' then the restore hint:\n%s", out)
+	i := strings.LastIndex(out, "no sources added; your data was backed up")
+	if i < 0 || strings.Contains(out, "nothing changed") || !strings.Contains(out[i:], "to restore:") {
+		t.Errorf("want the backed-up message then the restore hint:\n%s", out)
 	}
 	if exists(filepath.Join(f.env["IPM_HOME"], "sources", "package.json")) {
 		t.Error("no sources should be added")
@@ -373,5 +377,42 @@ func TestOnboardYesWithoutDefaultLists(t *testing.T) {
 	err := f.run("onboard", "--yes", "--list", other)
 	if err == nil || !strings.Contains(err.Error(), "--lists") {
 		t.Errorf("got %v, want an error suggesting --lists", err)
+	}
+}
+
+func TestRestoreHintWorks(t *testing.T) {
+	// Following the hint after a completed fresh run puts the old data back.
+	p := tempPaths(t)
+	makeData(t, p)
+	write(t, filepath.Join(p.Home, "old"), "old")
+	moved, err := backup(p, onboardNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	makeData(t, p) // the fresh run's data
+	hint := strings.TrimSuffix(strings.TrimPrefix(restoreHint(p, moved), "to restore: "), " && ipm serve")
+	if out, err := exec.Command("sh", "-c", hint).CombinedOutput(); err != nil {
+		t.Fatalf("%s: %v %s", hint, err, out)
+	}
+	if !exists(filepath.Join(p.Home, "old")) || exists(filepath.Join(p.Home, filepath.Base(moved[0]))) {
+		t.Error("the old home should be back in place, not nested inside the new one")
+	}
+}
+
+func TestOnboardResumeInTerminal(t *testing.T) {
+	f, list := onboardFake(t)
+	withSources(t, f, map[string]map[string]string{"o/tdd": {"skills/x/SKILL.md": "x"}})
+	f.interactive = true
+	f.stdin = "u\n"
+	f.checklist = func(c *tui.Checklist) error {
+		c.Update(tea.KeyPressMsg{Code: tea.KeyEnter})
+		c.Update(tea.KeyPressMsg{Code: 'y', Text: "y"})
+		return nil
+	}
+	if err := f.run("onboard", "--list", list); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if !strings.Contains(f.out.String(), "✓ sync") {
+		t.Errorf("resuming with nothing new should still sync:\n%s", f.out.String())
 	}
 }

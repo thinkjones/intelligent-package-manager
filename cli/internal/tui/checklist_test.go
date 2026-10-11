@@ -157,7 +157,7 @@ func TestChecklistFilter(t *testing.T) {
 }
 
 func TestChecklistNothingTicked(t *testing.T) {
-	c := newCk(t, nil, map[string]bool{"anthropics/skills": true}, 120)
+	c := newCk(t, nil, nil, 120)
 	if ckPress(t, c, "enter") || c.Confirmed() {
 		t.Fatal("enter with nothing ticked must not continue")
 	}
@@ -261,5 +261,28 @@ func TestGoldenChecklist(t *testing.T) {
 			}
 			goldenString(t, name, got)
 		})
+	}
+}
+
+func TestChecklistContinueWithOnlyLocked(t *testing.T) {
+	c := newCk(t, nil, map[string]bool{"anthropics/skills": true}, 120)
+	ckPress(t, c, "enter")
+	if !strings.Contains(ckView(c), "0 new repos — y continue with the 1 you follow · esc back") {
+		t.Errorf("want the continue line:\n%s", ckView(c))
+	}
+	if !ckPress(t, c, "y") || !c.Confirmed() || len(c.Picked()) != 0 {
+		t.Error("y should confirm with no new picks")
+	}
+}
+
+func TestChecklistFilterTicksOnlyMatches(t *testing.T) {
+	c := newCk(t, nil, nil, 120)
+	ckPress(t, c, "/", "g", "u", "a", "r", "d", "enter", " ")
+	if got := strings.Join(c.Picked(), ","); got != "nizos/tdd-guard" {
+		t.Errorf("Picked = %s, want only the visible match", got)
+	}
+	ckPress(t, c, " ")
+	if len(c.Picked()) != 0 {
+		t.Errorf("second space should untick the matches, Picked = %v", c.Picked())
 	}
 }

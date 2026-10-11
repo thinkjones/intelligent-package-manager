@@ -120,3 +120,35 @@ func TestUninstallInDotfilesHome(t *testing.T) {
 		t.Errorf("~/.local/bin/ipm under a git home is not a dev build: err=%v exists=%v", err, exists(f.exe))
 	}
 }
+
+// purgeRefusal is tested directly: never hand a dangerous path to code
+// that deletes.
+func TestPurgeRefusal(t *testing.T) {
+	user := "/Users/ada"
+	for _, dir := range []string{"/", "/Users", user, user + "/", "/Users/ada/../ada"} {
+		if err := purgeRefusal(dir, user); err == nil || !strings.Contains(err.Error(), "refusing") {
+			t.Errorf("purgeRefusal(%q) = %v, want a refusal", dir, err)
+		}
+	}
+	for _, dir := range []string{user + "/Library/ipm", user + "/Library/Caches/ipm", "/tmp/x/ipm"} {
+		if err := purgeRefusal(dir, user); err != nil {
+			t.Errorf("purgeRefusal(%q) = %v, want nil", dir, err)
+		}
+	}
+}
+
+func TestUninstallPurgeRefusesHomeFolder(t *testing.T) {
+	// HOME is a throwaway temp folder, so even a broken guard only costs it.
+	f := uninstallFake(t)
+	home := t.TempDir()
+	write(t, filepath.Join(home, "keep"), "x")
+	f.env["HOME"] = home
+	f.env["IPM_HOME"] = home
+	err := f.run("uninstall", "--purge", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "refusing") {
+		t.Errorf("got %v, want a refusal", err)
+	}
+	if !exists(f.exe) || !exists(filepath.Join(home, "keep")) {
+		t.Error("nothing should be removed")
+	}
+}
