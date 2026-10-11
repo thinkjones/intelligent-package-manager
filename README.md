@@ -114,7 +114,7 @@ Every flag is in the [commands reference](https://thinkjones.github.io/intellige
 - **`ipm` installs into Claude Code only when you deploy.** Building never touches your Claude Code configuration.
 - **Hooks and MCP servers come only with their whole plugin.** They (and inline commands) can't be picked on their own.
 - **Non-GitHub sources may lose files**, because pnpm applies npm's packing rules to them.
-- **No packaged release yet**, and Windows is untested.
+- **No prebuilt binaries**: installing needs Go. Windows is untested.
 
 ## Documentation
 
