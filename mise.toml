@@ -9,7 +9,7 @@ run = "go build -o bin/ipm ./cmd/ipm"
 
 [tasks.setup]
 description = "Install the git hooks (once per clone)"
-run = "echo 'no hooks yet'"
+run = "git config core.hooksPath .githooks"
 
 [tasks.fmt]
 description = "Format Go and shell files in place"
@@ -66,3 +66,7 @@ shfmt = "3.14.1"
 [env]
 # A test that needs a missing tool fails instead of skipping; only a bare `go test` skips.
 IPM_TEST_STRICT = "1"
+
+[hooks]
+# With mise activated in your shell, entering the checkout installs the git hooks.
+enter = "mise run setup"

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Refuses a push to main, whatever the local branch is called. GitHub's
+# ruleset refuses it too; this says so sooner. Installed by `mise run setup`.
+set -euo pipefail
+
+while read -r _ _ remote_ref _; do
+  if [[ $remote_ref == refs/heads/main ]]; then
+    echo "pre-push: direct pushes to main are refused — open a PR: gh pr create --fill && gh pr merge --auto --squash" >&2
+    exit 1
+  fi
+done
+exit 0
