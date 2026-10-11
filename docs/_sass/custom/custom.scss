@@ -1,23 +1,143 @@
-// The commit-pin motif: inline code reads like the pin chips in the hero.
-:not(pre, figure) > code {
-  border: 1px solid $ipm-border;
-  border-radius: 6px;
+// Headlines are serif and tight; everything else is Inter.
+h1,
+h2,
+h3,
+.text-alpha,
+.text-beta,
+.text-gamma {
+  font-family: $ipm-serif;
+  font-weight: 600;
   color: $ipm-fg;
 }
 
-// Code blocks sit on the hero's panel surface.
-div.highlighter-rouge,
-pre.highlight,
-figure.highlight {
-  border: 1px solid $ipm-border;
-  border-radius: 10px;
-}
-
-// Headings use the hero's tight, heavy title style.
+// The scale's tracking: tightest on the page title, easing off below it.
+// Word spacing keeps the words apart at that tracking.
 h1,
 .text-alpha {
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  word-spacing: 0.12em;
+}
+
+h2,
+.text-beta {
+  letter-spacing: -0.05em;
+  word-spacing: 0.08em;
+}
+
+h3,
+.text-gamma {
   letter-spacing: -0.02em;
+}
+
+.main-content {
+  h2 {
+    margin-top: 3rem;
+  }
+
+  // Sections are set apart by space, not rules.
+  hr {
+    height: 0;
+    margin: 2.5rem 0;
+    background: none;
+  }
+
+  // Text links read as text with an orange underline; orange on hover.
+  a:not(.btn, .anchor-heading) {
+    color: $ipm-fg;
+    text-decoration: underline;
+    text-decoration-color: $ipm-orange;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.2em;
+    background-image: none;
+
+    &:hover {
+      color: $ipm-orange;
+    }
+  }
+
+  strong {
+    color: $ipm-fg;
+    font-weight: 600;
+  }
+}
+
+// Section labels: mono, small caps, wide tracking, written as "// LABEL".
+.section-label {
+  display: block;
+  margin: 3.5rem 0 -2.25rem;
+  font-family: $mono-font-family;
+  font-size: 0.6875rem !important;
+  line-height: 1.4;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: $ipm-text;
+}
+
+// Buttons: square corners, dark slate for the primary action, no gradients.
+.btn {
+  border: 1px solid $ipm-border;
+  padding: 0.75rem 1.5rem;
+  border-radius: 2px;
+  box-shadow: none;
+  font-weight: 500;
+  color: $ipm-fg;
+  background-image: none;
+
+  &:hover,
+  &.zeroclipboard-is-hover {
+    color: $ipm-fg;
+    border-color: $ipm-text;
+    background-color: $ipm-card;
+    background-image: none;
+    box-shadow: none;
+  }
+}
+
+.btn-primary {
+  border-color: $ipm-cta;
+  background-color: $ipm-cta;
+  background-image: none;
+  color: #fff;
+
+  &:hover,
+  &.zeroclipboard-is-hover {
+    color: #fff;
+    border-color: $ipm-fg;
+    background-color: $ipm-fg;
+    background-image: none;
+  }
+}
+
+// The commit-pin motif: inline code reads like the pin chips in the hero.
+:not(pre, figure) > code {
+  border: 1px solid $ipm-border;
+  border-radius: 2px;
+  color: $ipm-fg;
+  background-color: $ipm-card;
+}
+
+// Code blocks and tables are panels: white, a hairline border, 4px corners.
+div.highlighter-rouge,
+pre.highlight,
+figure.highlight,
+.table-wrapper {
+  border: 1px solid $ipm-border;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+th {
+  text-align: left;
+  font-family: $mono-font-family;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: $ipm-text;
+}
+
+td {
+  color: $ipm-text;
 }
 
 // The ✓ in tables and text keeps the "verified" colour.
@@ -25,7 +145,7 @@ h1,
   color: $ipm-teal;
 }
 
-// Brand images keep their own rounded frame.
+// Brand images carry their own frame.
 img[src*="assets/brand/"] {
   display: block;
   width: 100%;
@@ -37,16 +157,132 @@ img[src*="assets/brand/"] {
   background-position: left center;
 }
 
-// Sidebar: warm white links, amber only for where you are.
+// Sidebar: slate links; where you are is marked in orange.
 .site-nav .nav-list .nav-list-item .nav-list-link {
   color: $ipm-text;
+  font-weight: 500;
+  background-image: none;
 
-  &.active,
   &:hover {
-    color: $ipm-amber;
+    color: $ipm-fg;
+    background-image: none;
+    background-color: $ipm-card;
+  }
+
+  &.active {
+    color: $ipm-fg;
+    font-weight: 600;
+    background-image: none;
+    background-color: $ipm-orange-soft;
+    box-shadow: inset 3px 0 0 $ipm-orange;
   }
 }
 
 .site-nav .nav-list .nav-list-item .nav-list-expander {
-  color: $ipm-muted;
+  color: $ipm-text;
+}
+
+// The header is the one glass surface.
+.main-header {
+  background-color: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.search-input {
+  background-color: transparent;
+}
+
+.aux-nav .aux-nav-list-item .site-button,
+.site-footer,
+.breadcrumb-nav-list-item {
+  font-family: $mono-font-family;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.04em;
+}
+
+// The GitHub link is a tertiary action: mono, orange, a cursor before it.
+.aux-nav .aux-nav-list-item .site-button::before {
+  content: ">\00a0";
+}
+
+// Callouts: a panel with a coloured edge, not a tinted box.
+blockquote.note,
+blockquote.warning,
+p.note,
+p.warning {
+  background: $ipm-card;
+  border: 1px solid $ipm-border;
+  border-left: 3px solid $ipm-amber;
+  border-radius: 4px;
+  box-shadow: none;
+
+  &::before,
+  > .note-title,
+  > .warning-title {
+    font-family: $mono-font-family;
+    font-size: 0.6875rem;
+    letter-spacing: 0.2em;
+    color: $ipm-text;
+  }
+}
+
+blockquote.warning,
+p.warning {
+  border-left-color: $ipm-rose;
+}
+
+// Home: the lede, and the numbered steps as panels on the 40px grid.
+.lede {
+  max-width: 40rem;
+  font-size: 1.125rem !important;
+  color: $ipm-text;
+}
+
+ol.steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 2rem;
+  margin: 1.5rem 0;
+  padding: 2rem;
+  list-style: none;
+  counter-reset: step;
+  border-radius: 4px;
+  background-image: linear-gradient(rgba(0, 0, 0, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+
+  > li {
+    margin: 0;
+    padding: 1.5rem;
+    background: $ipm-card;
+    border: 1px solid $ipm-border;
+    border-radius: 4px;
+    counter-increment: step;
+    transition: all 500ms ease;
+
+    &:hover {
+      transform: translateY(-8px);
+      border-color: transparent;
+      box-shadow: $ipm-shadow;
+    }
+
+    &::before {
+      position: static;
+      display: block;
+      margin: 0 0 0.75rem;
+      content: counter(step, decimal-leading-zero) " //";
+      font-family: $mono-font-family;
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      color: $ipm-orange;
+    }
+
+    > strong:first-child {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-family: $ipm-serif;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+  }
 }

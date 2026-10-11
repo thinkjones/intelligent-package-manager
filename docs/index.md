@@ -8,16 +8,20 @@ permalink: /
 ![ipm, the intelligent package manager for Claude Code: four items picked from two GitHub repos, each pinned to a commit, built by ipm install into one validated Claude Code plugin.](assets/brand/hero.svg)
 
 The intelligent package manager for agent artifacts. Find skills, agents, commands, hooks, MCP servers and plugins across every repo you follow, then pick the ones you want into your own Claude Code plugin, pinned to the commits you picked from.
-{: .fs-6 .fw-300 }
+{: .lede }
 
 [Get started](getting-started.md){: .btn .btn-primary .fs-5 .mb-4 .mb-md-0 .mr-2 }
 [View on GitHub](https://github.com/thinkjones/intelligent-package-manager){: .btn .fs-5 .mb-4 .mb-md-0 }
 
----
+// Why
+{: .section-label }
 
 ## The problem
 
 Good agent artifacts are scattered across hundreds of repos and marketplaces. Installing a whole plugin to get one skill drags in agents, hooks and MCP servers you didn't want, under names you don't control, at whatever commit happens to be current.
+
+// How
+{: .section-label }
 
 ## What ipm does
 
@@ -29,6 +33,7 @@ Good agent artifacts are scattered across hundreds of repos and marketplaces. In
 4. **Pick into packs.** `ipm pack add my-pack <id>…` collects skills, agents, commands and whole plugins from any of your repos into a named pack in your project's `ipm.toml`.
 5. **Or do it all in one screen.** `ipm tui` searches, shows relationships, collects into packs and builds, with keys instead of IDs.
 6. **Build plugins.** `ipm install` builds each pack into a Claude Code plugin and a local marketplace under `.ipm/`. Your picks load as `my-pack:<item>`; whole plugins come along as pinned dependencies.
+{: .steps }
 
 ```bash
 ipm source add obra/superpowers wshobson/agents
@@ -42,6 +47,9 @@ ipm install
 claude plugin marketplace add ./.ipm
 ```
 
+// Principles
+{: .section-label }
+
 ## Why it is different
 
 - **Pinned and reproducible.** Every item is pinned to a commit in `.ipm/ipm.lock`. Commit it, and a teammate who runs `ipm install` gets byte-identical plugins.
@@ -49,6 +57,9 @@ claude plugin marketplace add ./.ipm
 - **Your namespace.** Picked items load under your pack's name, not a dozen upstream plugin names.
 - **Built on pnpm.** Fetching, pinning, a content-addressable store and cheap linking come from pnpm; `ipm` doesn't reinvent them.
 - **You stay in control.** Building never touches your Claude Code configuration; `ipm deploy` installs a pack, at the scope you choose, only when you ask.
+
+// Next
+{: .section-label }
 
 ## Where next
 
