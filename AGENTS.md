@@ -64,6 +64,6 @@ Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.lo
 | --- | --- | --- |
 | `pre-commit`, `pre-push` hooks | Your clone | Yes, with `--no-verify` |
 | Ruleset on `main`: pull request and merge gate required, no force-push, no deletion | GitHub | No |
-| Release refuses a commit without a green full suite | GitHub | No |
+| The release workflow refuses a commit without a green full suite | GitHub | Yes: nothing stops someone with write access pushing a `cli/v*` tag by hand. Release only through the workflow |
 
 [`CLAUDE.md`](CLAUDE.md) has the commands and the sharp edges.

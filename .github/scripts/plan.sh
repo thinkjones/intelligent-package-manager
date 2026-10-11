@@ -11,6 +11,8 @@ docs_only() {
   list="$(dirname "${BASH_SOURCE[0]}")/../docs-only.txt"
   [[ $# -gt 0 ]] || return 1
   for f in "$@"; do
+    # Whatever the list says: these decide what CI runs.
+    case $f in .github/* | mise.toml) return 1 ;; esac
     ok=false
     while IFS= read -r pattern; do
       [[ -z $pattern || $pattern == \#* ]] && continue

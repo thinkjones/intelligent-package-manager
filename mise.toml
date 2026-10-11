@@ -15,14 +15,14 @@ run = "git config core.hooksPath .githooks"
 description = "Format Go and shell files in place"
 run = [
   "gofmt -w cli",
-  "shfmt -w -i 2 -ci $(scripts/shell-files)",
+  'files=$(scripts/shell-files) && shfmt -w -i 2 -ci $files',
 ]
 
 [tasks.lint]
 description = "gofmt and shfmt checks, golangci-lint"
 run = [
   'test -z "$(gofmt -l cli)" || { gofmt -l cli; echo "gofmt: the files above need mise run fmt" >&2; exit 1; }',
-  "shfmt -d -i 2 -ci $(scripts/shell-files)",
+  'files=$(scripts/shell-files) && shfmt -d -i 2 -ci $files',
   "cd cli && golangci-lint run ./...",
 ]
 
@@ -64,7 +64,7 @@ run = [
 [tasks."ci:shell"]
 description = "CI job shell: shellcheck, actionlint and the plan tests"
 run = [
-  "shellcheck $(scripts/shell-files)",
+  'files=$(scripts/shell-files) && shellcheck $files',
   "actionlint",
   "mise run ci:plan-test",
 ]

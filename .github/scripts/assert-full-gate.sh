@@ -12,17 +12,26 @@ GATE="CI Gate (full suite)"
 ACTIONS_APP=15368 # GitHub Actions: a check of the same name from another app doesn't count
 LOOKBACK=50
 
-# gate_conclusion <sha> prints the gate's latest conclusion for the commit, or nothing.
+# pick_conclusion reads GitHub's check runs for one commit on stdin and prints
+# the newest verdict, or nothing. Skipped (a run that scheduled no Tier 2),
+# cancelled and unfinished runs are not verdicts.
+pick_conclusion() {
+  jq -r '[.check_runs[] | select(.conclusion != null and .conclusion != "skipped" and .conclusion != "cancelled")]
+    | sort_by(.completed_at) | last | .conclusion // empty'
+}
+
+# gate_conclusion <sha> prints the gate's verdict for the commit, or nothing.
 gate_conclusion() {
-  gh api "repos/$GITHUB_REPOSITORY/commits/$1/check-runs?per_page=100" --paginate \
-    --jq ".check_runs | map(select(.name == \"$GATE\" and .app.id == $ACTIONS_APP)) | sort_by(.completed_at) | last | .conclusion // empty"
+  gh api -X GET "repos/$GITHUB_REPOSITORY/commits/$1/check-runs" \
+    -f check_name="$GATE" -F app_id="$ACTIONS_APP" -F per_page=100 | pick_conclusion
 }
 
 # ancestors <sha> prints the commits before it, newest first.
 ancestors() { git rev-list --first-parent --skip=1 --max-count="$LOOKBACK" "$1"; }
 
 # changed_files <from> <to> prints the files that differ.
-changed_files() { git diff --name-only "$1" "$2"; }
+# Renames count as a deletion and an addition, so code moved into docs/ shows.
+changed_files() { git diff --no-renames --name-only "$1" "$2"; }
 
 assert_full_gate() {
   local sha=$1 c a files=()
@@ -38,7 +47,8 @@ assert_full_gate() {
       while IFS= read -r f; do
         [[ -n $f ]] && files+=("$f")
       done < <(changed_files "$a" "$sha")
-      if [[ $c == success ]] && docs_only "${files[@]}"; then
+      # No files at all is the same tree, for example a commit and its revert.
+      if [[ $c == success ]] && { [[ ${#files[@]} -eq 0 ]] || docs_only "${files[@]}"; }; then
         echo "$GATE is green for $a, and only docs changed up to $sha"
         return 0
       fi

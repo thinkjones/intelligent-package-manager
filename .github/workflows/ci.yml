@@ -6,7 +6,8 @@ name: CI
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+    # edited: retargeting a pull request changes its diff, so it is planned again.
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   push:
     branches: [main]
   workflow_dispatch:
@@ -53,7 +54,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$EVENT" = pull_request ]; then
-            CHANGED="$(gh pr diff "$PR" --name-only)"
+            # Both names of a renamed file, so code moved into docs/ is still code.
+            CHANGED="$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[] | .filename, (.previous_filename // empty)')"
             export CHANGED
           fi
           # No pipe: a pipe would hide plan.sh failing, and the gate would pass on nothing.

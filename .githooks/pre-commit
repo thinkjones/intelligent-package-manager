@@ -4,12 +4,16 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
+# Nothing staged: git refuses the commit itself, or it is an --allow-empty one.
+git diff --cached --quiet && exit 0
+
+# The staged files that still exist; a commit of deletions has none and is
+# still checked by the gate below.
 staged=()
 while IFS= read -r -d '' f; do staged+=("$f"); done < <(git diff --cached --name-only --diff-filter=ACMR -z)
-[[ ${#staged[@]} -eq 0 ]] && exit 0
 
 # The checks read the working tree, so a staged file must match what is committed.
-for f in "${staged[@]}"; do
+for f in ${staged[@]+"${staged[@]}"}; do
   if ! git diff --quiet -- "$f"; then
     echo "pre-commit: $f has unstaged changes — stage or stash them, the hook checks whole files" >&2
     exit 1
@@ -18,7 +22,7 @@ done
 
 shell_files="$(scripts/shell-files)"
 go=() sh=()
-for f in "${staged[@]}"; do
+for f in ${staged[@]+"${staged[@]}"}; do
   if [[ $f == *.go ]]; then
     go+=("$f")
   elif grep -qxF -- "$f" <<<"$shell_files"; then

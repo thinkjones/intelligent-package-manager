@@ -69,8 +69,29 @@ gate "" "" "" fail
 gate failure success "docs/a.md" fail
 gate "" success "docs/a.md README.md" pass
 gate "" success "docs/a.md cli/x.go" fail
-gate "" success "" fail
+gate "" success "" pass
 gate "" failure "docs/a.md" fail
+
+# pick_conclusion reads the check runs GitHub returns for a commit.
+# pick <check runs as JSON> <expected conclusion>
+pick() {
+  local got
+  # shellcheck disable=SC1091
+  got=$(source ./assert-full-gate.sh && pick_conclusion <<<"{\"check_runs\": $1}")
+  if [[ $got != "$2" ]]; then
+    echo "FAIL: pick_conclusion $1: got '$got', want '$2'"
+    failed=1
+  fi
+}
+run() { printf '{"conclusion":"%s","completed_at":"%s"}' "$1" "$2"; }
+
+pick "[]" ""
+pick "[$(run success 2026-01-01T00:00:00Z)]" success
+# A fast-mode merge leaves a skipped full-suite check: that is not a verdict.
+pick "[$(run skipped 2026-01-01T00:00:00Z)]" ""
+pick "[$(run success 2026-01-01T00:00:00Z),$(run skipped 2026-01-02T00:00:00Z)]" success
+pick "[$(run success 2026-01-01T00:00:00Z),$(run failure 2026-01-02T00:00:00Z)]" failure
+pick "[$(run failure 2026-01-01T00:00:00Z),$(run cancelled 2026-01-03T00:00:00Z),$(run success 2026-01-02T00:00:00Z)]" success
 
 rm -f plan_test.err
 [[ $failed -eq 0 ]] && echo "plan_test: ok"
