@@ -127,6 +127,7 @@ Config
 		newScanCmd(sys),
 		newTuiCmd(sys),
 		newDeployCmd(sys),
+		newOnboardCmd(sys),
 		&cobra.Command{
 			Use:   "version",
 			Short: "print ipm's version",
