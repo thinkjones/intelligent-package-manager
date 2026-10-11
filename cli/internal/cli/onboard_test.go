@@ -349,3 +349,29 @@ func TestOnboardTopics(t *testing.T) {
 		t.Errorf("want %q in:\n%s", want, f.out.String())
 	}
 }
+
+func TestOnboardChecksListsBeforeBackup(t *testing.T) {
+	f, list := onboardFake(t)
+	withSources(t, f, map[string]map[string]string{"o/old": {"skills/x/SKILL.md": "x"}})
+	if err := f.run("onboard", "--fresh", "--lists", "Nope", "--list", list); err == nil {
+		t.Fatal("want an error for an unknown list")
+	}
+	if err := f.run("onboard", "--fresh", "--yes", "--list", filepath.Join(t.TempDir(), "missing.toml")); err == nil {
+		t.Fatal("want an error for a missing list file")
+	}
+	if !exists(filepath.Join(f.env["IPM_HOME"], "sources", "package.json")) || strings.Contains(f.out.String(), "backed up") {
+		t.Errorf("nothing should be backed up when the list can't be used:\n%s", f.out.String())
+	}
+}
+
+func TestOnboardYesWithoutDefaultLists(t *testing.T) {
+	f, _ := onboardFake(t)
+	other := filepath.Join(t.TempDir(), "other.toml")
+	write(t, other, "[[repos]]\nlist = \"Other\"\nrepo = \"o/x\"\n")
+	f.checklist = func(*tui.Checklist) error { t.Error("--yes must not show the checklist"); return nil }
+	f.interactive = true
+	err := f.run("onboard", "--yes", "--list", other)
+	if err == nil || !strings.Contains(err.Error(), "--lists") {
+		t.Errorf("got %v, want an error suggesting --lists", err)
+	}
+}

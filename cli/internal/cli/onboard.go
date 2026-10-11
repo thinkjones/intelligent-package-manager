@@ -189,18 +189,44 @@ func runOnboard(sys System, o onboardOpts) error {
 		now = sys.Now()
 	}
 
-	var moved []string
+	// Everything that can fail without changing anything comes first: the
+	// flags, then the curated list and the names in --lists. Only then is
+	// existing data backed up.
 	e, found, err := detect(p)
 	if err != nil {
 		return err
 	}
+	if found && !o.Keep && !o.Fresh && !interactive {
+		return usagef("onboard: ipm data exists — pass --keep to use it or --fresh to back it up")
+	}
+	if len(o.Lists) == 0 && !o.Yes && !interactive {
+		return usagef("onboard: pick sources with --lists <name> or --yes when not in a terminal")
+	}
+	data, cached, err := curated.Fetch(sys.HTTP, o.List, p.Cache)
+	if err != nil {
+		return err
+	}
+	lists, skipped, err := curated.Parse(data)
+	if err != nil {
+		return fmt.Errorf("%s: %v", o.List, err)
+	}
+	var picks []string
+	switch {
+	case len(o.Lists) > 0:
+		if picks, err = reposIn(lists, o.Lists); err != nil {
+			return err
+		}
+	case o.Yes:
+		if picks, _ = reposIn(lists, presentLists(lists, defaultLists)); len(picks) == 0 {
+			return fmt.Errorf("%s has none of the pre-ticked lists (%s) — name lists with --lists", o.List, strings.Join(defaultLists, ", "))
+		}
+	}
+
+	var moved []string
 	if found {
 		fmt.Fprintf(sys.Stdout, "found existing ipm data: %s\n", e)
 		fresh := o.Fresh
 		if !o.Keep && !o.Fresh {
-			if !interactive {
-				return usagef("onboard: ipm data exists — pass --keep to use it or --fresh to back it up")
-			}
 			switch ask(sys, in, "[u]se it · [b]ack it up and start fresh · [q]uit: ", "u", "b", "q") {
 			case "q":
 				fmt.Fprintln(sys.Stdout, "nothing changed")
@@ -219,49 +245,21 @@ func runOnboard(sys System, o onboardOpts) error {
 			fmt.Fprintln(sys.Stdout, restoreHint(p, moved))
 		}
 	}
-	nothing := func() error {
-		fmt.Fprintln(sys.Stdout, "nothing changed")
-		if len(moved) > 0 {
-			fmt.Fprintln(sys.Stdout, restoreHint(p, moved))
-		}
-		return nil
-	}
-
-	data, cached, err := curated.Fetch(sys.HTTP, o.List, p.Cache)
-	if err != nil {
-		return err
-	}
 	if cached {
 		fmt.Fprintf(sys.Stdout, "%s offline: using the copy of %s saved earlier\n", warn, o.List)
-	}
-	lists, skipped, err := curated.Parse(data)
-	if err != nil {
-		return fmt.Errorf("%s: %v", o.List, err)
 	}
 	if skipped > 0 {
 		fmt.Fprintf(sys.Stdout, "%s skipped %d %s without a valid owner/repo\n", warn, skipped, plural(skipped, "row"))
 	}
 
-	have, err := sources.Load(p.Sources())
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	locked := map[string]bool{}
-	for _, s := range have {
-		locked[strings.ToLower(s.Repo)] = true
-	}
-
-	var picks []string
-	switch {
-	case len(o.Lists) > 0:
-		if picks, err = reposIn(lists, o.Lists); err != nil {
+	if len(o.Lists) == 0 && !o.Yes {
+		have, err := sources.Load(p.Sources())
+		if err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
-	case o.Yes:
-		picks, _ = reposIn(lists, presentLists(lists, defaultLists))
-	default:
-		if !interactive {
-			return usagef("onboard: pick sources with --lists <name> or --yes when not in a terminal")
+		locked := map[string]bool{}
+		for _, s := range have {
+			locked[strings.ToLower(s.Repo)] = true
 		}
 		ticked := map[string]bool{}
 		if len(have) == 0 {
@@ -279,7 +277,11 @@ func runOnboard(sys System, o onboardOpts) error {
 			return err
 		}
 		if !c.Confirmed() {
-			return nothing()
+			fmt.Fprintln(sys.Stdout, "nothing changed")
+			if len(moved) > 0 {
+				fmt.Fprintln(sys.Stdout, restoreHint(p, moved))
+			}
+			return nil
 		}
 		picks = c.Picked()
 	}
