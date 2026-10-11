@@ -289,6 +289,8 @@ ipm version              (or ipm --version)
 ipm help [command]       (or ipm <command> --help)
 ```
 
+`ipm version` prints the release `ipm` was installed from, for example `ipm 0.2.0`. A build of a checkout (`./install.sh` in a clone, or `bin/ipm`) prints `ipm dev`.
+
 ### `ipm completion`
 
 ```text

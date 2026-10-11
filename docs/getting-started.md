@@ -30,7 +30,7 @@ Install `ipm`, pick the repos to follow, search them and build your first plugin
 curl -fsSL https://raw.githubusercontent.com/thinkjones/intelligent-package-manager/main/install.sh | bash
 ```
 
-The script runs `go install` for the latest `ipm` into `~/.local/bin` (set `IPM_BIN_DIR` to choose another folder). It needs Go. If that folder isn't on your `PATH`, it prints the `export PATH=…` line to add to your shell's startup file; if another `ipm` comes first on your `PATH`, it says which. In a terminal it then starts `ipm onboard`; otherwise it prints `next: ipm onboard`.
+The script runs `go install` for the latest release of `ipm` into `~/.local/bin` (set `IPM_BIN_DIR` to choose another folder). It needs Go. If that folder isn't on your `PATH`, it prints the `export PATH=…` line to add to your shell's startup file; if another `ipm` comes first on your `PATH`, it says which. In a terminal it then starts `ipm onboard`; otherwise it prints `next: ipm onboard`.
 
 For tab completion of commands and flags, install the script for your shell, for example zsh: `ipm completion zsh > "${fpath[1]}/_ipm"`. `ipm completion --help` lists the shells.
 
@@ -52,7 +52,7 @@ From a checkout, `install.sh` builds `cli/` instead of fetching the published mo
 go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest
 ```
 
-This puts `ipm` in `$(go env GOPATH)/bin`; make sure that folder is on your `PATH`. Then run `ipm onboard`, or follow the manual steps below.
+This puts the latest release of `ipm` in `$(go env GOPATH)/bin`; make sure that folder is on your `PATH`. `ipm version` prints which release you have. Then run `ipm onboard`, or follow the manual steps below.
 
 ## Onboard
 

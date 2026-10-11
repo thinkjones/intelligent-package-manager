@@ -20,13 +20,30 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/cli"
 	"golang.org/x/term"
 )
 
-const version = "0.2.0"
+// version is the module version Go records in the binary, so it always
+// matches the release tag it was installed from.
+func version() string {
+	info, _ := debug.ReadBuildInfo()
+	return versionFrom(info)
+}
+
+// versionFrom reads "0.2.0" from an installed release, a pseudo-version from
+// go install of a commit between releases, and "dev" from a build of a
+// checkout, where Go records no module version.
+func versionFrom(info *debug.BuildInfo) string {
+	if info == nil || info.Main.Version == "" || info.Main.Version == "(devel)" {
+		return "dev"
+	}
+	return strings.TrimPrefix(info.Main.Version, "v")
+}
 
 func main() {
 	os.Exit(run())
@@ -53,7 +70,7 @@ func run() int {
 		HTTP:    &http.Client{},
 		Getwd:   os.Getwd,
 		Now:     time.Now,
-		Version: version,
+		Version: version(),
 		Stdin:   os.Stdin,
 		Interactive: func() bool {
 			return term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd()))
