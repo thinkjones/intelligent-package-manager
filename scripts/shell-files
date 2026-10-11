@@ -3,5 +3,5 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 for f in install.sh bin/ipm scripts/shell-files .githooks/* .github/scripts/*.sh; do
-  [[ -f $f ]] && echo "$f"
+  if [[ -f $f ]]; then echo "$f"; fi
 done
