@@ -12,7 +12,7 @@ Router for agents working in [thinkjones/intelligent-package-manager](https://gi
 | `bin/ipm` | Shim that builds `cli/bin/ipm` when a Go source changes and runs it: `bin/ipm <command>` runs a development build. It isn't on PATH; `.envrc` no longer adds it. |
 | `install.sh` | Installs `ipm` into `~/.local/bin` (or `$IPM_BIN_DIR`): builds `cli/` from a checkout, or runs `go install …@latest` when piped from curl; then starts `ipm onboard` in a terminal. |
 | [`docs/`](docs/) | The user documentation, published to GitHub Pages at <https://thinkjones.github.io/intelligent-package-manager/> (Jekyll, Just the Docs theme, `docs/_config.yml`): [getting started](docs/getting-started.md), [concepts](docs/concepts.md), `guides/`, `reference/` ([commands](docs/reference/commands.md), [sources](docs/reference/sources.md), [files](docs/reference/files.md)), [troubleshooting](docs/troubleshooting.md), [how it works](docs/architecture.md). |
-| `docs/assets/brand/` | The hero, workflow and logo SVGs, shared by the README and the site. The palette (`#11151C` background, `#F3EFE6` text, `#F0A847` pins, `#5CC8A8` verified) is also in `docs/_sass/custom/setup.scss`; change both together. |
+| `docs/assets/brand/` | The hero, workflow and logo SVGs, shared by the README and the site. The palette (`#f8fafc` background, `#0f172a` text, `#e85d26` orange for the wordmark and pins, `#19a0a6` teal for verified) is also in `docs/_sass/custom/setup.scss`; change both together. |
 | `docs/plans/` | Early notes. Historical, and excluded from the site. |
 | `docs/superpowers/` | Design specs and implementation plans. Historical: never rewrite them to match the code. Excluded from the site. |
 | `LICENSE` | MIT. |
