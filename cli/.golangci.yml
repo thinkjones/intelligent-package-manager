@@ -1,0 +1,24 @@
+# golangci-lint's default linters: errcheck, govet, ineffassign, staticcheck, unused.
+version: "2"
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        # Output for a person: a terminal or a buffer, with nothing to do on failure.
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        # Closing a file that was only read, or on a path already returning an error.
+        - (*os.File).Close
+        - (io.ReadCloser).Close
+        - (*io.PipeWriter).Close
+    staticcheck:
+      checks:
+        - all
+        # Messages open with a product name: "Docker is not running", "Typesense did not …".
+        - -ST1005
+  exclusions:
+    rules:
+      # Test setup ignores errors that the assertions after it would catch.
+      - path: _test\.go
+        linters: [errcheck]

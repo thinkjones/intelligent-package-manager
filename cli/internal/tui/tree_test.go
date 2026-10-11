@@ -250,7 +250,7 @@ func TestTreeKeepsSiblingsAroundBigCursor(t *testing.T) {
 	for _, rows := range []int{10, 12, 14} {
 		ls := tv.lines(76, rows, -1, false)
 		text := ansi.Strip(strings.Join(ls, "\n"))
-		if !strings.Contains(caretRow(ls), "p40") || !strings.Contains(text, "↑ ") || !strings.Contains(text, "more") || !(strings.Contains(text, "p39") || strings.Contains(text, "p41")) {
+		if !strings.Contains(caretRow(ls), "p40") || !strings.Contains(text, "↑ ") || !strings.Contains(text, "more") || (!strings.Contains(text, "p39") && !strings.Contains(text, "p41")) {
 			t.Errorf("rows %d: want the cursor, a sibling and the scroll rows:\n%s", rows, text)
 		}
 		if strings.Count(text, "↓ ") < 1 {

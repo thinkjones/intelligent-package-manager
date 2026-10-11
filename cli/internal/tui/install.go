@@ -57,7 +57,7 @@ func (in *install) next() tea.Msg {
 	}
 	if err := in.scanner.Err(); err != nil {
 		// A line too long to show: keep reading so the install can finish.
-		io.Copy(io.Discard, in.pipe)
+		_, _ = io.Copy(io.Discard, in.pipe)
 		if res := <-in.result; res != nil {
 			return installDone{res}
 		}

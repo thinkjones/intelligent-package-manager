@@ -76,7 +76,6 @@ const (
 )
 
 func (m *Model) tooSmall() bool { return m.width < minWidth || m.height < minHeight }
-func (m *Model) wide() bool     { return m.width >= wideWidth }
 
 // New is the TUI over d.
 func New(d Deps) *Model {

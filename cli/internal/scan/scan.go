@@ -113,7 +113,7 @@ func parent(rel string) string {
 // which are reported on their own.
 func skillCount(dir string) int {
 	n := 0
-	filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+	_ = filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 		switch {
 		case err != nil:
 			return nil
