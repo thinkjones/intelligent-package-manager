@@ -1,6 +1,6 @@
 // Package curated reads curated source lists: TOML files of [[repos]]
 // tables, each naming a GitHub repo and the list it belongs to, such as
-// thinkjones/ai-sdlc-repo-list's starred_repos.toml. ipm onboard offers them
+// thinkjones/agentic-tools's starred_repos.toml. ipm onboard offers them
 // as the sources a new user can pick from.
 package curated
 
@@ -22,7 +22,20 @@ import (
 )
 
 // DefaultURL is the curated list ipm onboard offers unless told otherwise.
-const DefaultURL = "https://thinkjones.github.io/ai-sdlc-repo-list/starred_repos.toml"
+const DefaultURL = "https://raw.githubusercontent.com/thinkjones/agentic-tools/main/starred_repos.toml"
+
+// githubBlob matches a GitHub file page: github.com/<owner>/<repo>/blob/<ref>/<path>.
+var githubBlob = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/([^?#]+)`)
+
+// rawURL turns a GitHub file page into the URL of the file itself; other
+// URLs are returned as they are.
+func rawURL(u string) string {
+	m := githubBlob.FindStringSubmatch(u)
+	if m == nil {
+		return u
+	}
+	return "https://raw.githubusercontent.com/" + m[1] + "/" + m[2] + "/" + m[3] + "/" + m[4]
+}
 
 // Repo is one curated repo; List is the list it was read under.
 type Repo struct {
@@ -118,6 +131,7 @@ func Fetch(client *http.Client, src, cacheDir string) (data []byte, cached bool,
 		data, err = os.ReadFile(src)
 		return data, false, err
 	}
+	src = rawURL(src)
 	sum := sha256.Sum256([]byte(src))
 	path := filepath.Join(cacheDir, "curated", hex.EncodeToString(sum[:])[:16]+".toml")
 	data, ferr := get(client, src)

@@ -36,7 +36,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `skipped N rows without a valid owner/repo` | Some `[[repos]]` tables in the curated list lack a `repo` of the form `owner/repo`, or a `list`. The rest load; fix the list if it's yours. |
 | `- stats skipped: gh is not installed`, `… gh is not logged in (gh auth login)` | Onboard carries on without GitHub stats. Install or log in to `gh`, then run `ipm stats` and `ipm load`. |
 | `- search skipped: start Docker, then ipm serve && ipm load` | Docker isn't running. Start it and run those two commands. |
-| `✗ <step>` then `rerun: <command>` | A step failed; the output above says why. Fix it and run the command shown. Running `ipm onboard` again also works: sources you already follow are kept. |
+| `✗ <step>` then `rerun: <command>` | A step failed; the output above, which is everything the step printed, says why. Fix it and run the command shown. Running `ipm onboard` again also works: sources you already follow are kept. |
 | `can't back up …: … — nothing was changed` | The home or cache folder couldn't be renamed. Check its permissions; both folders are as they were. |
 | `… is a development build in a git checkout — rerun with --force to remove it` | You ran `ipm uninstall` with `bin/ipm` or a binary built inside an `ipm` checkout. Uninstall the installed one by running it by path (`~/.local/bin/ipm uninstall`), or pass `--force` to delete the development build. |
 | `uninstall: --purge needs --yes when not in a terminal` | It can't ask you to type the home path. Pass `--yes` if you mean it. |

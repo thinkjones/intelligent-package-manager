@@ -31,13 +31,21 @@ The curated list is fetched each time and cached under the cache folder's `curat
 
 | Flag | Does |
 | --- | --- |
-| `--list L` | The curated list: a URL or a file. Default `https://thinkjones.github.io/ai-sdlc-repo-list/starred_repos.toml`. The format is in [Curated lists](../guides/sources.md#curated-lists). |
+| `--list L` | The curated list: a URL or a file; a GitHub `blob/` link is read as the raw file. Default `https://raw.githubusercontent.com/thinkjones/agentic-tools/main/starred_repos.toml`. The format is in [Curated lists](../guides/sources.md#curated-lists). |
 | `--lists NAME` | Follow every repo in this list, by exact name (repeatable). Skips the checklist. |
 | `--yes` | Follow the pre-ticked lists without showing the checklist. |
 | `--keep` | Use existing ipm data without asking. |
 | `--fresh` | Back up existing ipm data and start fresh without asking. |
 
 When not in a terminal, `--lists` or `--yes` is required, and so is `--keep` or `--fresh` if data exists. `--keep` and `--fresh` together are a usage error.
+
+It then runs five steps: add the sources, `ipm sync`, `ipm stats`, `ipm serve` and `ipm load`. In a terminal, one line is redrawn while they run:
+
+```text
+[████████░░░░░░░░░░░░] 3/5 stats · 17/42 anthropics/skills · 0:48
+```
+
+The bar covers all five steps and moves inside `stats` (per repo) and `load` (per 500 documents); after the step comes the last line it printed or its count, then the time since the steps began. The steps' own output is not shown. Each finished step leaves one line, such as `✓ sync · catalog: 3280 record(s), 2 warning(s)`; run `ipm index` to read the warnings. If a step fails, everything it printed is shown, then `✗ <step>` and `rerun: <command>`. When stdout is not a terminal there is no bar and each step prints what it prints on its own.
 
 ## Sources
 

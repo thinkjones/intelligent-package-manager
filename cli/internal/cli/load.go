@@ -61,6 +61,7 @@ func runLoad(sys System) error {
 			}
 			counts[d["type"].(string)]++
 		}
+		sys.progress(i+len(batch), len(docs), "documents")
 	}
 	tw := tabwriter.NewWriter(sys.Stdout, 0, 0, 2, ' ', 0)
 	for _, typ := range catalog.Types {

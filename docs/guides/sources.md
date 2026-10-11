@@ -30,7 +30,7 @@ An external plugin ID adds the repo that plugin lives in. It only works once the
 
 ## Curated lists
 
-`ipm onboard` offers repos from a curated list: a TOML file that groups GitHub repos into named lists. The default is [thinkjones/ai-sdlc-repo-list](https://thinkjones.github.io/ai-sdlc-repo-list/)'s `starred_repos.toml`. Anyone can publish one; pass it as a URL or a file:
+`ipm onboard` offers repos from a curated list: a TOML file that groups GitHub repos into named lists. The default is [thinkjones/agentic-tools](https://github.com/thinkjones/agentic-tools)'s [`starred_repos.toml`](https://github.com/thinkjones/agentic-tools/blob/main/starred_repos.toml). Anyone can publish one; pass it as a URL or a file (a GitHub `blob/` link is read as the raw file):
 
 ```bash
 ipm onboard --list https://example.com/my-list.toml
