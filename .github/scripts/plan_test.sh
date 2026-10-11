@@ -36,6 +36,12 @@ check prod push "" "docs/a.md" "gate=true tier1=true full=true"
 check "" pull_request "" "cli/x.go" FAIL
 check Fast pull_request "" "cli/x.go" FAIL
 
+# A pipe after plan.sh would hide its failure from the workflow step.
+if grep -nE 'plan\.sh[^#]*\|' ../workflows/ci.yml; then
+  echo "FAIL: ci.yml pipes plan.sh; its exit status must reach the step"
+  failed=1
+fi
+
 # assert-full-gate.sh, with the GitHub and git lookups replaced.
 # gate <head conclusion> <parent conclusion> <files changed since the parent> <pass|fail>
 gate() {

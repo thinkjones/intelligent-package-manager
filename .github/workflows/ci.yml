@@ -56,7 +56,10 @@ jobs:
             CHANGED="$(gh pr diff "$PR" --name-only)"
             export CHANGED
           fi
-          .github/scripts/plan.sh | tee -a "$GITHUB_OUTPUT"
+          # No pipe: a pipe would hide plan.sh failing, and the gate would pass on nothing.
+          .github/scripts/plan.sh >plan.out
+          cat plan.out >>"$GITHUB_OUTPUT"
+          cat plan.out
 
   unit: # Tier 1
     needs: plan
