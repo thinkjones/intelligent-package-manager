@@ -1,14 +1,21 @@
-// The same font stacks as the brand SVGs.
-$body-font-family: -apple-system, blinkmacsystemfont, "Segoe UI", system-ui, roboto, "Helvetica Neue", arial, sans-serif;
-$mono-font-family: ui-monospace, "SFMono-Regular", menlo, consolas, monospace;
+// Four Signals 2.1 (light), shared with docs/assets/brand/*.svg and
+// color_schemes/ipm.scss. The fonts are loaded in _includes/head_custom.html.
+$body-font-family: Inter, -apple-system, blinkmacsystemfont, "Segoe UI", helvetica, arial, sans-serif;
+$mono-font-family: "JetBrains Mono", ui-monospace, "SFMono-Regular", menlo, consolas, monospace;
+$ipm-serif: "Source Serif 4", georgia, "Times New Roman", serif;
+$body-line-height: 1.625;
+$border-radius: 4px;
 
-// ipm's palette, shared with docs/assets/brand/*.svg and color_schemes/ipm.scss.
-$ipm-bg: #11151c;
-$ipm-surface: #161c25;
-$ipm-raised: #1d2430;
-$ipm-border: #2c3747;
-$ipm-fg: #f3efe6;
-$ipm-text: #c9d1d9;
-$ipm-muted: #8b95a3;
-$ipm-amber: #f0a847;
-$ipm-teal: #5cc8a8;
+$ipm-bg: #f8fafc;
+$ipm-card: #ffffff;
+$ipm-border: #e2e8f0;
+$ipm-fg: #0f172a;
+$ipm-text: #475569;
+$ipm-muted: #94a3b8;
+$ipm-cta: #1e293b;
+$ipm-orange: #e85d26;
+$ipm-orange-soft: #e85d2620;
+$ipm-teal: #19a0a6;
+$ipm-amber: #ffb800;
+$ipm-rose: #eb5570;
+$ipm-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);

@@ -2,61 +2,60 @@
   <title id="title">ipm — the intelligent package manager for Claude Code</title>
   <desc id="desc">Four items picked from two GitHub repos — a skill, an agent and a command from wshobson/agents, and the stripe plugin from anthropics/claude-plugins-official — each pinned to a commit, built by ipm install into one Claude Code plugin, .ipm/plugins/csharp-sdlc, that passes claude plugin validate --strict.</desc>
 
-  <rect width="1200" height="540" rx="24" fill="#11151C"/>
-  <rect x="0.75" y="0.75" width="1198.5" height="538.5" rx="23.25" fill="none" stroke="#263040" stroke-width="1.5"/>
+  <rect x="1" y="1" width="1198" height="538" rx="4" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
 
-  <g id="title-block" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
-    <text x="64" y="84" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="2" fill="#8B95A3">INTELLIGENT PACKAGE MANAGER · FOR CLAUDE CODE</text>
-    <text x="58" y="190" font-size="120" font-weight="800" letter-spacing="-4" fill="#F3EFE6">ipm</text>
-    <text x="310" y="142" font-size="32" font-weight="600" fill="#F3EFE6">Pick skills, agents and commands from any repo.</text>
-    <text x="310" y="184" font-size="32" font-weight="400" fill="#C3CAD3">Get one Claude Code plugin, pinned to commits.</text>
+  <g id="title-block" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="64" y="84" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" letter-spacing="3" fill="#475569">// INTELLIGENT PACKAGE MANAGER / FOR CLAUDE CODE</text>
+    <text x="60" y="186" font-family="'Source Serif 4', Georgia, 'Times New Roman', serif" font-size="112" font-weight="700" letter-spacing="-5" fill="#0f172a">ipm</text>
+    <text x="310" y="142" font-size="30" font-weight="600" fill="#0f172a">Pick skills, agents and commands from any repo.</text>
+    <text x="310" y="184" font-size="30" font-weight="400" fill="#475569">Get one Claude Code plugin, pinned to commits.</text>
   </g>
 
-  <line x1="64" y1="232" x2="1136" y2="232" stroke="#263040" stroke-width="1.5"/>
+  <line x1="64" y1="232" x2="1136" y2="232" stroke="#e2e8f0" stroke-width="1.5"/>
 
-  <g id="picks" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
-    <text x="64" y="272" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#8B95A3">ipm.toml · 4 picks from 2 repos</text>
+  <g id="picks" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+    <text x="64" y="272" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">ipm.toml · 4 picks from 2 repos</text>
 
     <g transform="translate(64 292)">
-      <rect width="100" height="30" rx="8" fill="none" stroke="#3A4556" stroke-width="1.5"/>
-      <text x="50" y="21" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#C9D1D9">skill</text>
-      <text x="118" y="22" font-size="22" font-weight="600" fill="#F3EFE6">dotnet-backend-patterns</text>
-      <text x="118" y="48" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#8B95A3">wshobson/agents <tspan fill="#F0A847">@46891e7</tspan></text>
+      <rect width="100" height="30" rx="2" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="50" y="21" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">skill</text>
+      <text x="118" y="22" font-size="22" font-weight="600" fill="#0f172a">dotnet-backend-patterns</text>
+      <text x="118" y="48" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">wshobson/agents <tspan fill="#e85d26">@46891e7</tspan></text>
     </g>
     <g transform="translate(64 352)">
-      <rect width="100" height="30" rx="8" fill="none" stroke="#3A4556" stroke-width="1.5"/>
-      <text x="50" y="21" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#C9D1D9">agent</text>
-      <text x="118" y="22" font-size="22" font-weight="600" fill="#F3EFE6">csharp-pro</text>
-      <text x="118" y="48" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#8B95A3">wshobson/agents <tspan fill="#F0A847">@46891e7</tspan></text>
+      <rect width="100" height="30" rx="2" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="50" y="21" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">agent</text>
+      <text x="118" y="22" font-size="22" font-weight="600" fill="#0f172a">csharp-pro</text>
+      <text x="118" y="48" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">wshobson/agents <tspan fill="#e85d26">@46891e7</tspan></text>
     </g>
     <g transform="translate(64 412)">
-      <rect width="100" height="30" rx="8" fill="none" stroke="#3A4556" stroke-width="1.5"/>
-      <text x="50" y="21" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#C9D1D9">command</text>
-      <text x="118" y="22" font-size="22" font-weight="600" fill="#F3EFE6">accessibility-audit</text>
-      <text x="118" y="48" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#8B95A3">wshobson/agents <tspan fill="#F0A847">@46891e7</tspan></text>
+      <rect width="100" height="30" rx="2" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="50" y="21" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">command</text>
+      <text x="118" y="22" font-size="22" font-weight="600" fill="#0f172a">accessibility-audit</text>
+      <text x="118" y="48" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">wshobson/agents <tspan fill="#e85d26">@46891e7</tspan></text>
     </g>
     <g transform="translate(64 472)">
-      <rect width="100" height="30" rx="8" fill="none" stroke="#3A4556" stroke-width="1.5"/>
-      <text x="50" y="21" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#C9D1D9">plugin</text>
-      <text x="118" y="22" font-size="22" font-weight="600" fill="#F3EFE6">stripe</text>
-      <text x="200" y="22" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" fill="#8B95A3">anthropics/claude-plugins-official</text>
+      <rect width="100" height="30" rx="2" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+      <text x="50" y="21" text-anchor="middle" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">plugin</text>
+      <text x="118" y="22" font-size="22" font-weight="600" fill="#0f172a">stripe</text>
+      <text x="200" y="22" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#475569">anthropics/claude-plugins-official</text>
     </g>
   </g>
 
-  <g id="install-arrow" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
-    <text x="626" y="378" text-anchor="middle" font-size="18" fill="#F0A847">ipm install</text>
-    <line x1="584" y1="394" x2="664" y2="394" stroke="#F0A847" stroke-width="2"/>
-    <path d="M656 386 L668 394 L656 402" fill="none" stroke="#F0A847" stroke-width="2" stroke-linejoin="round"/>
+  <g id="install-arrow" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <text x="626" y="378" text-anchor="middle" font-size="18" fill="#e85d26">ipm install</text>
+    <line x1="584" y1="394" x2="664" y2="394" stroke="#e85d26" stroke-width="2"/>
+    <path d="M656 386 L668 394 L656 402" fill="none" stroke="#e85d26" stroke-width="2" stroke-linejoin="round"/>
   </g>
 
-  <g id="built-plugin" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">
-    <rect x="692" y="256" width="444" height="252" rx="14" fill="#161C25" stroke="#2C3747" stroke-width="1.5"/>
-    <text x="716" y="292" font-size="20" font-weight="700" fill="#F3EFE6">.ipm/plugins/csharp-sdlc/</text>
-    <text x="716" y="330" font-size="19" fill="#C9D1D9">├─ skills/dotnet-backend-patterns/</text>
-    <text x="716" y="362" font-size="19" fill="#C9D1D9">├─ agents/csharp-pro.md</text>
-    <text x="716" y="394" font-size="19" fill="#C9D1D9">├─ commands/accessibility-audit.md</text>
-    <text x="716" y="426" font-size="19" fill="#C9D1D9">└─ .claude-plugin/plugin.json</text>
-    <text x="716" y="464" font-size="18" fill="#8B95A3">+ dependency csharp-sdlc-stripe</text>
-    <text x="716" y="492" font-size="18" fill="#5CC8A8">✓ validate --strict</text>
+  <g id="built-plugin" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+    <rect x="692" y="256" width="444" height="252" rx="4" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1.5"/>
+    <text x="716" y="292" font-size="20" font-weight="700" fill="#0f172a">.ipm/plugins/csharp-sdlc/</text>
+    <text x="716" y="330" font-size="19" fill="#475569">├─ skills/dotnet-backend-patterns/</text>
+    <text x="716" y="362" font-size="19" fill="#475569">├─ agents/csharp-pro.md</text>
+    <text x="716" y="394" font-size="19" fill="#475569">├─ commands/accessibility-audit.md</text>
+    <text x="716" y="426" font-size="19" fill="#475569">└─ .claude-plugin/plugin.json</text>
+    <text x="716" y="464" font-size="18" fill="#475569">+ dependency csharp-sdlc-stripe</text>
+    <text x="716" y="492" font-size="18" fill="#19a0a6">✓ <tspan fill="#0f172a">validate --strict</tspan></text>
   </g>
 </svg>

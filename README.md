@@ -2,14 +2,9 @@
   <img src="./docs/assets/brand/hero.svg" width="100%" alt="ipm, the intelligent package manager for Claude Code: four items picked from two GitHub repos, each pinned to a commit, built by ipm install into one validated Claude Code plugin.">
 </p>
 
-<p align="center">
-  <a href="https://thinkjones.github.io/intelligent-package-manager/">Documentation</a> ·
-  <a href="https://thinkjones.github.io/intelligent-package-manager/getting-started.html">Getting started</a> ·
-  <a href="#install">Install</a> ·
-  <a href="LICENSE">MIT</a>
-</p>
-
 Good agent artifacts are spread across hundreds of repos. Installing a whole plugin to get one skill drags in agents, hooks and MCP servers you didn't want, under names you don't control, at whatever commit is current today. `ipm` lets you follow the repos, search everything in them, and build exactly the parts you want into a plugin of your own.
+
+**[Read the documentation on the site](https://thinkjones.github.io/intelligent-package-manager/)**, or start with [getting started](https://thinkjones.github.io/intelligent-package-manager/getting-started.html) or [install](#install) below. `ipm` is [MIT licensed](LICENSE).
 
 ## See it
 
