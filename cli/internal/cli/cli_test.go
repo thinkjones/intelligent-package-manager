@@ -924,7 +924,7 @@ func TestSourceAddListRemove(t *testing.T) {
 	}
 	f.out.Reset()
 	f.run("source", "list")
-	if !regexpMatch(`anthropics--skills\s+anthropics/skills\s+v1\s+not synced`, f.out.String()) || !strings.Contains(f.out.String(), "obra/superpowers") {
+	if !regexpMatch(`anthropics--skills\s+anthropics/skills\s+★ —\s+v1\s+not synced`, f.out.String()) || !strings.Contains(f.out.String(), "obra/superpowers") {
 		t.Errorf("list:\n%s", f.out.String())
 	}
 	if err := f.run("source", "remove", "obra/superpowers"); err != nil {

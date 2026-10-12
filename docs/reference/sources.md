@@ -57,7 +57,7 @@ A source may name a ref — a tag, branch or commit. Without one it follows the 
 | --- | --- |
 | `ipm source add <repo>…` | Add sources. Each is `owner/repo[@ref]`, a git URL (`https://…`, `ssh://…`, `file://…`, `git@…`) with an optional `#ref`, or an external plugin's catalog ID (`plugin:<marketplace repo>#<name>`), which adds the repo that plugin lives in. A repo already listed, or an alias collision, is refused and nothing is written. |
 | `ipm source remove <repo>…` | Remove sources, matched by alias. An unknown repo is an error and nothing is written. |
-| `ipm source list` | A table of alias, repo, ref and pinned commit (`not synced` until `ipm sync` has run). |
+| `ipm source list` | Your sources grouped by the list each belongs to in the default [curated list](../guides/sources.md#curated-lists): alias, repo, stars, ref and pinned commit (`not synced` until `ipm sync` has run), then description, topics and homepage. Sources in no list come last, under `Other`. |
 | `ipm source import <path/to/manifest.toml>` | One-time migration from the aihs-era list of repos of interest: adds each `[[repo]]` entry (`repo`, with `version` as its ref), and copies a sibling `catalog/github.jsonl` into the cache if the cache has none, so GitHub stats need not be refetched. |
 
 Run `ipm sync` after any change; `add`, `remove` and `import` only edit `package.json`.

@@ -73,6 +73,11 @@ run = [
 description = "Table tests for the scripts that decide what CI runs and what may be released"
 run = ".github/scripts/plan_test.sh"
 
+[tasks."packs:update"]
+description = "Scan thinkjones/agentic-tools's starred_repos.toml for new repos ipm can catalog and add them to source-packs.toml (-- --recheck scans skipped repos again)"
+dir = "cli"
+run = "go run ./cmd/sourcepacks --packs ../source-packs.toml --skipped ../source-packs.skipped.txt"
+
 [tools]
 actionlint = "1.7.12"
 go = "1.26.9"

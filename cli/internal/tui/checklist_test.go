@@ -286,3 +286,36 @@ func TestChecklistFilterTicksOnlyMatches(t *testing.T) {
 		t.Errorf("second space should untick the matches, Picked = %v", c.Picked())
 	}
 }
+
+func TestChecklistDetailLine(t *testing.T) {
+	lists := ckLists()
+	lists[0].Repos[0].Homepage = "https://superpowers.example"
+	lists[0].Repos[1].Homepage = "https://tdd-guard.example"
+	c := NewChecklist(lists, nil, nil, ckNow)
+	c.Update(tea.WindowSizeMsg{Width: 120, Height: 20})
+	if strings.Contains(ckView(c), "topics:") {
+		t.Errorf("a list row has no detail:\n%s", ckView(c))
+	}
+	ckPress(t, c, "right", "down")
+	if l := ckLine(t, c, "topics:"); strings.TrimSpace(l) != "topics: skills, tdd · https://superpowers.example" {
+		t.Errorf("detail = %q", l)
+	}
+	ckPress(t, c, "down")
+	if v := ckView(c); strings.Contains(v, "topics:") || strings.TrimSpace(ckLine(t, c, "https://tdd-guard.example")) != "https://tdd-guard.example" {
+		t.Errorf("a repo without topics shows its homepage alone:\n%s", v)
+	}
+	// the filter line wins the row while filtering
+	ckPress(t, c, "/", "t", "d", "d")
+	if v := ckView(c); strings.Contains(v, "https://") {
+		t.Errorf("no detail while typing a filter:\n%s", v)
+	}
+	// and a narrow screen cuts the detail rather than wrapping
+	n := NewChecklist(lists, nil, nil, ckNow)
+	n.Update(tea.WindowSizeMsg{Width: 30, Height: 20})
+	ckPress(t, n, "right", "down")
+	for _, l := range strings.Split(ckView(n), "\n") {
+		if ansi.StringWidth(l) > 30 {
+			t.Errorf("line wider than the screen: %q", l)
+		}
+	}
+}

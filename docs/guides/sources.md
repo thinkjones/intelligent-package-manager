@@ -46,8 +46,10 @@ list = "AI · Agentic Engineering Methods"   # the list it appears under, requir
 stars = 297229                              # optional, like everything below
 description = "An agentic skills framework & software development methodology that works."
 language = "Shell"
+homepage = "https://example.com"
 last_push = 2026-10-10                      # a TOML date or date-time, or a "YYYY-MM-DD" string
 topics = ["skills", "sdlc", "superpowers"]
+artifacts = { plugins = 1, skills = 14 }    # what the repo holds, when the list records it
 ```
 
 Lists appear in the order they first occur, with their repos sorted by stars. A repo can be in several lists by repeating its table with another `list`. Rows without a valid `owner/repo` or a `list` are skipped and counted. Other fields, and a `[meta]` table, are ignored.
@@ -77,10 +79,28 @@ Packs you have already built keep their own pins; see [Keep it current](build-a-
 ## List and remove
 
 ```bash
-ipm source list                   # alias, repo, ref and pinned commit
+ipm source list                   # your sources, grouped
 ipm source remove anthropics/skills
 ipm sync
 ```
+
+`ipm source list` groups your sources by the list each belongs to in the default [curated list](#curated-lists), and shows what is known about each:
+
+```text
+AI · Agentic Engineering Methods (1)
+  obra--superpowers   obra/superpowers   ★ 297k   —   3f2a91c
+      An agentic skills framework & software development methodology that works.
+      topics: skills, sdlc, superpowers · https://example.com
+
+Other (1)
+  me--my-skills       me/my-skills       ★ —      v1  not synced
+
+2 source(s) in ~/Library/ipm/sources
+```
+
+Each row is the alias, the repo, its stars, the ref it follows (`—` for the default branch) and the pinned commit. A repo in several lists appears under the first. Sources in no list come last, under `Other`. Stars, description and topics come from the curated list, or from `ipm stats` for a source that isn't in it; the homepage comes from the curated list only. In a terminal, long lines are cut to its width.
+
+The curated list is the copy `ipm onboard` saved; `ipm source list` fetches it when there is no copy or the copy is over a week old. With no copy and no network, every source is under `Sources` and a last line says `not grouped: no copy of the source packs yet`.
 
 `list` shows `not synced` for a source added since the last sync.
 

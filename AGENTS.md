@@ -8,7 +8,7 @@ Router for agents working in [thinkjones/intelligent-package-manager](https://gi
 
 | Path | What it is |
 | --- | --- |
-| [`cli/`](cli/README.md) | `ipm`, the Go CLI. Every command is in `cli/internal/cli`; the TUI's model is `cli/internal/tui` (Bubble Tea, behind four interfaces that `cli/internal/cli/tui.go` implements), which also holds `ipm onboard`'s checklist (`checklist.go`); `cli/internal/curated` reads the curated source lists `ipm onboard` offers. |
+| [`cli/`](cli/README.md) | `ipm`, the Go CLI. Every command is in `cli/internal/cli`; the TUI's model is `cli/internal/tui` (Bubble Tea, behind four interfaces that `cli/internal/cli/tui.go` implements), which also holds `ipm onboard`'s checklist (`checklist.go`); `cli/internal/curated` reads the curated source lists `ipm onboard` offers. `cli/cmd/sourcepacks` is a maintainer's tool, not part of the installed `ipm`: see [Source packs](#source-packs). |
 | `bin/ipm` | Shim that builds `cli/bin/ipm` when a Go source changes and runs it: `bin/ipm <command>` runs a development build. It isn't on PATH; `.envrc` no longer adds it. |
 | `install.sh` | Installs `ipm` into `~/.local/bin` (or `$IPM_BIN_DIR`): builds `cli/` from a checkout, or runs `go install …@latest` when piped from curl; then starts `ipm onboard` in a terminal. |
 | [`docs/`](docs/) | The user documentation, published to GitHub Pages at <https://thinkjones.github.io/intelligent-package-manager/> (Jekyll, Just the Docs theme, `docs/_config.yml`): [getting started](docs/getting-started.md), [concepts](docs/concepts.md), `guides/`, `reference/` ([commands](docs/reference/commands.md), [sources](docs/reference/sources.md), [files](docs/reference/files.md)), [troubleshooting](docs/troubleshooting.md), [how it works](docs/architecture.md). |
@@ -65,5 +65,14 @@ Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.lo
 | `pre-commit`, `pre-push` hooks | Your clone | Yes, with `--no-verify` |
 | Ruleset on `main`: pull request and merge gate required, no force-push, no deletion | GitHub | No |
 | The release workflow refuses a commit without a green full suite | GitHub | Yes: nothing stops someone with write access pushing a `cli/v*` tag by hand. Release only through the workflow |
+
+## Source packs
+
+`source-packs.toml` is a curated list holding only repos with something `ipm` can catalog, grouped into named lists (the source packs). It and `source-packs.skipped.txt` are generated: never edit them by hand.
+
+- **`mise run packs:update`** reads [thinkjones/agentic-tools](https://github.com/thinkjones/agentic-tools)'s `starred_repos.toml`, downloads each repo it hasn't seen, and looks for the markers the catalog indexes (`cli/internal/catalog`'s `Walk`). A repo holding something joins its list in `source-packs.toml` with its stars, description, topics, homepage and counts; one holding nothing goes in `source-packs.skipped.txt` and isn't fetched again (`-- --recheck` does). A repo that can't be fetched is recorded nowhere and tried on the next run. It prints a Markdown report of the new repos by pack.
+- **The Source packs workflow** (`.github/workflows/source-packs.yml`) runs that task by hand: `gh workflow run source-packs.yml`. The report is the run's summary. If the files changed, it pushes them to the branch `source-packs/update` and opens a draft pull request with the report as its body.
+- **The pull request is a draft on purpose.** One opened with the workflow's token starts no CI run, so the merge gate would never report. Read the list, then mark it ready (`gh pr ready source-packs/update`), which starts CI; `gh pr merge --auto --squash source-packs/update` then merges it.
+- The repo setting "Allow GitHub Actions to create and approve pull requests" must stay on for the workflow to open one.
 
 [`CLAUDE.md`](CLAUDE.md) has the commands and the sharp edges.

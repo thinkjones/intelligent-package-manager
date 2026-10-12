@@ -7,11 +7,16 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"text/tabwriter"
+	"time"
+	"unicode/utf8"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/curated"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/github"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/paths"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 
 	"github.com/spf13/cobra"
@@ -134,6 +139,43 @@ func sourceRepo(plugins []map[string]any, id string) (string, error) {
 	return "", fmt.Errorf("no plugin %s in the catalog — run `ipm index`", id)
 }
 
+// packsMaxAge is how old the saved source packs may be before ipm source
+// list fetches them again.
+const packsMaxAge = 7 * 24 * time.Hour
+
+// sourcePacks is the default curated list, which groups ipm source list:
+// the saved copy, fetched again when it is missing or old. ok is false when
+// there is no copy and none could be fetched.
+func sourcePacks(sys System, p paths.Paths) (lists []curated.List, ok bool) {
+	data, saved, ok := curated.Cached(curated.DefaultURL, p.Cache)
+	now := time.Now()
+	if sys.Now != nil {
+		now = sys.Now()
+	}
+	if (!ok || now.Sub(saved) > packsMaxAge) && sys.HTTP != nil {
+		client := *sys.HTTP
+		client.Timeout = 5 * time.Second
+		if fresh, _, err := curated.Fetch(&client, curated.DefaultURL, p.Cache); err == nil {
+			data, ok = fresh, true
+		}
+	}
+	if !ok {
+		return nil, false
+	}
+	lists, _, err := curated.Parse(data)
+	return lists, err == nil
+}
+
+// sourceRow is one source as ipm source list shows it.
+type sourceRow struct {
+	alias, repo, stars, ref, commit string
+	description, homepage           string
+	topics                          []string
+}
+
+// sourceList prints the sources under the source pack each belongs to (the
+// first, for a repo in several), then the rest under Other. Stars,
+// description and topics come from the pack, else from ipm stats.
 func sourceList(sys System, p paths.Paths) error {
 	srcs, err := sources.Load(p.Sources())
 	if err != nil {
@@ -149,20 +191,102 @@ func sourceList(sys System, p paths.Paths) error {
 			commits[c.Alias] = c.Commit[:7]
 		}
 	}
-	tw := tabwriter.NewWriter(sys.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "ALIAS\tREPO\tREF\tCOMMIT")
-	for _, s := range srcs {
-		ref, commit := s.Ref, commits[s.Alias]
-		if ref == "" {
-			ref = "—"
+	stats := map[string]github.Stats{}
+	if read, err := github.Read(filepath.Join(p.Catalog(), "github.jsonl")); err == nil {
+		for repo, s := range read {
+			stats[strings.ToLower(repo)] = s
 		}
-		if commit == "" {
-			commit = "not synced"
-		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", s.Alias, s.Repo, ref, commit)
 	}
-	tw.Flush()
-	fmt.Fprintf(sys.Stdout, "\n%d source(s) in %s\n", len(srcs), p.Sources())
+	lists, grouped := sourcePacks(sys, p)
+	packOf := map[string]int{}
+	detail := map[string]curated.Repo{}
+	for i, l := range lists {
+		for _, r := range l.Repos {
+			if k := strings.ToLower(r.Repo); detail[k].Repo == "" {
+				packOf[k], detail[k] = i, r
+			}
+		}
+	}
+	groups := make([][]sourceRow, len(lists)+1)
+	width := [4]int{}
+	for _, s := range srcs {
+		k := strings.ToLower(s.Repo)
+		row := sourceRow{alias: s.Alias, repo: s.Repo, stars: "—", ref: s.Ref, commit: commits[s.Alias]}
+		if row.ref == "" {
+			row.ref = "—"
+		}
+		if row.commit == "" {
+			row.commit = "not synced"
+		}
+		g := len(lists)
+		if d, ok := detail[k]; ok {
+			g = packOf[k]
+			row.description, row.homepage, row.topics = d.Description, d.Homepage, d.Topics
+			if d.Stars > 0 {
+				row.stars = search.Stars(d.Stars)
+			}
+		}
+		if st, ok := stats[k]; ok {
+			if row.stars == "—" {
+				row.stars = search.Stars(st.Stars)
+			}
+			if row.description == "" {
+				row.description = st.Description
+			}
+			if row.topics == nil {
+				row.topics = st.Topics
+			}
+		}
+		groups[g] = append(groups[g], row)
+		for i, cell := range []string{row.alias, row.repo, row.stars, row.ref} {
+			width[i] = max(width[i], utf8.RuneCountInString(cell))
+		}
+	}
+	term := 0
+	if sys.TermWidth != nil {
+		term = sys.TermWidth()
+	}
+	line := func(s string) {
+		if term > 0 {
+			s = ansi.Truncate(s, term, "…")
+		}
+		fmt.Fprintln(sys.Stdout, s)
+	}
+	pad := func(s string, w int) string { return s + strings.Repeat(" ", w-utf8.RuneCountInString(s)) }
+	for g, rows := range groups {
+		if len(rows) == 0 {
+			continue
+		}
+		name := "Other"
+		switch {
+		case g < len(lists):
+			name = lists[g].Name
+		case !grouped:
+			name = "Sources"
+		}
+		line(fmt.Sprintf("%s (%d)", name, len(rows)))
+		for _, r := range rows {
+			line(fmt.Sprintf("  %s  %s  ★ %s  %s  %s", pad(r.alias, width[0]), pad(r.repo, width[1]), pad(r.stars, width[2]), pad(r.ref, width[3]), r.commit))
+			if d := strings.Join(strings.Fields(r.description), " "); d != "" {
+				line("      " + d)
+			}
+			var more []string
+			if len(r.topics) > 0 {
+				more = append(more, "topics: "+strings.Join(r.topics, ", "))
+			}
+			if r.homepage != "" {
+				more = append(more, r.homepage)
+			}
+			if len(more) > 0 {
+				line("      " + strings.Join(more, " · "))
+			}
+		}
+		fmt.Fprintln(sys.Stdout)
+	}
+	fmt.Fprintf(sys.Stdout, "%d source(s) in %s\n", len(srcs), p.Sources())
+	if !grouped {
+		fmt.Fprintln(sys.Stdout, "- not grouped: no copy of the source packs yet — `ipm onboard` fetches one")
+	}
 	return nil
 }
 
