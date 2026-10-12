@@ -9,7 +9,7 @@ ipm onboard [--list <path|url>] [--lists <name>]… [--keep|--fresh] [--yes]
                                pick sources from a curated list, then add, sync, stats, serve and load
 ipm source add <repo>…         add sources: owner/repo[@ref], a git URL[#ref], or an external plugin ID
 ipm source remove <repo>…      remove sources
-ipm source list                alias, repo, ref and pinned commit of every source
+ipm source list                every source under its curated list: alias, repo, stars, ref, pinned commit, description, topics, homepage
 ipm source import <manifest>   one-time: add the [[repo]] entries of an aihs-era manifest.toml
 ipm sync [--upgrade]           pnpm install (or update --latest) the sources, then ipm index
 ipm index                      rebuild <cache>/catalog/*.jsonl from the synced sources
@@ -71,7 +71,8 @@ internal/assemble/         resolve picks (lock, then catalog), plan each pack's 
 internal/pack/             naming rules, and reading an aihs-era manifest.toml for source import
 internal/copilot/          which skills a Copilot plugin.json lists
 internal/marketplace/      marketplace.json entries (including upstream entry maps) and atomic Write
-internal/curated/          curated source lists for ipm onboard: parse [[repos]] TOML, fetch with a cached copy for offline
+internal/curated/          curated source lists for ipm onboard and ipm source list: parse and write [[repos]] TOML, fetch with a cached copy for offline
+internal/sourcepacks/      maintain source-packs.toml: find the repos of a wider list that hold something ipm can catalog (cmd/sourcepacks runs it; not part of the installed ipm)
 internal/tui/              the Bubble Tea model behind ipm tui: search, detail, tray, picker, install modal; depends only on its four interfaces (deps.go); checklist.go is ipm onboard's picker
 ```
 

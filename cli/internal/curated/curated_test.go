@@ -196,3 +196,21 @@ func TestRawURL(t *testing.T) {
 		}
 	}
 }
+
+func TestParseDropsControlCharacters(t *testing.T) {
+	lists, _, err := Parse([]byte("[[repos]]\nrepo = \"o/r\"\nlist = \"L\\u001b[2J\"\ndescription = \"red \\u001b[31m text\\u0007 and\\na line\"\nhomepage = \"https://h.example/\\u001b]0;x\"\ntopics = [\"a\\u001bb\"]\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := lists[0].Repos[0]
+	for _, s := range []string{lists[0].Name, r.List, r.Description, r.Homepage, r.Topics[0]} {
+		for _, c := range s {
+			if c < 0x20 || c == 0x7f {
+				t.Errorf("%q keeps a control character", s)
+			}
+		}
+	}
+	if r.Description != "red [31m text and a line" {
+		t.Errorf("description = %q", r.Description)
+	}
+}

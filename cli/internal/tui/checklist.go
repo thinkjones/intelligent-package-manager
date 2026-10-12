@@ -14,10 +14,10 @@ import (
 
 // CuratedRepo is one repo in a curated list, as the checklist shows it.
 type CuratedRepo struct {
-	Repo, Description, Language string
-	Stars                       int
-	LastPush                    time.Time
-	Topics                      []string
+	Repo, Description, Language, Homepage string
+	Stars                                 int
+	LastPush                              time.Time
+	Topics                                []string
 }
 
 // CuratedList is a named group of curated repos.
@@ -361,7 +361,7 @@ func (c *Checklist) render() string {
 	case c.filter != "":
 		lines = append(lines, fit(stMuted.Render("filter: ")+c.filter+stMuted.Render(" · esc clears"), w))
 	default:
-		lines = append(lines, spaces(w))
+		lines = append(lines, fit(c.detail(), w))
 	}
 	foot := "space tick · ←→ collapse/expand · / filter · a all · n none · enter continue · q quit"
 	if w < 100 {
@@ -377,6 +377,24 @@ func (c *Checklist) render() string {
 		lines = append(lines, fit(stMuted.Render(foot), w))
 	}
 	return strings.Join(lines, "\n")
+}
+
+// detail is the highlighted repo's topics and homepage, which its row has no
+// room for; empty on a list or a repo with neither.
+func (c *Checklist) detail() string {
+	r, ok := c.current()
+	if !ok || r.repo < 0 {
+		return ""
+	}
+	x := c.lists[r.list].Repos[r.repo]
+	var parts []string
+	if len(x.Topics) > 0 {
+		parts = append(parts, stMuted.Render("topics: ")+stText.Render(strings.Join(x.Topics, ", ")))
+	}
+	if x.Homepage != "" {
+		parts = append(parts, stTeal.Render(x.Homepage))
+	}
+	return strings.Join(parts, stMuted.Render(" · "))
 }
 
 // rowText draws one row, w cells wide (without the caret column).

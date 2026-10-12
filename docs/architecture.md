@@ -202,7 +202,8 @@ cli/
     ├── pack/                  naming rules; reading an aihs-era manifest.toml for source import
     ├── copilot/               the skills a Copilot plugin.json lists
     ├── marketplace/           marketplace.json entries (ipm's own or upstream entry maps) and atomic Write
-    ├── curated/               read curated source lists ([[repos]] TOML) for ipm onboard; fetch with a cached fallback
+    ├── curated/               read and write curated source lists ([[repos]] TOML) for ipm onboard and ipm source list; fetch with a cached fallback
+    ├── sourcepacks/           maintain source-packs.toml from a wider list of repos (run by cmd/sourcepacks, a maintainer's tool)
     └── tui/                   the Bubble Tea model behind ipm tui (tree.go, deploy.go), over five interfaces (deps.go); checklist.go, ipm onboard's picker
 ```
 

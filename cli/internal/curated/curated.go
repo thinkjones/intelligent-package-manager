@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/BurntSushi/toml"
 )
@@ -37,12 +38,14 @@ func rawURL(u string) string {
 	return "https://raw.githubusercontent.com/" + m[1] + "/" + m[2] + "/" + m[3] + "/" + m[4]
 }
 
-// Repo is one curated repo; List is the list it was read under.
+// Repo is one curated repo; List is the list it was read under. Artifacts
+// counts what ipm would catalog in it, by kind, when the list records that.
 type Repo struct {
-	Repo, List, Description, Language string
-	Stars                             int
-	LastPush                          time.Time
-	Topics                            []string
+	Repo, List, Description, Language, Homepage string
+	Stars                                       int
+	LastPush                                    time.Time
+	Topics                                      []string
+	Artifacts                                   map[string]int
 }
 
 // List is a named group of repos, sorted by stars, most first.
@@ -55,8 +58,8 @@ var ownerRepoRE = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
 
 // Parse reads a curated list. Lists keep the order they first appear in;
 // rows without a valid owner/repo are skipped and counted. Every field
-// other than repo, list, stars, description, language, last_push and
-// topics is ignored.
+// other than repo, list, stars, description, language, homepage, last_push,
+// topics and artifacts is ignored.
 func Parse(data []byte) (lists []List, skipped int, err error) {
 	var doc struct {
 		Repos []map[string]any `toml:"repos"`
@@ -67,14 +70,21 @@ func Parse(data []byte) (lists []List, skipped int, err error) {
 	index := map[string]int{}
 	for _, row := range doc.Repos {
 		repo, _ := row["repo"].(string)
-		list, _ := row["list"].(string)
+		list := text(row["list"])
 		if !ownerRepoRE.MatchString(repo) || list == "" {
 			skipped++
 			continue
 		}
 		r := Repo{Repo: repo, List: list, LastPush: date(row["last_push"])}
-		r.Description, _ = row["description"].(string)
-		r.Language, _ = row["language"].(string)
+		r.Description, r.Language, r.Homepage = text(row["description"]), text(row["language"]), text(row["homepage"])
+		if as, ok := row["artifacts"].(map[string]any); ok {
+			r.Artifacts = map[string]int{}
+			for k, v := range as {
+				if n, ok := v.(int64); ok {
+					r.Artifacts[k] = int(n)
+				}
+			}
+		}
 		switch n := row["stars"].(type) {
 		case int64:
 			r.Stars = int(n)
@@ -83,7 +93,7 @@ func Parse(data []byte) (lists []List, skipped int, err error) {
 		}
 		if ts, ok := row["topics"].([]any); ok {
 			for _, t := range ts {
-				if s, ok := t.(string); ok {
+				if s := text(t); s != "" {
 					r.Topics = append(r.Topics, s)
 				}
 			}
@@ -107,6 +117,16 @@ func Parse(data []byte) (lists []List, skipped int, err error) {
 	return lists, skipped, nil
 }
 
+// text is v as one line of plain text: a list is someone else's file, shown
+// in a terminal, so control characters (an escape sequence, a line break)
+// become spaces and runs of space collapse. Not a string is "".
+func text(v any) string {
+	s, _ := v.(string)
+	return strings.Join(strings.FieldsFunc(s, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.IsControl(r)
+	}), " ")
+}
+
 // date reads last_push as a TOML date or date-time (both decode to
 // time.Time) or a string; anything else is the zero time.
 func date(v any) time.Time {
@@ -123,6 +143,26 @@ func date(v any) time.Time {
 	return time.Time{}
 }
 
+// cachePath is where a URL's list is saved under cacheDir.
+func cachePath(src, cacheDir string) string {
+	sum := sha256.Sum256([]byte(rawURL(src)))
+	return filepath.Join(cacheDir, "curated", hex.EncodeToString(sum[:])[:16]+".toml")
+}
+
+// Cached is the copy of a URL's list saved by the last Fetch that reached
+// it, and when that was; ok is false when there is none.
+func Cached(src, cacheDir string) (data []byte, saved time.Time, ok bool) {
+	path := cachePath(src, cacheDir)
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, time.Time{}, false
+	}
+	if data, err = os.ReadFile(path); err != nil {
+		return nil, time.Time{}, false
+	}
+	return data, info.ModTime(), true
+}
+
 // Fetch reads src, a file path or an http(s) URL. A URL that answers with a
 // list that parses is cached under cacheDir/curated; when it fails, the
 // cached copy is returned with cached set. Paths are read as they are.
@@ -132,8 +172,7 @@ func Fetch(client *http.Client, src, cacheDir string) (data []byte, cached bool,
 		return data, false, err
 	}
 	src = rawURL(src)
-	sum := sha256.Sum256([]byte(src))
-	path := filepath.Join(cacheDir, "curated", hex.EncodeToString(sum[:])[:16]+".toml")
+	path := cachePath(src, cacheDir)
 	data, ferr := get(client, src)
 	if ferr == nil {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err == nil {

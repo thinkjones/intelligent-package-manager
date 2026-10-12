@@ -1,0 +1,59 @@
+name: Source packs
+
+# Run by hand. Looks in thinkjones/agentic-tools's starred_repos.toml for
+# repos that aren't in source-packs.toml yet, keeps the ones holding
+# something ipm can catalog, and opens a draft pull request with them. The
+# work is a mise task: mise run packs:update reproduces it.
+
+on:
+  workflow_dispatch:
+    inputs:
+      recheck:
+        description: Also scan again the repos recorded as holding nothing
+        type: boolean
+        default: false
+
+# One update at a time, and never cancelled halfway.
+concurrency:
+  group: source-packs
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  # The mise the tasks were verified with.
+  MISE_VERSION: 2026.10.8
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+        with:
+          version: ${{ env.MISE_VERSION }}
+      - uses: actions/cache@v6
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('cli/go.sum', 'mise.toml') }}
+      - name: Scan for new repos
+        env:
+          RECHECK: ${{ inputs.recheck }}
+        run: |
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::source packs are updated from main, not $GITHUB_REF"; exit 1
+          fi
+          args=(--report "$RUNNER_TEMP/source-packs.md")
+          if [ "$RECHECK" = true ]; then args+=(--recheck); fi
+          mise run packs:update -- "${args[@]}"
+          cat "$RUNNER_TEMP/source-packs.md" >>"$GITHUB_STEP_SUMMARY"
+      - name: Open a draft pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPORT: ${{ runner.temp }}/source-packs.md
+        run: .github/scripts/source-packs-pr.sh

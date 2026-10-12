@@ -452,7 +452,7 @@ func checklistLists(lists []curated.List) []tui.CuratedList {
 	for _, l := range lists {
 		cl := tui.CuratedList{Name: l.Name}
 		for _, r := range l.Repos {
-			cl.Repos = append(cl.Repos, tui.CuratedRepo{Repo: r.Repo, Description: r.Description, Language: r.Language, Stars: r.Stars, LastPush: r.LastPush, Topics: r.Topics})
+			cl.Repos = append(cl.Repos, tui.CuratedRepo{Repo: r.Repo, Description: r.Description, Language: r.Language, Stars: r.Stars, LastPush: r.LastPush, Topics: r.Topics, Homepage: r.Homepage})
 		}
 		out = append(out, cl)
 	}

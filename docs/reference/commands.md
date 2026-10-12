@@ -27,7 +27,7 @@ Takes you from nothing to a searchable library: picks sources from a curated lis
 
 If `ipm` already has sources or a catalog, it prints, for example, `found existing ipm data: 26 sources · 3,280 artifacts · synced 2026-10-09` and asks `[u]se it · [b]ack it up and start fresh · [q]uit`. Backing up renames the home and cache folders to `<folder>.backup-YYYYMMDD-HHMM` and prints how to undo it: `to restore: rm -rf <home> <cache> && mv <home>.backup-… <home> && mv <cache>.backup-… <cache> && ipm serve`. If you then quit the checklist, it says `no sources added; your data was backed up to …` and prints the same line. With sources you already follow, `enter` with nothing new ticked continues with those (`0 new repos — y continue with the N you follow`), so rerunning `ipm onboard` after a failed step resumes it. While filtering, space on a list ticks only the repos shown.
 
-The curated list is fetched each time and cached under the cache folder's `curated/`; offline, the cached copy is used. In a terminal it shows a checklist of the lists, which expand into their repos; see [Getting started](../getting-started.md#onboard) for the keys. On a fresh start "AI · Agentic Engineering Methods" and "AI · Skills, Plugins & Registries" are ticked; repos you already follow show `✓` and nothing is ticked. Rerunning `ipm onboard` adds only what is new.
+The curated list is fetched each time and cached under the cache folder's `curated/`; offline, the cached copy is used. In a terminal it shows a checklist of the lists, which expand into their repos; see [Getting started](../getting-started.md#onboard) for the keys. The line above the key hints shows the highlighted repo's topics and homepage. On a fresh start "AI · Agentic Engineering Methods" and "AI · Skills, Plugins & Registries" are ticked; repos you already follow show `✓` and nothing is ticked. Rerunning `ipm onboard` adds only what is new.
 
 | Flag | Does |
 | --- | --- |
@@ -62,7 +62,7 @@ ipm source import <path/to/manifest.toml>
 | --- | --- |
 | `add` | Add sources: `owner/repo[@ref]`, a git URL (`https://`, `ssh://`, `file://`, `git@`) with an optional `#ref`, or an external plugin ID (`plugin:<marketplace repo>#<name>`), which adds the repo the plugin lives in. A repo already listed, or two repos that would share an alias, is refused and nothing is written. |
 | `remove` | Remove sources. An unknown repo is an error and nothing is written. |
-| `list` | Alias, repo, ref and pinned commit of every source (`not synced` until `ipm sync`). |
+| `list` | Every source under the list it belongs to in the curated list, each with its alias, repo, stars, ref and pinned commit (`not synced` until `ipm sync`), then its description, topics and homepage. See [List and remove](../guides/sources.md#list-and-remove). |
 | `import` | One-time migration from an aihs-era `manifest.toml`. |
 
 `add`, `remove` and `import` only edit the source list; run `ipm sync` after.

@@ -37,6 +37,7 @@ The source code of `ipm`, a Go CLI (`cli/`) that keeps a per-user list of repos 
 | Install the git hooks, once per clone | `mise run setup` |
 | Fix formatting | `mise run fmt` |
 | Run the tests that need real pnpm, Node and Docker | `mise run test:integration` |
+| Look for new repos to add to `source-packs.toml` (downloads repos; the Source packs workflow runs it and opens a pull request) | `mise run packs:update` |
 | Install from the published module | `go install github.com/thinkjones/intelligent-package-manager/cli/cmd/ipm@latest` |
 
 The loop: `ipm source add <repo>` → `ipm sync` (installs, then indexes) → `ipm stats` when stars should be refreshed → `ipm load` to refresh search. Source files and refs are in [docs/reference/sources.md](docs/reference/sources.md). The pack loop: `ipm pack new` → `ipm pack add` → `ipm install` → `claude plugin marketplace add <project>/.ipm` (in a sandbox `CLAUDE_CONFIG_DIR` when testing).
@@ -44,6 +45,7 @@ The loop: `ipm source add <repo>` → `ipm sync` (installs, then indexes) → `i
 ## Sharp edges
 
 - **Never hand-edit generated files**: `$IPM_HOME/sources/package.json` (use `ipm source`), `pnpm-lock.yaml`, `.pnpmfile.cjs` (rewritten on every sync), the catalog, and everything in a project's `.ipm/` (`ipm install` rewrites it; `ipm.toml` is edited with `ipm pack`).
+- **`source-packs.toml` and `source-packs.skipped.txt` are generated too**, by `mise run packs:update`; see [AGENTS.md](AGENTS.md#source-packs).
 - **`.ipm/plugins/` files are hard links into pnpm's store.** Editing one edits pnpm's copy too, and `ipm install` rebuilds the folder anyway. Edit upstream or in your own repo.
 - **`ipm install` keeps existing pins** from `.ipm/ipm.lock`; `--update` re-pins to the current catalog. It must stay deterministic: two runs give byte-identical `.ipm/`, and items removed from a pack leave no files.
 - **Hooks, MCP servers and inline commands are not pickable**; `ipm pack add` refuses them and names the owning plugin to add instead. Pack names Claude Code reserves (`claude-…`, `anthropic-…`, `official` beside claude/anthropic) are refused.
