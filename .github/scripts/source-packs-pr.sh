@@ -49,6 +49,8 @@ git push --quiet --force origin "$branch"
 
 if [[ -n $(gh pr list --head "$branch" --state open --json number --jq '.[].number') ]]; then
   gh pr edit "$branch" --title "$title" --body-file "$body"
+  # This push started no CI either, so the list has to be read and marked ready again.
+  gh pr ready "$branch" --undo
   echo "updated the open pull request"
 else
   gh pr create --draft --base main --head "$branch" --title "$title" --body-file "$body"

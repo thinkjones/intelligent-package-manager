@@ -125,6 +125,11 @@ func TestUpdateRecheck(t *testing.T) {
 	if !reflect.DeepEqual(names(res.Added), []string{"Skills: o/late"}) || !reflect.DeepEqual(res.Skipped, []string{"o/still-empty"}) {
 		t.Errorf("recheck: added %v, skipped %v", names(res.Added), res.Skipped)
 	}
+	// a recheck that can't fetch a repo forgets it was skipped, so the next run tries it
+	failing := func(string) (map[string]int, error) { return nil, errors.New("timeout") }
+	if res := Update(starred, nil, skipped, true, failing, 1); len(res.Skipped) != 0 || len(res.Failed) != 2 {
+		t.Errorf("failed recheck: skipped %v, failed %v", res.Skipped, res.Failed)
+	}
 }
 
 func TestReport(t *testing.T) {
@@ -140,7 +145,7 @@ func TestReport(t *testing.T) {
 	}
 	want := `## 2 new repos in 1 source pack
 
-Scanned 3 repos not seen before; 1 hold nothing ipm can catalog so far.
+Scanned 3 repos; 1 hold nothing ipm can catalog so far.
 
 ### AI · Skills (2)
 
@@ -158,6 +163,19 @@ These are tried again on the next run.
 ` + "- `o/broken`: HTTP 404 Not Found\n"
 	if got := Report(res); got != want {
 		t.Errorf("report =\n%s\nwant\n%s", got, want)
+	}
+	hostile := Report(Result{Scanned: 1, Added: []curated.List{{Name: "L", Repos: []curated.Repo{{
+		Repo: "o/x", Description: "Fixes #12, thanks @octocat ![x](https://t.example/p.png) <img src=x> `a` *b* [c](d)",
+		Topics:   []string{"ok", "bad\n\n# heading"},
+		Homepage: "https://h.example/>\n\n## injected", Artifacts: map[string]int{"skills": 1},
+	}}}}})
+	for _, bad := range []string{"#12", "@octocat", "![x]", " <img", "\n# heading", "\n## injected", "`a`", " *b* ", "[c](d)"} {
+		if strings.Contains(hostile, bad) {
+			t.Errorf("the report carries %q from a repo's own text:\n%s", bad, hostile)
+		}
+	}
+	if !strings.Contains(hostile, "Fixes #\u200b12, thanks @\u200boctocat") {
+		t.Errorf("want the words kept, readable:\n%s", hostile)
 	}
 	if got := Report(Result{Scanned: 0}); !strings.HasPrefix(got, "## No new repos for the source packs\n") {
 		t.Errorf("empty report = %q", got)

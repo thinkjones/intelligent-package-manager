@@ -33,5 +33,6 @@ A manually run CI task that parses [thinkjones/agentic-tools's `starred_repos.to
 ## Not done
 
 - No removal of repos that leave the starred list or lose their artifacts.
+- A repo that moves to another list upstream, or whose list is renamed, is added under the new list and stays under the old one.
 - No scheduled runs.
 - `ipm source list` groups by the default list even when `ipm onboard` was given another with `--list`.

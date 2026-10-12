@@ -8,6 +8,7 @@ package sourcepacks
 
 import (
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -146,9 +147,11 @@ func Update(starred, packs []curated.List, skipped []string, recheck bool, scan 
 		k := strings.ToLower(repo)
 		switch r := results[i]; {
 		case r.err != nil:
+			// not skipped any more, so a failed recheck is tried again too
 			failed[k] = true
+			delete(skip, k)
 			res.Failed = append(res.Failed, Failure{repo, r.err})
-		case !qualifies(r.counts):
+		case !Qualifies(r.counts):
 			skip[k] = true
 		default:
 			delete(skip, k)
@@ -203,10 +206,10 @@ func Update(starred, packs []curated.List, skipped []string, recheck bool, scan 
 	return res
 }
 
-// qualifies reports whether counts hold something worth following a repo
+// Qualifies reports whether counts hold something worth following a repo
 // for. An MCP file alone doesn't count: most are a repo's own development
 // setup, and an MCP server can't be picked into a pack.
-func qualifies(counts map[string]int) bool {
+func Qualifies(counts map[string]int) bool {
 	for kind, n := range counts {
 		if kind != "mcp" && n > 0 {
 			return true
@@ -248,20 +251,26 @@ func Report(res Result) string {
 	} else {
 		fmt.Fprintf(&b, "## %d new %s in %d source %s\n", n, plural(n, "repo"), len(res.Added), plural(len(res.Added), "pack"))
 	}
-	fmt.Fprintf(&b, "\nScanned %d %s not seen before; %d hold nothing ipm can catalog so far.\n", res.Scanned, plural(res.Scanned, "repo"), len(res.Skipped))
+	fmt.Fprintf(&b, "\nScanned %d %s; %d hold nothing ipm can catalog so far.\n", res.Scanned, plural(res.Scanned, "repo"), len(res.Skipped))
 	for _, l := range res.Added {
 		fmt.Fprintf(&b, "\n### %s (%d)\n\n", l.Name, len(l.Repos))
 		for _, r := range l.Repos {
 			fmt.Fprintf(&b, "- **[%s](https://github.com/%s)** ★ %s", r.Repo, r.Repo, search.Stars(r.Stars))
 			if r.Description != "" {
-				fmt.Fprintf(&b, " — %s", strings.Join(strings.Fields(r.Description), " "))
+				fmt.Fprintf(&b, " — %s", plain(r.Description))
 			}
 			b.WriteString("\n")
 			if len(r.Topics) > 0 {
-				fmt.Fprintf(&b, "  - topics: %s\n", strings.Join(r.Topics, ", "))
+				topics := make([]string, len(r.Topics))
+				for i, t := range r.Topics {
+					topics[i] = plain(t)
+				}
+				fmt.Fprintf(&b, "  - topics: %s\n", strings.Join(topics, ", "))
 			}
-			if r.Homepage != "" {
+			if u, err := url.Parse(r.Homepage); err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && !strings.ContainsAny(r.Homepage, "<> \t\r\n") {
 				fmt.Fprintf(&b, "  - homepage: <%s>\n", r.Homepage)
+			} else if r.Homepage != "" {
+				fmt.Fprintf(&b, "  - homepage: %s\n", plain(r.Homepage))
 			}
 			fmt.Fprintf(&b, "  - holds: %s\n", Holds(r.Artifacts))
 		}
@@ -270,6 +279,28 @@ func Report(res Result) string {
 		fmt.Fprintf(&b, "\n### Couldn't be scanned (%d)\n\nThese are tried again on the next run.\n\n", len(res.Failed))
 		for _, f := range res.Failed {
 			fmt.Fprintf(&b, "- `%s`: %v\n", f.Repo, f.Err)
+		}
+	}
+	return b.String()
+}
+
+// plain writes a repo's own words (its description, a topic) so Markdown
+// shows them and does nothing else: on one line, with nothing read as
+// formatting, a link, an image or HTML, and with a zero-width space after #
+// and @ so "Fixes #12" closes no issue and "@name" notifies no one.
+func plain(s string) string {
+	var b strings.Builder
+	for _, r := range strings.Join(strings.Fields(s), " ") {
+		switch {
+		case r == '#' || r == '@':
+			b.WriteRune(r)
+			b.WriteRune('\u200b')
+		case strings.ContainsRune("\\`*_[]()<>!|~&", r):
+			b.WriteByte('\\')
+			b.WriteRune(r)
+		case r < 0x20 || r == 0x7f:
+		default:
+			b.WriteRune(r)
 		}
 	}
 	return b.String()

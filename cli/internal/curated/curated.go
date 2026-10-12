@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/BurntSushi/toml"
 )
@@ -69,15 +70,13 @@ func Parse(data []byte) (lists []List, skipped int, err error) {
 	index := map[string]int{}
 	for _, row := range doc.Repos {
 		repo, _ := row["repo"].(string)
-		list, _ := row["list"].(string)
+		list := text(row["list"])
 		if !ownerRepoRE.MatchString(repo) || list == "" {
 			skipped++
 			continue
 		}
 		r := Repo{Repo: repo, List: list, LastPush: date(row["last_push"])}
-		r.Description, _ = row["description"].(string)
-		r.Language, _ = row["language"].(string)
-		r.Homepage, _ = row["homepage"].(string)
+		r.Description, r.Language, r.Homepage = text(row["description"]), text(row["language"]), text(row["homepage"])
 		if as, ok := row["artifacts"].(map[string]any); ok {
 			r.Artifacts = map[string]int{}
 			for k, v := range as {
@@ -94,7 +93,7 @@ func Parse(data []byte) (lists []List, skipped int, err error) {
 		}
 		if ts, ok := row["topics"].([]any); ok {
 			for _, t := range ts {
-				if s, ok := t.(string); ok {
+				if s := text(t); s != "" {
 					r.Topics = append(r.Topics, s)
 				}
 			}
@@ -116,6 +115,16 @@ func Parse(data []byte) (lists []List, skipped int, err error) {
 		})
 	}
 	return lists, skipped, nil
+}
+
+// text is v as one line of plain text: a list is someone else's file, shown
+// in a terminal, so control characters (an escape sequence, a line break)
+// become spaces and runs of space collapse. Not a string is "".
+func text(v any) string {
+	s, _ := v.(string)
+	return strings.Join(strings.FieldsFunc(s, func(r rune) bool {
+		return unicode.IsSpace(r) || unicode.IsControl(r)
+	}), " ")
 }
 
 // date reads last_push as a TOML date or date-time (both decode to

@@ -18,6 +18,10 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sourcepacks"
 )
 
+// allFailedIsOutage is how many repos must be scanned, every one failing,
+// before the run is taken for an outage and nothing is written.
+const allFailedIsOutage = 10
+
 func main() {
 	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "sourcepacks: %v\n", err)
@@ -33,6 +37,7 @@ func run(args []string) error {
 	report := fs.String("report", "", "also write the Markdown report to this file")
 	recheck := fs.Bool("recheck", false, "scan the repos in the skipped file again")
 	workers := fs.Int("workers", 6, "how many repos to fetch at once")
+	timeout := fs.Duration("timeout", 10*time.Minute, "how long one repo may take to download")
 	base := fs.String("github", sourcepacks.GitHub, "where repos are fetched from")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -74,7 +79,7 @@ func run(args []string) error {
 		return err
 	}
 
-	fetcher := sourcepacks.Fetcher{Client: &http.Client{}, Base: *base, Tmp: tmp, Timeout: 5 * time.Minute}
+	fetcher := sourcepacks.Fetcher{Client: &http.Client{}, Base: *base, Tmp: tmp, Timeout: *timeout}
 	scan := func(repo string) (map[string]int, error) {
 		counts, err := fetcher.Scan(repo)
 		switch {
@@ -82,14 +87,18 @@ func run(args []string) error {
 			fmt.Fprintf(os.Stderr, "✗ %s: %v\n", repo, err)
 		case len(counts) == 0:
 			fmt.Fprintf(os.Stderr, "- %s: nothing to catalog\n", repo)
+		case !sourcepacks.Qualifies(counts):
+			fmt.Fprintf(os.Stderr, "- %s: only %s\n", repo, sourcepacks.Holds(counts))
 		default:
 			fmt.Fprintf(os.Stderr, "✓ %s: %s\n", repo, sourcepacks.Holds(counts))
 		}
 		return counts, err
 	}
 	res := sourcepacks.Update(starred, packs, skipped, *recheck, scan, *workers)
-	// every scan failing is the network or GitHub, not a list of bad repos
-	if res.Scanned > 0 && len(res.Failed) == res.Scanned {
+	// Many repos all failing is the network or GitHub, not the repos. A few
+	// can fail on every run (deleted, or too big to fetch in time) and must
+	// not stop the rest being written.
+	if res.Scanned > allFailedIsOutage && len(res.Failed) == res.Scanned {
 		return fmt.Errorf("none of the %d repos could be fetched; nothing was written — first error: %s: %v", res.Scanned, res.Failed[0].Repo, res.Failed[0].Err)
 	}
 	if err := os.WriteFile(*packsFile, curated.Encode(sourcepacks.Header, res.Packs), 0o644); err != nil {

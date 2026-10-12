@@ -50,6 +50,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `no sources yet — add some with ipm source add owner/repo` | Add a source first. |
 | `sources are not synced yet`, `… has no pinned commit in pnpm-lock.yaml`, `… is not installed` | Run `ipm sync`. |
 | `… is already a source` | It's listed already; `ipm source list` shows it. |
+| `- not grouped: no copy of the source packs yet — ipm onboard fetches one` | `ipm source list` groups by the curated list, and it has no saved copy and couldn't fetch one. Your sources are all listed under `Sources`. Run it again when you are online. |
 | `… and … would both install as "<alias>" — remove one first` | Two repos differ only in case or punctuation. Keep one. |
 | `… is not owner/repo or a git URL` | Use `owner/repo[@ref]`, or a URL starting `https://`, `ssh://`, `file://` or `git@`. |
 | `no plugin plugin:… in the catalog — run ipm index` | That plugin ID isn't in your catalog. Check it with `ipm search --type plugin`. |

@@ -8,7 +8,8 @@ import (
 
 // Encode writes lists as a curated list file: header as comment lines, then
 // one [[repos]] table per repo, in the order given. Fields without a value
-// are left out, so Parse(Encode(lists)) gives the same repos back.
+// are left out, and last_push keeps its day only; otherwise
+// Parse(Encode(lists)) gives the same repos back.
 func Encode(header string, lists []List) []byte {
 	var b strings.Builder
 	for _, line := range strings.Split(strings.TrimSpace(header), "\n") {
