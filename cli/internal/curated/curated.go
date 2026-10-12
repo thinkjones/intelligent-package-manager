@@ -1,6 +1,6 @@
 // Package curated reads curated source lists: TOML files of [[repos]]
 // tables, each naming a GitHub repo and the list it belongs to, such as
-// thinkjones/agentic-tools's starred_repos.toml. ipm onboard offers them
+// this repo's source-packs.toml. ipm onboard offers them
 // as the sources a new user can pick from.
 package curated
 
@@ -22,8 +22,11 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// DefaultURL is the curated list ipm onboard offers unless told otherwise.
-const DefaultURL = "https://raw.githubusercontent.com/thinkjones/agentic-tools/main/starred_repos.toml"
+// DefaultURL is the curated list ipm onboard offers unless told otherwise,
+// and the one ipm source list groups by: this repo's source-packs.toml, the
+// repos of thinkjones/agentic-tools's starred_repos.toml that hold
+// something ipm can catalog (see internal/sourcepacks).
+const DefaultURL = "https://raw.githubusercontent.com/thinkjones/intelligent-package-manager/main/source-packs.toml"
 
 // githubBlob matches a GitHub file page: github.com/<owner>/<repo>/blob/<ref>/<path>.
 var githubBlob = regexp.MustCompile(`^https://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/([^?#]+)`)
