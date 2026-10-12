@@ -35,6 +35,7 @@ func TestUpdate(t *testing.T) {
 			{Repo: "o/have", Stars: 900, Description: "new words"},
 			{Repo: "o/new", Stars: 50, Homepage: "https://new.example", Topics: []string{"skills"}},
 			{Repo: "o/empty", Stars: 40},
+			{Repo: "o/mcp-only", Stars: 35},
 			{Repo: "o/skipped", Stars: 30},
 			{Repo: "o/broken", Stars: 20},
 		}},
@@ -59,6 +60,8 @@ func TestUpdate(t *testing.T) {
 			return map[string]int{"skills": 3, "plugins": 1}, nil
 		case "o/big":
 			return map[string]int{"agents": 1}, nil
+		case "o/mcp-only":
+			return map[string]int{"mcp": 2}, nil
 		case "o/broken":
 			return nil, errors.New("HTTP 404 Not Found")
 		}
@@ -67,11 +70,11 @@ func TestUpdate(t *testing.T) {
 	res := Update(starred, packs, []string{"o/skipped", "o/old-skip"}, false, scan, 3)
 
 	sort.Strings(scanned)
-	if want := []string{"o/big", "o/broken", "o/empty", "o/new"}; !reflect.DeepEqual(scanned, want) {
+	if want := []string{"o/big", "o/broken", "o/empty", "o/mcp-only", "o/new"}; !reflect.DeepEqual(scanned, want) {
 		t.Errorf("scanned %v, want %v", scanned, want)
 	}
-	if res.Scanned != 4 {
-		t.Errorf("Scanned = %d, want 4", res.Scanned)
+	if res.Scanned != 5 {
+		t.Errorf("Scanned = %d, want 5", res.Scanned)
 	}
 	wantPacks := []string{"Kept first: o/gone-upstream", "Skills: o/have", "Skills: o/new", "Fresh pack: o/big", "Fresh pack: O/Have", "Fresh pack: o/new"}
 	if got := names(res.Packs); !reflect.DeepEqual(got, wantPacks) {
@@ -81,7 +84,7 @@ func TestUpdate(t *testing.T) {
 	if got := names(res.Added); !reflect.DeepEqual(got, wantAdded) {
 		t.Errorf("added =\n%v, want\n%v", got, wantAdded)
 	}
-	if want := []string{"o/empty", "o/old-skip", "o/skipped"}; !reflect.DeepEqual(res.Skipped, want) {
+	if want := []string{"o/empty", "o/mcp-only", "o/old-skip", "o/skipped"}; !reflect.DeepEqual(res.Skipped, want) {
 		t.Errorf("skipped = %v, want %v", res.Skipped, want)
 	}
 	if len(res.Failed) != 1 || res.Failed[0].Repo != "o/broken" {

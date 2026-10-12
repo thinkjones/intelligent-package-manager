@@ -20,7 +20,7 @@ A manually run CI task that parses [thinkjones/agentic-tools's `starred_repos.to
 
 **File.** `source-packs.toml` uses the curated-list format, so `ipm onboard` reads it unchanged. Two optional fields are added to the format: `homepage`, and `artifacts`, a table of counts by kind. `source-packs.skipped.txt` lists repos found to hold nothing, so they aren't fetched again.
 
-**Scan.** `cli/internal/sourcepacks` downloads each unseen repo's default-branch archive, writes its files empty (only names matter), and runs `catalog.Walk`, the catalog's own marker search. This is not `ipm scan`'s folder report, which counts any `hooks/` folder: a web app's `src/hooks` must not qualify. A repo that fails to download is recorded nowhere and retried next run. If every download fails, nothing is written.
+**Scan.** `cli/internal/sourcepacks` downloads each unseen repo's default-branch archive, writes its files empty (only names matter), and runs `catalog.Walk`, the catalog's own marker search. This is not `ipm scan`'s folder report, which counts any `hooks/` folder: a web app's `src/hooks` must not qualify. A repo holding only `.mcp.json` files does not qualify: those are mostly a repo's own development setup, and MCP servers can't be picked into a pack. A repo that fails to download is recorded nowhere and retried next run. If every download fails, nothing is written.
 
 **Update.** Existing packs keep their order and repos. Repos still in the starred list take its current stars, description, topics and homepage. A repo removed from the starred list stays. A repo already in one pack joins another without a new scan.
 

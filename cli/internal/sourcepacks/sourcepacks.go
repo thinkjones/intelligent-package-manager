@@ -23,7 +23,8 @@ var Kinds = []struct{ Key, One string }{
 }
 
 // Scan counts what ipm would catalog in repo, by kind. A repo holding
-// nothing gives an empty map; an error means it couldn't be read.
+// nothing gives an empty map; an error means it couldn't be read. Update
+// keeps a repo that holds anything other than MCP files.
 type Scan func(repo string) (map[string]int, error)
 
 // Failure is a repo that couldn't be scanned. It is recorded nowhere, so the
@@ -147,7 +148,7 @@ func Update(starred, packs []curated.List, skipped []string, recheck bool, scan 
 		case r.err != nil:
 			failed[k] = true
 			res.Failed = append(res.Failed, Failure{repo, r.err})
-		case total(r.counts) == 0:
+		case !qualifies(r.counts):
 			skip[k] = true
 		default:
 			delete(skip, k)
@@ -202,12 +203,16 @@ func Update(starred, packs []curated.List, skipped []string, recheck bool, scan 
 	return res
 }
 
-func total(counts map[string]int) int {
-	n := 0
-	for _, c := range counts {
-		n += c
+// qualifies reports whether counts hold something worth following a repo
+// for. An MCP file alone doesn't count: most are a repo's own development
+// setup, and an MCP server can't be picked into a pack.
+func qualifies(counts map[string]int) bool {
+	for kind, n := range counts {
+		if kind != "mcp" && n > 0 {
+			return true
+		}
 	}
-	return n
+	return false
 }
 
 // Holds says what counts hold, as "14 skills, 1 plugin".
