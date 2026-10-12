@@ -68,7 +68,7 @@ Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.lo
 
 ## Source packs
 
-`source-packs.toml` is a curated list holding only repos with something `ipm` can catalog, grouped into named lists (the source packs). It and `source-packs.skipped.txt` are generated: never edit them by hand.
+`source-packs.toml` is the curated list `ipm onboard` offers by default and `ipm source list` groups by (`curated.DefaultURL` reads it from `main`, so a merge changes what every user is offered). It holds only repos with something `ipm` can catalog, grouped into named lists (the source packs). It and `source-packs.skipped.txt` are generated: never edit them by hand.
 
 - **`mise run packs:update`** reads [thinkjones/agentic-tools](https://github.com/thinkjones/agentic-tools)'s `starred_repos.toml`, downloads each repo it hasn't seen, and looks for the markers the catalog indexes (`cli/internal/catalog`'s `Walk`). A repo holding something other than MCP files joins its list in `source-packs.toml` with its stars, description, topics, homepage and counts; any other goes in `source-packs.skipped.txt` and isn't fetched again (`-- --recheck` does). A repo that can't be fetched (`--timeout`, 10 minutes each) is recorded nowhere and tried on the next run. It prints a Markdown report of the new repos by pack.
 - **The Source packs workflow** (`.github/workflows/source-packs.yml`) runs that task by hand: `gh workflow run source-packs.yml`. The report is the run's summary. If the files changed, it pushes them to the branch `source-packs/update` and opens a draft pull request with the report as its body.
