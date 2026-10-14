@@ -35,7 +35,7 @@ In a project (the nearest ancestor of the working directory holding `ipm.toml`):
 | --- | --- |
 | `ipm.toml` | Packs: `[packs.<name>]` with `description`, `items` (catalog IDs) and `[[packs.<name>.installs]]` (where the pack is installed, written by `ipm install`). Edited with `ipm pack`. Committed. |
 | `.ipm/ipm.lock` | Every picked item resolved to repo, path and commit. Generated, committed. |
-| `.ipm/build.stamp` | A hash of the packs, the lock and the ipm version: `ipm install` skips a build while it matches. Generated, committed. |
+| `.ipm/build.stamp` | A hash of the packs, the lock and the ipm version: `ipm install` skips a build while it matches. Generated, gitignored by the generated `.ipm/.gitignore` (it describes the ignored `plugins/` and changes with the ipm version). |
 | `.ipm/package.json`, `.ipm/pnpm-lock.yaml`, `.ipm/.pnpmfile.cjs` | One pnpm dependency per source repo, pinned to a commit. Generated, committed. |
 | `.ipm/.claude-plugin/marketplace.json` | The marketplace listing each pack and its whole-plugin dependencies. Generated, committed. |
 | `.ipm/plugins/<pack>/`, `.ipm/node_modules/` | Built plugins (hard links into pnpm's files) and pnpm's output. Gitignored by the generated `.ipm/.gitignore`. |

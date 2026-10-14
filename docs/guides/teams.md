@@ -21,8 +21,8 @@ Commit a pack so everyone on the project builds the same plugin, at the same com
 | `.ipm/ipm.lock` | Yes | Every item resolved to a repo, path and commit |
 | `.ipm/package.json`, `.ipm/pnpm-lock.yaml`, `.ipm/.pnpmfile.cjs` | Yes | pnpm's pins for the repos the items come from |
 | `.ipm/.claude-plugin/marketplace.json` | Yes | The marketplace Claude Code reads |
-| `.ipm/build.stamp` | Yes | A hash of the packs, the lock and the ipm version; lets `ipm install` skip a build that is already current |
 | `.ipm/.gitignore` | Yes | Keeps the next two rows out |
+| `.ipm/build.stamp` | No | A hash of the packs, the lock and the ipm version that describes your local `.ipm/plugins/`; it changes with the ipm version, so each teammate keeps their own |
 | `.ipm/node_modules/`, `.ipm/plugins/` | No | Built by `ipm pack build` |
 
 `ipm pack build` writes `.ipm/.gitignore` for you.

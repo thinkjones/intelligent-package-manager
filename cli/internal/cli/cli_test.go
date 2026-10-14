@@ -1319,7 +1319,7 @@ func TestPackBuildBuildsPlugin(t *testing.T) {
 		t.Errorf("marketplace.json:\n%s", mp)
 	}
 	gi, _ := os.ReadFile(filepath.Join(ipm, ".gitignore"))
-	if string(gi) != "node_modules/\nplugins/\nplugins.tmp/\n" {
+	if string(gi) != "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n" {
 		t.Errorf(".gitignore %q", gi)
 	}
 	if got := callWith(f, "pnpm install"); !strings.Contains(got, "--dir "+ipm) {

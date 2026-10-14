@@ -51,9 +51,9 @@ $IPM_CACHE_DIR/
   .ipm/package.json                      one dependency per repo         commit
   .ipm/pnpm-lock.yaml                    pnpm's pins                     commit
   .ipm/.pnpmfile.cjs                     pnpm hooks                      commit
-  .ipm/.gitignore                        ignores the next two            commit
+  .ipm/.gitignore                        ignores the last three          commit
   .ipm/.claude-plugin/marketplace.json   the marketplace                 commit
-  .ipm/build.stamp                       what the last build used        commit
+  .ipm/build.stamp                       what the last build used        ignored
   .ipm/node_modules/                     pnpm's output                   ignored
   .ipm/plugins/<pack>/                   the built plugins               ignored
 ```
@@ -104,7 +104,7 @@ One `[[item]]` per picked item, sorted by ID. Whole plugins defined in a marketp
 
 ## `.ipm/build.stamp`
 
-One line: the hex SHA-256 of the packs in `ipm.toml` (name, description and items; install records are left out), the `.ipm/ipm.lock` that the build wrote and the ipm version. `ipm pack build` writes it last. `ipm install claude` recomputes it and skips the build while it matches and `.ipm/plugins/` and the marketplace file exist. Generated; commit it with the rest of `.ipm/`.
+One line: the hex SHA-256 of the packs in `ipm.toml` (name, description and items; install records are left out), the `.ipm/ipm.lock` that the build wrote and the ipm version. `ipm pack build` writes it last. `ipm install claude` recomputes it and skips the build while it matches and `.ipm/plugins/` and the marketplace file exist. Generated and git-ignored: it describes the ignored `.ipm/plugins/`, and because it hashes the ipm version it would change between teammates.
 
 ## The built plugin
 
