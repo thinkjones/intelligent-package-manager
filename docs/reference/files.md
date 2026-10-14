@@ -111,7 +111,7 @@ path = "plugins/dotnet-contribution/skills/dotnet-backend-patterns"
 sha = "…40 hex characters…"
 ```
 
-One `[[item]]` per picked item, sorted by ID. Whole plugins defined in a marketplace (IDs with `#`) also carry `source`: their upstream marketplace entry, as JSON. A Copilot plugin's `source` lists its skills' IDs. A whole plugin also carries `parts`: the IDs of the skills, agents, commands and hooks it holds, which `ipm install gascity` reads to write them; `ipm pack build --update` records them for a lock written before ipm did.
+One `[[item]]` per picked item, sorted by ID. Whole plugins defined in a marketplace (IDs with `#`) also carry `source`: their upstream marketplace entry, as JSON. A Copilot plugin's `source` lists its skills' IDs. A whole plugin also carries `parts`: the IDs of the skills, agents, commands, hooks and MCP servers it holds (an empty `parts = []` means the plugin holds none), which `ipm install gascity` reads to write them; `ipm pack build --update` records them for a lock written before ipm did.
 
 ## `.ipm/build.stamp`
 

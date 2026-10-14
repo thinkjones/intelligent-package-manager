@@ -272,7 +272,7 @@ ipm install [-g]
 | `-p`, `--path DIR` | The folder for project or local scope. Default: the pack's project. `~` and relative paths work. |
 | `-g`, `--global` | Install a pack from your user scope. |
 | `--update` | Re-pin every item to your current catalog and rebuild first. |
-| `--dry-run` | Print the `claude` commands without building, running or recording anything. |
+| `--dry-run` | Print the `claude` commands without building, running or recording anything. Can't be combined with `--update` (usage error, exit 2: `install claude: --dry-run and --update can't be used together`). |
 
 The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (always — Claude Code accepts a repeat), `claude plugin marketplace update <name>` when Claude Code already knows the marketplace, then `claude plugin install <pack>@<name> --scope S`, or `claude plugin update …` when the pack is already installed there. Needs `claude` on your `PATH`.
 
@@ -287,9 +287,9 @@ The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (
 | `-g`, `--global` | Install a pack from your user scope. |
 | `--force` | Replace a folder that ipm did not write. |
 | `--update` | Re-pin every item to your current catalog and rebuild first. |
-| `--dry-run` | List the files that would be written, without building, writing or recording anything. Needs a current build: `--dry-run needs a current build — run ipm pack build first`. |
+| `--dry-run` | List the files that would be written, without building, writing or recording anything. Needs a current build: `--dry-run needs a current build — run ipm pack build first`. If the folder would be refused, it prints `would refuse: <message>` and exits 1. Can't be combined with `--update` (usage error, exit 2: `install gascity: --dry-run and --update can't be used together`). |
 
-The folder holds `pack.toml`, `skills/<name>/` (each skill folder copied whole), `agents/<name>/prompt.md` with `agents/<name>/agent.toml`, and `mcp/<name>.toml`. Files are copied, not hard-linked, and two runs give byte-identical folders. Names are lowercased, with other characters turned into `-` (MCP servers use only `a-z 0-9 -`); clashes within a kind get `-<owner>`, then `-2`, `-3`. An agent's prompt is its body without the frontmatter, as plain markdown (Gas City does not template it).
+The folder holds `pack.toml`, `skills/<name>/` (each skill folder copied whole), `agents/<name>/prompt.md` with `agents/<name>/agent.toml`, and `mcp/<name>.toml`. Files are copied, not hard-linked, and two runs give byte-identical folders. Names are lowercased. For skills and agents `_` is kept and other characters become `-`; MCP server names also turn `_` into `-` (they use only `a-z 0-9 -`). Clashes within a kind get `-<owner>`, then `-2`, `-3`. An agent's prompt is its body without the frontmatter, as plain markdown (Gas City does not template it).
 
 Gas City has no equivalent for some items, so ipm skips them and prints each as a warning:
 
@@ -299,18 +299,18 @@ Gas City has no equivalent for some items, so ipm skips them and prints each as 
 | `skipped <id>: Gas City packs have no hooks` | A plugin's hooks are not written. |
 | `skipped <id>: external plugin — its files live in another repo; add its skills and agents directly` | A plugin whose files are in another repo. Add its skills and agents to the pack instead. |
 | `skipped <id>: its parts aren't recorded — run ipm pack build --update` | A whole plugin that the lock has no parts for; `ipm pack build --update` records them. |
+| `skipped <id>: nothing Gas City can hold` | A whole plugin whose parts are all things Gas City has no equivalent for (or that has none). |
+| `agents/<name>: frontmatter is not valid YAML — wrote the body only` | The agent's frontmatter doesn't parse. ipm still writes `prompt.md` with the body and an `agent.toml` holding only `provider = "claude"`. |
 | `agents/<name>: dropped tools, color — Gas City agents have no equivalent` | Agent frontmatter keys other than `name`, `description` and `model` are dropped, one warning per agent. |
 | `mcp/<name>: dropped <keys>` | MCP server keys Gas City doesn't know (Claude's `type` is dropped silently). |
 | `mcp/<name>: uses ${CLAUDE_PLUGIN_ROOT}, which Gas City does not set` | The server's command, arguments, environment or URL use Claude Code's plugin path, which won't resolve in a city. |
 
-ipm writes into `<DIR>/.<NAME>.ipm-tmp` and swaps the result in, replacing a folder it wrote earlier completely, so items removed from a pack leave no files. A folder that exists, isn't empty and wasn't written by ipm (its `pack.toml` lacks ipm's header line) is refused with exit 1: `<path> exists and was not written by ipm — use --force to replace it`.
+ipm writes into `<DIR>/.<NAME>.ipm-tmp` and swaps the result in, replacing a folder it wrote earlier completely, so items removed from a pack leave no files. A folder that exists, isn't empty and wasn't written by ipm (its `pack.toml` lacks ipm's header line) is refused with exit 1: `<path> exists and was not written by ipm — use --force to replace it`. The check runs before any build. Even with `--force`, ipm refuses a folder that is, or holds, the project (or `$IPM_HOME/global` with `-g`) or `$IPM_HOME`: `refusing to replace <path>: it holds the project` or `… it holds ipm's home`.
 
 Afterwards it records the install (`target = "gascity"`, `path`, `name`), as for Claude Code, and prints:
 
 ```text
-Import it into a city:
-  gc import add <folder>
-or add to the city's pack.toml:
+Import it into a city's pack.toml or city.toml:
   [imports.<name>]
   source = "<folder>"
 ```
