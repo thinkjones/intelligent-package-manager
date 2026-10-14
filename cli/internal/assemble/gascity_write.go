@@ -67,9 +67,9 @@ func WriteGascity(files []GasFile, dir, name string, force bool) (string, error)
 		return "", err
 	}
 	if exists {
-		if err := os.RemoveAll(old); err != nil {
-			return "", err
-		}
+		// The new pack is in place; a failed cleanup must not report the
+		// install as failed. The next run removes a stale .ipm-old first.
+		_ = os.RemoveAll(old)
 	}
 	return target, nil
 }

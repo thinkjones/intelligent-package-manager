@@ -154,3 +154,39 @@ func TestWriteGascityRejectsBadInput(t *testing.T) {
 		t.Errorf("wrote something: %v", entries)
 	}
 }
+
+func TestWriteGascityForceReplacesSymlink(t *testing.T) {
+	dir := t.TempDir()
+	dest := filepath.Join(dir, "elsewhere")
+	if err := os.Mkdir(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	keep := filepath.Join(dest, "keep.txt")
+	if err := os.WriteFile(keep, []byte("keep"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "kit")
+	if err := os.Symlink(dest, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := WriteGascity(gasTree(), dir, "kit", false); !errors.Is(err, ErrNotOurs) {
+		t.Fatalf("err = %v", err)
+	}
+	if _, err := WriteGascity(gasTree("skills/a/SKILL.md"), dir, "kit", true); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Lstat(link)
+	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
+		t.Fatalf("kit should be a real directory: %v %v", info, err)
+	}
+	if _, err := os.Stat(filepath.Join(link, "skills", "a", "SKILL.md")); err != nil {
+		t.Error(err)
+	}
+	if b, err := os.ReadFile(keep); err != nil || string(b) != "keep" {
+		t.Errorf("destination touched: %q %v", b, err)
+	}
+	entries, _ := os.ReadDir(dest)
+	if len(entries) != 1 {
+		t.Errorf("destination entries: %v", entries)
+	}
+}
