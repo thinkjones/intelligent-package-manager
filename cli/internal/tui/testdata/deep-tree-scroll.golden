@@ -1,10 +1,11 @@
-ipm  o/r › p › agent-23                                                                                         ● hybrid
+ipm  project /work                                                                                              ● hybrid
+CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
+━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
+skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
 ╭─ search: tdd             ────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ▶ 50   skill  ✓ tdd                              o/r                                                                 │
-│   50   skill    tdd-guard                        o/r                                                                 │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
+│   TYPE   ✓ NAME       REPO ↗ ★ SCORE DESCRIPTION                                                                     │
+│ ▶ skill  ✓ tdd        o/r         50                                                                                 │
+│   skill    tdd-guard  o/r         50                                                                                 │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -12,8 +13,7 @@ ipm  o/r › p › agent-23                                                     
 ╭─ tree ── agent:o/r:agents/a23.md ────────────────────────────────────────────────────────────────────────────────────╮
 │   repo    o/r                              The repo                                                                  │
 │   └ plugin  p                              The p plugin                                                              │
-│     ├ ↑ 21 more                                                                                                      │
-│     ├ agent   agent-19                     An agent                                                                  │
+│     ├ ↑ 22 more                                                                                                      │
 │     ├ agent   agent-20                     An agent                                                                  │
 │     ├ agent   agent-21                     An agent                                                                  │
 │     ├ agent   agent-22                     An agent                                                                  │
@@ -26,5 +26,5 @@ ipm  o/r › p › agent-23                                                     
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
-2 of 100                                                                                                                
+2 of 100  o/r › p › agent-23                                                                                            
 ↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help                                       

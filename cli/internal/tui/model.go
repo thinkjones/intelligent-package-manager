@@ -34,6 +34,8 @@ type searchDone struct {
 // Model is the TUI's state. It implements tea.Model.
 type Model struct {
 	d        Deps
+	tab      tab
+	counts   [tabCount]int // the tab bar's counts, notLoaded until a tab reads its data
 	input    textinput.Model
 	focus    focus
 	filter   int // index into typeFilters
@@ -52,12 +54,13 @@ type Model struct {
 	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
 	backStack []string // external entries jumped from, newest last
 
-	packs    []Pack
-	active   string // the active pack's name
-	traySel  int
-	dirty    bool // a pack changed since the last install
-	picker   *picker
-	statusOK bool // status is a note, not an error
+	catCounts map[string]int // items per type, read once at start
+	packs     []Pack
+	active    string // the active pack's name
+	traySel   int
+	dirty     bool // a pack changed since the last install
+	picker    *picker
+	statusOK  bool // status is a note, not an error
 
 	inst   *install     // the install or deploy output modal, while open
 	deploy *deployModal // the deploy modal before it runs
@@ -87,6 +90,11 @@ func New(d Deps) *Model {
 	in.Placeholder = "type to search"
 	in.Focus()
 	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
+	m.catCounts = d.Catalog.Counts()
+	for i := range m.counts {
+		m.counts[i] = notLoaded
+	}
+	m.counts[tabCatalog] = sumCounts(m.catCounts)
 	m.input.SetWidth(m.width - 30)
 	m.plain = os.Getenv("NO_COLOR") != ""
 	m.reloadPacks()
@@ -178,84 +186,15 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.pickerKey(msg)
 		return nil
 	}
-	if m.focus != focusSearch {
-		switch k {
-		case "a":
-			m.addSelected()
-			return nil
-		case "d":
-			m.removeSelected()
-			return nil
-		case "p":
-			m.openPicker(false)
-			return nil
-		case "i", "b":
-			return m.startInstall()
-		case "D":
-			m.openDeploy()
-			return nil
-		case "e":
-			m.openExternal()
-			return nil
-		case "t":
-			m.setFocus(focusTray)
-			return nil
-		case "?":
-			m.help = true
+	if m.focus != focusSearch || m.tab != tabCatalog {
+		if m.tabKey(k) {
 			return nil
 		}
 	}
-	if m.focus == focusTree {
-		if k == "q" {
-			return tea.Quit
-		}
-		m.treeKey(k)
-		return nil
+	if m.tab != tabCatalog {
+		return m.otherTabKey(k)
 	}
-	if m.focus == focusTray {
-		m.trayKey(k)
-		if k == "q" {
-			return tea.Quit
-		}
-		return nil
-	}
-	if m.focus == focusSearch {
-		switch k {
-		case "down", "tab":
-			m.setFocus(focusResults)
-			return nil
-		}
-		before := m.input.Value()
-		var cmd tea.Cmd
-		m.input, cmd = m.input.Update(msg)
-		if m.input.Value() != before {
-			return tea.Batch(cmd, m.queryChanged())
-		}
-		return cmd
-	}
-	switch k {
-	case "q":
-		return tea.Quit
-	case "/":
-		m.setFocus(focusSearch)
-	case "f":
-		m.filter = (m.filter + 1) % len(typeFilters)
-		return m.queryChanged()
-	case "down", "j":
-		m.move(1)
-	case "up", "k":
-		m.move(-1)
-	case "left", "h":
-		m.treeUp()
-	case "right", "l":
-		m.treeDown()
-	case "tab", "enter":
-		if m.cursor != "" {
-			m.setFocus(focusTree)
-			m.treeSel = m.tree.Cursor
-		}
-	}
-	return nil
+	return m.catalogKey(msg)
 }
 
 // treeKey handles keys in tree mode.
@@ -396,9 +335,8 @@ func (m *Model) searchCmd(seq int) tea.Cmd {
 	}
 }
 
-// View draws the screen: a header with the cursor's breadcrumb, the results
-// and tree panels (or a modal), the pack tray, the status line and the keys
-// for the current mode.
+// View draws the screen: the title line, tab bar and stats strip over the
+// active tab's body (or a modal), then the status line and the tab's keys.
 func (m *Model) View() tea.View {
 	content := m.render()
 	if m.plain {
@@ -414,17 +352,16 @@ func (m *Model) render() string {
 		return fmt.Sprintf("ipm needs at least %d×%d — enlarge the terminal (q quits)", minWidth, minHeight)
 	}
 	w := m.width
-	var top []string
-	mode := stTeal.Render("● hybrid")
-	if m.d.Searcher.Mode() != "hybrid" {
-		mode = stMuted.Render("○ local")
-	}
-	head := stTitle.Render("ipm") + "  " + m.breadcrumb(w-lipglossWidth(mode)-8)
-	top = append(top, fit(head, w-lipglossWidth(mode)-1)+" "+mode)
+	top := []string{m.titleLine(w)}
 	if n := m.d.Searcher.Notice(); n != "" {
 		top = append(top, fit(stAmber.Render(n), w))
 	}
-	tray := m.trayLines(w)
+	top = append(top, m.tabBar(w)...)
+	top = append(top, m.statsStrip(w))
+	var tray []string
+	if m.tab == tabCatalog {
+		tray = m.trayLines(w)
+	}
 	body := max(6, m.height-len(top)-len(tray)-2)
 
 	var mid []string
@@ -439,27 +376,15 @@ func (m *Model) render() string {
 		mid = panel(stTitle.Render("keys"), m.helpLines(w-4, body-2), w, true)
 	case m.picker != nil:
 		mid = panel(stTitle.Render("packs"), m.pickerLines(w-4, body-2), w, true)
+	case m.tab == tabCatalog:
+		mid = m.catalogBody(w, body)
 	default:
-		resH := max(5, body*40/100)
-		m.input.SetWidth(min(w-24, max(lipglossWidth(m.input.Placeholder), lipglossWidth(m.input.Value())+1)))
-		search := stMuted.Render("search: ") + m.input.View()
-		if f := typeFilters[m.filter]; f != "" {
-			search += stMuted.Render("  type: ") + stAmber.Render(f)
+		for range body {
+			mid = append(mid, spaces(w))
 		}
-		resultsFocused := m.focus == focusSearch || m.focus == focusResults
-		mid = panel(search, m.resultLines(w-4, resH-2), w, resultsFocused)
-		sel := -1
-		if m.focus == focusTree {
-			sel = m.treeSel
-		}
-		title := stMuted.Render("tree")
-		if m.cursor != "" {
-			title += stMuted.Render(" ── ") + stText.Render(m.cursor)
-		}
-		mid = append(mid, panel(title, m.tree.lines(w-4, body-resH-2, sel, m.focus == focusTree), w, m.focus == focusTree)...)
 	}
 
-	status := stMuted.Render(m.countLine())
+	status := m.statusText()
 	switch {
 	case m.status != "" && m.statusOK:
 		status = stTeal.Render(m.status)
@@ -470,39 +395,12 @@ func (m *Model) render() string {
 	return strings.Join(lines, "\n")
 }
 
-// hints is the footer: the keys that matter where the focus is.
-func (m *Model) hints() string {
-	switch {
-	case m.inst != nil:
-		return "esc close (when finished)"
-	case m.deploy != nil && m.deploy.step == stepConfirm:
-		return "y deploy  esc cancel"
-	case m.deploy != nil:
-		return "enter next  esc cancel"
-	case m.ext != nil:
-		return "↑↓ move  enter jump  esc close"
-	case m.help:
-		return "esc or ? close"
-	case m.picker != nil:
-		return "enter choose  n new pack  esc cancel"
-	case m.focus == focusSearch:
-		return "type to search  ↓ results  ctrl+c quit"
-	case m.focus == focusTree:
-		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help"
-	case m.focus == focusTray:
-		return "←→ items  d remove  esc back"
+// statusText is the status line when nothing has been said.
+func (m *Model) statusText() string {
+	if m.tab == tabCatalog {
+		return m.countLine()
 	}
-	return "↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  b build  D deploy  ? help  q quit"
-}
-
-func (m *Model) countLine() string {
-	if len(m.res.Hits) == 0 {
-		if strings.TrimSpace(m.input.Value()) == "" {
-			return "type to search"
-		}
-		return "no matches"
-	}
-	return fmt.Sprintf("%d of %d", len(m.res.Hits), m.res.Found)
+	return ""
 }
 
 // followSelection centres the tree on the selected result, forgetting jumps.

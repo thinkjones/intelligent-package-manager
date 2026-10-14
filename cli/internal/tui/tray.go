@@ -20,6 +20,7 @@ func (m *Model) reloadPacks() {
 	}
 	sort.Slice(packs, func(i, j int) bool { return packs[i].Name < packs[j].Name })
 	m.packs = packs
+	m.counts[tabPacks] = len(packs)
 	if m.activePack() == nil {
 		m.active = ""
 		if len(packs) > 0 {

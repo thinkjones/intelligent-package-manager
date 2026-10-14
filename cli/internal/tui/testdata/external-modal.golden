@@ -1,4 +1,7 @@
-ipm  b/s › m › cf                                                                                               ● hybrid
+ipm  project /work                                                                                              ● hybrid
+CATALOG (0)  PACKS (0)  INSTALLS (…)  MARKETPLACE (…)                                                                   
+━━━━━━━━━━━──────────────────────────────────────────                                                                   
+catalog empty                                                                                                           
 ╭─ external references ────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ External references to b/s — used by 2 repos                                                                         │
 │                                                                                                                      │
@@ -20,11 +23,8 @@ ipm  b/s › m › cf                                                           
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ project /work · no pack — press p to create one                                                                       
                                                                                                                         
-1 of 1                                                                                                                  
+1 of 1  b/s › m › cf                                                                                                    
 ↑↓ move  enter jump  esc close                                                                                          

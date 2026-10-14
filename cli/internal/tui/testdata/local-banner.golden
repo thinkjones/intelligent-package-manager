@@ -1,10 +1,12 @@
-ipm  o/r › p › tdd                                                                                               ○ local
+ipm  project /work                                                                                               ○ local
 server off: keyword search only — run `ipm catalog serve` and `ipm catalog rebuild` for semantic search                 
+CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
+━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
+skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
 ╭─ search: tdd             ────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ▶ 50   skill  ✓ tdd                              o/r                                                                 │
-│   50   skill    tdd-guard                        o/r                                                                 │
-│                                                                                                                      │
-│                                                                                                                      │
+│   TYPE   ✓ NAME       REPO ↗ ★ SCORE DESCRIPTION                                                                     │
+│ ▶ skill  ✓ tdd        o/r         50                                                                                 │
+│   skill    tdd-guard  o/r         50                                                                                 │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -21,10 +23,8 @@ server off: keyword search only — run `ipm catalog serve` and `ipm catalog reb
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
-2 of 100                                                                                                                
+2 of 100  o/r › p › tdd                                                                                                 
 type to search  ↓ results  ctrl+c quit                                                                                  

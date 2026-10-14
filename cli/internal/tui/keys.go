@@ -1,6 +1,6 @@
 package tui
 
-// searchKeys and treeKeys are the ? overlay, one table per mode.
+// searchKeys and treeKeys are the Catalog tab's ? overlay, one table per mode.
 var searchKeys = [][2]string{
 	{"typing", "search (results refresh as you type)"},
 	{"↓ / tab", "from the search box: focus the results"},
@@ -12,8 +12,7 @@ var searchKeys = [][2]string{
 	{"t", "the pack tray (d removes, esc back)"},
 	{"f", "cycle the type filter"},
 	{"p", "switch pack, or n for a new one"},
-	{"b / i", "build every pack (ipm pack build)"},
-	{"D", "deploy the active pack to Claude Code"},
+	{"1-4  [ ]", "switch tab"},
 	{"e", "external references to this repo"},
 	{"ctrl+r", "check the search server again"},
 	{"?", "this help"},
@@ -32,3 +31,11 @@ var treeKeys = [][2]string{
 
 // typeFilters is the cycle f steps through.
 var typeFilters = []string{"", "skill", "agent", "command", "plugin"}
+
+// tabKeys is the ? overlay of a tab with no keys of its own.
+var tabKeys = [][2]string{
+	{"1-4", "switch to Catalog, Packs, Installs or Marketplace"},
+	{"[ ]", "previous / next tab"},
+	{"?", "this help"},
+	{"q  ctrl+c", "quit"},
+}
