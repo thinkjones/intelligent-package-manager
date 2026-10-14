@@ -141,6 +141,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case installDone:
 		if m.inst != nil {
 			m.inst.done, m.inst.err = true, msg.err
+			m.status, m.statusOK = "", false
 			if msg.err == nil {
 				m.dirty = false
 			}
@@ -164,11 +165,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // key handles a key press for whatever has focus.
 func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
-	m.status, m.statusOK = "", false
 	k := msg.String()
 	if m.inst != nil {
+		// A run's own status, set when it finished, outlives the key that closes it.
 		return m.installKey(k)
 	}
+	m.status, m.statusOK = "", false
 	if k == "ctrl+c" {
 		return tea.Quit
 	}

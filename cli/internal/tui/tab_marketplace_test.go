@@ -219,6 +219,10 @@ func TestMarketplaceSyncStreamsAndSaysToRestart(t *testing.T) {
 	if f.mk.listCalls != 2 {
 		t.Errorf("the list is reloaded once after a sync: %d", f.mk.listCalls)
 	}
+	press(t, m, "esc")
+	if m.inst != nil || !strings.Contains(view(m), syncedMsg) {
+		t.Errorf("the status outlives the key that closes the modal:\n%s", view(m))
+	}
 }
 
 func TestMarketplaceSyncFailureKeepsTheList(t *testing.T) {
@@ -259,5 +263,52 @@ func TestMarketplaceFooter(t *testing.T) {
 	m, _ := marketModel(t)
 	if v := view(m); !strings.Contains(v, "space follow") || !strings.Contains(v, "s sync") {
 		t.Errorf("footer:\n%s", v)
+	}
+}
+
+func TestMarketplaceUnfollowLastFilteredRowKeepsSelectionInRange(t *testing.T) {
+	m, _ := marketModel(t)
+	press(t, m, "/", "✓", "enter", "down", "down")
+	if r := m.selectedRepo(); r == nil || r.Repo != "me/mine" {
+		t.Fatalf("selection %+v", r)
+	}
+	press(t, m, " ")
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	_ = view(m) // must not panic
+	if m.mk.sel != len(m.visibleRepos())-1 {
+		t.Errorf("sel %d of %d", m.mk.sel, len(m.visibleRepos()))
+	}
+}
+
+func TestMarketplaceNilDepDoesNotPanic(t *testing.T) {
+	m, _ := newTest(t)
+	m.d.Marketplace = nil
+	press(t, m, "down", "4")
+	if !strings.Contains(view(m), "could not load the marketplace: no marketplace available") {
+		t.Errorf("view:\n%s", view(m))
+	}
+}
+
+func TestMarketplaceLoadingAndErrorFooterShowOnlyWorkingKeys(t *testing.T) {
+	m, _ := newTestWith(t, withMarket)
+	press(t, m, "down")
+	m.Update(key("4"))
+	if v := view(m); strings.Contains(v, "space follow") || !strings.Contains(v, "s sync") {
+		t.Errorf("loading footer:\n%s", v)
+	}
+	m, _ = newTestWith(t, func(f fakes) { f.mk.listErr = errors.New("x") })
+	press(t, m, "down", "4")
+	if v := view(m); strings.Contains(v, "space follow") {
+		t.Errorf("error footer:\n%s", v)
+	}
+}
+
+func TestFinishingARunDropsAStaleStatus(t *testing.T) {
+	m, _ := newTest(t)
+	m.d.Builder.(*fakeBuilder).lines = []string{"ok"}
+	m.status, m.statusOK = "stale", true
+	drain(t, m, m.startBuild())
+	if m.status != "" {
+		t.Errorf("finishing a run drops the old status: %q", m.status)
 	}
 }

@@ -2,6 +2,7 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"io"
 	"slices"
 	"strconv"
@@ -57,6 +58,9 @@ func (r Repo) cells() []string {
 // the curated lists over HTTP.
 func (m *Model) loadMarket() tea.Cmd {
 	mk := m.d.Marketplace
+	if mk == nil {
+		return func() tea.Msg { return marketLoaded{err: errors.New("no marketplace available")} }
+	}
 	return func() tea.Msg {
 		repos, err := mk.List()
 		return marketLoaded{repos, err}
@@ -186,6 +190,7 @@ func (m *Model) toggleFollow() {
 			m.mk.rows[i].Followed = on
 		}
 	}
+	m.clampMarket()
 	m.note("%s %s — press s to sync", verb, r.Repo)
 }
 
@@ -241,6 +246,9 @@ func (m *Model) marketplaceStats() string {
 func (m *Model) marketHints() []string {
 	if m.mk.filter.typing {
 		return []string{"type to filter", "enter keep", "esc clear"}
+	}
+	if !m.mk.loaded || m.mk.err != nil {
+		return []string{"s sync", "1-4 tabs"}
 	}
 	return []string{"↑↓ move", "space follow", "s sync", "/ filter", "1-4 tabs"}
 }
