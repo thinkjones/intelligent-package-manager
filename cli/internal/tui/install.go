@@ -30,8 +30,8 @@ type install struct {
 // startInstall runs the installer in the background, its output piped into
 // the modal line by line.
 func (m *Model) startInstall() tea.Cmd {
-	return m.stream("install", "✓ installed", func(w io.Writer) error {
-		return m.d.Installer.Install(context.Background(), w)
+	return m.stream("install", "✓ built", func(w io.Writer) error {
+		return m.d.Builder.Build(context.Background(), w)
 	})
 }
 

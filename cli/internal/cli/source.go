@@ -52,13 +52,18 @@ func newMarketplaceRemoveCmd(sys System) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if err := sources.Remove(p.Sources(), args); err != nil {
-				return err
-			}
-			fmt.Fprintf(sys.Stdout, "%s removed %s — run `ipm catalog sync` to reindex\n", ok, strings.Join(args, ", "))
-			return nil
+			return sourceRemove(sys, p, args)
 		},
 	}
+}
+
+// sourceRemove stops following repos.
+func sourceRemove(sys System, p paths.Paths, repos []string) error {
+	if err := sources.Remove(p.Sources(), repos); err != nil {
+		return err
+	}
+	fmt.Fprintf(sys.Stdout, "%s removed %s — run `ipm catalog sync` to reindex\n", ok, strings.Join(repos, ", "))
+	return nil
 }
 
 func newMarketplaceImportCmd(sys System) *cobra.Command {

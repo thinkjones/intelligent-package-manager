@@ -13,7 +13,7 @@ import (
 // reloadPacks reads the scope's packs, keeping the active pack when it still
 // exists and otherwise taking the first by name.
 func (m *Model) reloadPacks() {
-	packs, err := m.d.Packs.List()
+	packs, err := m.d.Packs.List(false)
 	if err != nil {
 		m.status = err.Error()
 		return

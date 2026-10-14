@@ -120,6 +120,8 @@ type fakeCatalog struct {
 	err     error
 }
 
+func (f *fakeCatalog) Counts() map[string]int { return map[string]int{} }
+
 func (f *fakeCatalog) Node(id string) (Node, error) {
 	f.asked = append(f.asked, id)
 	if f.err != nil {
@@ -140,7 +142,7 @@ type fakePacks struct {
 }
 
 func (f *fakePacks) Scope() string { return f.scope }
-func (f *fakePacks) List() ([]Pack, error) {
+func (f *fakePacks) List(bool) ([]Pack, error) {
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
@@ -182,14 +184,14 @@ func (f *fakePacks) Remove(pack string, ids ...string) error {
 	return nil
 }
 
-type fakeInstaller struct {
+type fakeBuilder struct {
 	lines []string
 	err   error
 	// gate, when set, holds Install until it is closed.
 	gate chan struct{}
 }
 
-func (f *fakeInstaller) Install(_ context.Context, out io.Writer) error {
+func (f *fakeBuilder) Build(_ context.Context, out io.Writer) error {
 	for _, l := range f.lines {
 		fmt.Fprintln(out, l)
 	}
@@ -207,7 +209,7 @@ func hits(names ...string) []Hit {
 	return out
 }
 
-type fakeDeployer struct {
+type fakeInstaller struct {
 	def      Target
 	cleaned  *Target // what Plan returns as the target; nil returns t unchanged
 	plan     []string
@@ -217,14 +219,16 @@ type fakeDeployer struct {
 	deployed []string
 }
 
-func (f *fakeDeployer) Default(pack string) Target { return f.def }
-func (f *fakeDeployer) Plan(pack string, t Target) (Target, []string, error) {
+func (f *fakeInstaller) Targets() []string                { return []string{"claude", "gascity"} }
+func (f *fakeInstaller) Default(pack, kind string) Target { return f.def }
+func (f *fakeInstaller) List(bool) ([]Install, error)     { return nil, nil }
+func (f *fakeInstaller) Plan(pack string, t Target) (Target, []string, error) {
 	if f.cleaned != nil {
 		t = *f.cleaned
 	}
 	return t, f.plan, f.planErr
 }
-func (f *fakeDeployer) Deploy(_ context.Context, pack string, t Target, out io.Writer) error {
+func (f *fakeInstaller) Install(_ context.Context, pack string, t Target, out io.Writer) error {
 	f.deployed = append(f.deployed, fmt.Sprintf("%s %s %s", pack, t.Scope, t.Path))
 	for _, l := range f.lines {
 		fmt.Fprintln(out, l)
@@ -236,8 +240,8 @@ type fakes struct {
 	s *fakeSearcher
 	c *fakeCatalog
 	p *fakePacks
-	i *fakeInstaller
-	d *fakeDeployer
+	i *fakeBuilder
+	d *fakeInstaller
 }
 
 func newTest(t *testing.T) (*Model, fakes) {
@@ -255,14 +259,14 @@ func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
 		}, errs: map[string]error{}},
 		c: &fakeCatalog{details: map[string]Node{}},
 		p: &fakePacks{scope: "project /work"},
-		i: &fakeInstaller{},
-		d: &fakeDeployer{def: Target{Scope: "project", Path: "/work"},
+		i: &fakeBuilder{},
+		d: &fakeInstaller{def: Target{Scope: "project", Path: "/work"},
 			plan: []string{"ipm install", "claude plugin marketplace add /work/.ipm --scope project", "claude plugin install kit@work-ipm --scope project"}},
 	}
 	if setup != nil {
 		setup(f)
 	}
-	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Installer: f.i, Deployer: f.d})
+	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Builder: f.i, Installer: f.d})
 	m.debounce = 0
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m, f
@@ -560,7 +564,7 @@ func TestInstallStreams(t *testing.T) {
 	typeText(t, m, "tdd")
 	press(t, m, "down", "a", "i")
 	v := view(m)
-	for _, want := range []string{"✓ kit: 2 item(s)", "validate: ok", "✓ installed"} {
+	for _, want := range []string{"✓ kit: 2 item(s)", "validate: ok", "✓ built"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("install modal lacks %q:\n%s", want, v)
 		}
@@ -590,7 +594,7 @@ func TestQuitIgnoredDuringInstall(t *testing.T) {
 	}
 	close(f.i.gate)
 	drain(t, m, cmd)
-	if !strings.Contains(view(m), "✓ installed") {
+	if !strings.Contains(view(m), "✓ built") {
 		t.Errorf("install should finish:\n%s", view(m))
 	}
 }

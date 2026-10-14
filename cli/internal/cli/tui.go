@@ -5,6 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"os"
+	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -12,10 +16,13 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/spf13/cobra"
 
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/assemble"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catgraph"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/curated"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/tui"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/typesense"
 )
@@ -49,11 +56,12 @@ func runTui(sys System, global bool) error {
 		return err
 	}
 	m := tui.New(tui.Deps{
-		Searcher:  newTuiSearcher(sys, g, p.Catalog()),
-		Catalog:   tuiCatalog{g},
-		Packs:     tuiPacks{sys: sys, scope: scope, global: global},
-		Installer: tuiInstaller{sys: sys, global: global},
-		Deployer:  tuiDeployer{sys: sys, scope: scope, global: global},
+		Searcher:    newTuiSearcher(sys, g, p.Catalog()),
+		Catalog:     tuiCatalog{g},
+		Packs:       tuiPacks{sys: sys, scope: scope, global: global},
+		Builder:     tuiBuilder{sys: sys, global: global},
+		Installer:   tuiInstaller{sys: sys, scope: scope},
+		Marketplace: tuiMarketplace{sys: sys},
 	})
 	_, err = tea.NewProgram(m).Run()
 	return err
@@ -279,6 +287,9 @@ func (c tuiCatalog) Node(id string) (tui.Node, error) {
 	return out, nil
 }
 
+// Counts is how many items the catalog holds of each type.
+func (c tuiCatalog) Counts() map[string]int { return c.g.Counts() }
+
 // refs describes ids as tree rows: name, description, repo, whether each is
 // an external entry, and how many repos reference it directly.
 func (c tuiCatalog) refs(ids []string) []tui.Ref {
@@ -310,14 +321,62 @@ func (p tuiPacks) Scope() string {
 	return "project " + p.scope.Root
 }
 
-func (p tuiPacks) List() ([]tui.Pack, error) {
-	packs, err := project.LoadPacks(p.scope.Root)
+// List is the scope's packs, and the user scope's too with global when the
+// scope is a project.
+func (p tuiPacks) List(global bool) ([]tui.Pack, error) {
+	out, err := p.scopePacks(p.scope)
+	if err != nil || !global || p.scope.Global {
+		return out, err
+	}
+	gscope, err := currentScope(p.sys, true)
 	if err != nil {
 		return nil, err
 	}
+	more, err := p.scopePacks(gscope)
+	return append(out, more...), err
+}
+
+// scopePacks lists scope's packs with their build state and installs.
+func (p tuiPacks) scopePacks(scope project.Scope) ([]tui.Pack, error) {
+	packs, err := project.LoadPacks(scope.Root)
+	if err != nil {
+		return nil, err
+	}
+	installs, err := tuiInstalls(p.sys, scope)
+	if err != nil {
+		return nil, err
+	}
+	current := buildCurrent(p.sys, scope)
 	var out []tui.Pack
 	for _, pk := range packs {
-		out = append(out, tui.Pack{Name: pk.Name, Description: pk.Description, Items: pk.Items})
+		built := "never"
+		if _, err := os.Stat(filepath.Join(scope.IPMDir(), "plugins", pk.Name)); err == nil {
+			built = "stale"
+			if current {
+				built = "fresh"
+			}
+		}
+		tp := tui.Pack{Name: pk.Name, Description: pk.Description, Items: pk.Items, Global: scope.Global, Built: built}
+		for _, in := range installs {
+			if in.Pack == pk.Name {
+				tp.Installs = append(tp.Installs, in)
+			}
+		}
+		out = append(out, tp)
+	}
+	return out, nil
+}
+
+// tuiInstalls is scope's recorded installs.
+func tuiInstalls(sys System, scope project.Scope) ([]tui.Install, error) {
+	recs, err := loadInstalls(sys, scope)
+	if err != nil {
+		return nil, err
+	}
+	var out []tui.Install
+	for _, r := range recs {
+		out = append(out, tui.Install{Pack: r.Pack,
+			Target: tui.Target{Kind: r.Target, Scope: r.Scope, Path: r.Path, Name: r.Name, Global: scope.Global}})
 	}
 	return out, nil
 }
@@ -336,16 +395,16 @@ func (p tuiPacks) Remove(pack string, ids ...string) error {
 	return err
 }
 
-// tuiInstaller runs ipm pack build with its output going to the TUI.
-type tuiInstaller struct {
+// tuiBuilder runs ipm pack build with its output going to the TUI.
+type tuiBuilder struct {
 	sys    System
 	global bool
 }
 
-func (in tuiInstaller) Install(_ context.Context, out io.Writer) error {
-	sys := in.sys
+func (b tuiBuilder) Build(_ context.Context, out io.Writer) error {
+	sys := b.sys
 	sys.Stdout = out
-	err := runBuild(sys, in.global, false, false)
+	err := runBuild(sys, b.global, false, false)
 	var exit *ExitError
 	if errors.As(err, &exit) {
 		return errors.New("build failed — see the output above")
@@ -370,42 +429,210 @@ func strList(v any) []string {
 	return out
 }
 
-// tuiDeployer installs the scope's packs with the code behind ipm install claude.
-type tuiDeployer struct {
-	sys    System
-	scope  project.Scope
-	global bool
+// tuiInstaller installs the scope's packs with the code behind ipm install
+// claude and ipm install gascity.
+type tuiInstaller struct {
+	sys   System
+	scope project.Scope
 }
 
-func (d tuiDeployer) Default(string) tui.Target {
-	t := claudeDefaults(d.scope, claudeTarget{})
-	return tui.Target{Scope: t.Scope, Path: t.Path}
-}
+func (in tuiInstaller) Targets() []string { return slices.Sorted(maps.Keys(installers)) }
 
-func (d tuiDeployer) Plan(pack string, t tui.Target) (tui.Target, []string, error) {
-	if err := needClaude(d.sys); err != nil {
-		return t, nil, err
+// scopeFor is the scope a pack to install lives in: the user scope for a
+// global target, even from a project.
+func (in tuiInstaller) scopeFor(global bool) (project.Scope, error) {
+	if global && !in.scope.Global {
+		return currentScope(in.sys, true)
 	}
-	target, err := cleanTarget(claudeTarget{Scope: t.Scope, Path: t.Path}, workDir(d.sys, d.scope), d.sys.Getenv("HOME"))
+	return in.scope, nil
+}
+
+func (in tuiInstaller) Default(pack, kind string) tui.Target {
+	if kind == "gascity" {
+		return tui.Target{Kind: kind, Path: workDir(in.sys, in.scope), Name: pack, Global: in.scope.Global}
+	}
+	t := claudeDefaults(in.scope, claudeTarget{})
+	return tui.Target{Kind: "claude", Scope: t.Scope, Path: t.Path, Global: in.scope.Global}
+}
+
+func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, error) {
+	scope, err := in.scopeFor(t.Global)
 	if err != nil {
 		return t, nil, err
 	}
-	cmds, err := planDeploy(d.sys, d.scope.IPMDir(), marketName(d.scope), pack, target)
-	if err != nil {
-		return t, nil, err
+	switch t.Kind {
+	case "claude":
+		if err := needClaude(in.sys); err != nil {
+			return t, nil, err
+		}
+		target, err := cleanTarget(claudeTarget{Scope: t.Scope, Path: t.Path}, workDir(in.sys, scope), in.sys.Getenv("HOME"))
+		if err != nil {
+			return t, nil, err
+		}
+		cmds, err := planDeploy(in.sys, scope.IPMDir(), marketName(scope), pack, target)
+		if err != nil {
+			return t, nil, err
+		}
+		build := "ipm pack build"
+		if scope.Global {
+			build += " -g"
+		}
+		out := []string{build}
+		for _, c := range cmds {
+			out = append(out, c.String())
+		}
+		return tui.Target{Kind: "claude", Scope: target.Scope, Path: target.Path, Global: t.Global}, out, nil
+	case "gascity":
+		name := t.Name
+		if name == "" {
+			name = pack
+		}
+		if !assemble.ValidGasName(name) {
+			return t, nil, fmt.Errorf("folder name %q must start with a letter or digit and use only letters, digits, '_' and '-'", name)
+		}
+		dir, err := gascityDir(t.Path, workDir(in.sys, scope), in.sys.Getenv("HOME"))
+		if err != nil {
+			return t, nil, err
+		}
+		line := "ipm install gascity " + pack + " -C " + dir + " --name " + name
+		if t.Global {
+			line += " -g"
+		}
+		return tui.Target{Kind: "gascity", Path: dir, Name: name, Global: t.Global}, []string{line}, nil
 	}
-	build := "ipm pack build"
-	if d.global {
-		build += " -g"
-	}
-	out := []string{build}
-	for _, c := range cmds {
-		out = append(out, c.String())
-	}
-	return tui.Target{Scope: target.Scope, Path: target.Path}, out, nil
+	return t, nil, fmt.Errorf("can't install to %q — use %s", t.Kind, targetNames())
 }
 
-func (d tuiDeployer) Deploy(_ context.Context, pack string, t tui.Target, out io.Writer) error {
-	_, err := installClaude(d.sys, d.scope, pack, project.Install{Target: "claude", Scope: t.Scope, Path: t.Path}, installOpts{Global: d.global}, out)
+func (in tuiInstaller) Install(_ context.Context, pack string, t tui.Target, out io.Writer) error {
+	install, ok := installers[t.Kind]
+	if !ok {
+		return fmt.Errorf("can't install to %q — use %s", t.Kind, targetNames())
+	}
+	scope, err := in.scopeFor(t.Global)
+	if err != nil {
+		return err
+	}
+	_, err = install(in.sys, scope, pack, project.Install{Target: t.Kind, Scope: t.Scope, Path: t.Path, Name: t.Name}, installOpts{Global: scope.Global}, out)
+	return err
+}
+
+func (in tuiInstaller) List(global bool) ([]tui.Install, error) {
+	out, err := tuiInstalls(in.sys, in.scope)
+	if err != nil || !global || in.scope.Global {
+		return out, err
+	}
+	gscope, err := currentScope(in.sys, true)
+	if err != nil {
+		return nil, err
+	}
+	more, err := tuiInstalls(in.sys, gscope)
+	return append(out, more...), err
+}
+
+// tuiMarketplace is the curated repos and the sources, with the code behind
+// ipm marketplace and ipm catalog sync. Its output never goes to stdout,
+// which the TUI owns.
+type tuiMarketplace struct{ sys System }
+
+// quiet is the System with the output of the CLI functions dropped.
+func (m tuiMarketplace) quiet() System {
+	sys := m.sys
+	sys.Stdout = io.Discard
+	return sys
+}
+
+func (m tuiMarketplace) List() ([]tui.Repo, error) {
+	p, err := ipmPaths(m.sys)
+	if err != nil {
+		return nil, err
+	}
+	data, _, err := curated.Fetch(m.sys.HTTP, curated.DefaultURL, p.Cache)
+	if err != nil {
+		return nil, err
+	}
+	lists, _, err := curated.Parse(data)
+	if err != nil {
+		return nil, err
+	}
+	have, err := sources.Load(p.Sources())
+	if err != nil {
+		return nil, err
+	}
+	followed := map[string]bool{}
+	for _, s := range have {
+		followed[strings.ToLower(s.Repo)] = true
+	}
+	inList := map[string]bool{}
+	for _, l := range lists {
+		for _, r := range l.Repos {
+			inList[strings.ToLower(r.Repo)] = true
+		}
+	}
+	var other []curated.Repo
+	for _, s := range have {
+		if !inList[strings.ToLower(s.Repo)] {
+			other = append(other, curated.Repo{Repo: s.Repo})
+		}
+	}
+	if len(other) > 0 {
+		lists = append(lists[:len(lists):len(lists)], curated.List{Name: "Other", Repos: other})
+	}
+	items, err := itemsByRepo(p.Catalog())
+	if err != nil {
+		return nil, err
+	}
+	var out []tui.Repo
+	for _, l := range lists {
+		for _, r := range l.Repos {
+			out = append(out, tui.Repo{Repo: r.Repo, List: l.Name, Description: r.Description, Topics: r.Topics, Stars: r.Stars,
+				Items: items[strings.ToLower(r.Repo)], Followed: followed[strings.ToLower(r.Repo)]})
+		}
+	}
+	return out, nil
+}
+
+// itemsByRepo counts the catalog's items per repo, by lower-case repo; a
+// repo's own record is not an item.
+func itemsByRepo(dir string) (map[string]int, error) {
+	out := map[string]int{}
+	for _, typ := range catalog.Types {
+		if typ == catalog.TypeRepo {
+			continue
+		}
+		recs, err := catalog.Load(dir, typ)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range recs {
+			out[strings.ToLower(str(r, "repo"))]++
+		}
+	}
+	return out, nil
+}
+
+func (m tuiMarketplace) Follow(repo string) error {
+	p, err := ipmPaths(m.sys)
+	if err != nil {
+		return err
+	}
+	return sourceAdd(m.quiet(), p, []string{repo})
+}
+
+func (m tuiMarketplace) Unfollow(repo string) error {
+	p, err := ipmPaths(m.sys)
+	if err != nil {
+		return err
+	}
+	return sourceRemove(m.quiet(), p, []string{repo})
+}
+
+func (m tuiMarketplace) Sync(_ context.Context, out io.Writer) error {
+	sys := m.sys
+	sys.Stdout = out
+	err := runSync(sys, false)
+	var exit *ExitError
+	if errors.As(err, &exit) {
+		return errors.New("sync failed — see the output above")
+	}
 	return err
 }

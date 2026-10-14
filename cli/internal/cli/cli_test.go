@@ -1717,7 +1717,7 @@ func TestTuiPacks(t *testing.T) {
 	if err := p.Add("kit", "hook:o/r:p/hooks/hooks.json"); err == nil || !strings.Contains(err.Error(), "comes only with its plugin") {
 		t.Errorf("hook: %v", err)
 	}
-	packs, err := p.List()
+	packs, err := p.List(false)
 	if err != nil || len(packs) != 1 || packs[0].Description != "My kit" || !reflect.DeepEqual(packs[0].Items, []string{"skill:o/r:p/skills/s1"}) {
 		t.Errorf("list %+v %v", packs, err)
 	}
@@ -1729,10 +1729,10 @@ func TestTuiPacks(t *testing.T) {
 	}
 }
 
-func TestTuiInstallerStreams(t *testing.T) {
+func TestTuiBuilderStreams(t *testing.T) {
 	f, _ := installFake(t)
 	var out bytes.Buffer
-	if err := (tuiInstaller{sys: f.system()}).Install(context.Background(), &out); err != nil {
+	if err := (tuiBuilder{sys: f.system()}).Build(context.Background(), &out); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
 	if !strings.Contains(out.String(), "✓ kit:") || strings.Contains(f.out.String(), "✓ kit:") {
@@ -1974,18 +1974,18 @@ func TestTuiCatalogNode(t *testing.T) {
 	}
 }
 
-func TestTuiDeployerPlan(t *testing.T) {
+func TestTuiInstallerPlan(t *testing.T) {
 	f, root := installFake(t) // not built yet: the plan must not need .ipm/
 	f.onPath["claude"] = true
 	f.full = map[string]result{
 		"claude plugin marketplace list --json": {"[]", nil},
 		"claude plugin list --json":             {"[]", nil},
 	}
-	d := tuiDeployer{sys: f.system(), scope: project.Scope{Root: root}}
-	if got := d.Default("kit"); got.Scope != "project" || got.Path != root {
+	d := tuiInstaller{sys: f.system(), scope: project.Scope{Root: root}}
+	if got := d.Default("kit", "claude"); got.Scope != "project" || got.Path != root {
 		t.Errorf("default %+v", got)
 	}
-	cleaned, plan, err := d.Plan("kit", tui.Target{Scope: "project", Path: root + "/"})
+	cleaned, plan, err := d.Plan("kit", tui.Target{Kind: "claude", Scope: "project", Path: root + "/"})
 	if cleaned.Path != root {
 		t.Errorf("Plan should return the cleaned target: %+v", cleaned)
 	}
@@ -1994,7 +1994,7 @@ func TestTuiDeployerPlan(t *testing.T) {
 		t.Errorf("plan %v %v\nwant %v", plan, err, want)
 	}
 	f.onPath["claude"] = false
-	if _, _, err := d.Plan("kit", tui.Target{Scope: "user"}); err == nil || !strings.Contains(err.Error(), "claude") {
+	if _, _, err := d.Plan("kit", tui.Target{Kind: "claude", Scope: "user"}); err == nil || !strings.Contains(err.Error(), "claude") {
 		t.Errorf("no claude: %v", err)
 	}
 }
@@ -2002,7 +2002,7 @@ func TestTuiDeployerPlan(t *testing.T) {
 func TestInstallClaudeOutputSaysEachThingOnce(t *testing.T) {
 	f, root := claudeFake(t)
 	var out bytes.Buffer
-	if err := (tuiDeployer{sys: f.system(), scope: project.Scope{Root: root}}).Deploy(context.Background(), "kit", tui.Target{Scope: "project", Path: root}, &out); err != nil {
+	if err := (tuiInstaller{sys: f.system(), scope: project.Scope{Root: root}}).Install(context.Background(), "kit", tui.Target{Kind: "claude", Scope: "project", Path: root}, &out); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
 	if strings.Contains(out.String(), "✓ installed") || strings.Contains(out.String(), "Install in Claude Code") {
@@ -2027,7 +2027,7 @@ func TestPlanDeployRefusesOtherProjectsMarketplace(t *testing.T) {
 	}
 }
 
-func TestTuiDeployerPlanGlobal(t *testing.T) {
+func TestTuiInstallerPlanGlobal(t *testing.T) {
 	f, _ := installFake(t)
 	f.onPath["claude"] = true
 	f.full = map[string]result{
@@ -2036,8 +2036,8 @@ func TestTuiDeployerPlanGlobal(t *testing.T) {
 	}
 	home := filepath.Join(t.TempDir(), "home")
 	os.MkdirAll(filepath.Join(home, "global"), 0o755)
-	d := tuiDeployer{sys: f.system(), scope: project.Scope{Root: filepath.Join(home, "global"), Global: true}, global: true}
-	_, plan, err := d.Plan("kit", tui.Target{Scope: "user"})
+	d := tuiInstaller{sys: f.system(), scope: project.Scope{Root: filepath.Join(home, "global"), Global: true}}
+	_, plan, err := d.Plan("kit", tui.Target{Kind: "claude", Scope: "user"})
 	if err != nil || len(plan) == 0 || plan[0] != "ipm pack build -g" {
 		t.Errorf("plan %v %v", plan, err)
 	}

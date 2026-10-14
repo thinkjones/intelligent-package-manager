@@ -41,7 +41,7 @@ func (m *Model) openDeploy() {
 		m.status = "no pack to deploy — press p to create one"
 		return
 	}
-	def := m.d.Deployer.Default(p.Name)
+	def := m.d.Installer.Default(p.Name, "claude")
 	dm := &deployModal{pack: p.Name, path: newInput("folder")}
 	for i, s := range deployScopes {
 		if s[0] == def.Scope {
@@ -68,7 +68,7 @@ func (m *Model) deployKey(msg keyMsg) tea.Cmd {
 			dm.sel = min(len(deployScopes)-1, dm.sel+1)
 		case "enter":
 			if scope := deployScopes[dm.sel][0]; scope == "user" {
-				m.planFor(Target{Scope: "user"})
+				m.planFor(Target{Kind: "claude", Scope: "user"})
 			} else {
 				dm.step = stepPath
 				dm.path.Focus()
@@ -76,7 +76,7 @@ func (m *Model) deployKey(msg keyMsg) tea.Cmd {
 		}
 	case stepPath:
 		if k == "enter" {
-			m.planFor(Target{Scope: deployScopes[dm.sel][0], Path: dm.path.Value()})
+			m.planFor(Target{Kind: "claude", Scope: deployScopes[dm.sel][0], Path: dm.path.Value()})
 			return nil
 		}
 		dm.path, _ = dm.path.Update(msg)
@@ -90,7 +90,7 @@ func (m *Model) deployKey(msg keyMsg) tea.Cmd {
 
 // planFor asks the deployer what it will run for t, and shows it to confirm.
 func (m *Model) planFor(t Target) {
-	cleaned, plan, err := m.d.Deployer.Plan(m.deploy.pack, t)
+	cleaned, plan, err := m.d.Installer.Plan(m.deploy.pack, t)
 	if err != nil {
 		m.status = err.Error()
 		return
@@ -102,7 +102,7 @@ func (m *Model) startDeploy() tea.Cmd {
 	pack, t := m.deploy.pack, m.deploy.target
 	m.deploy = nil
 	return m.stream("deploy", "✓ deployed "+pack+" ("+describe(t)+")", func(w io.Writer) error {
-		return m.d.Deployer.Deploy(context.Background(), pack, t, w)
+		return m.d.Installer.Install(context.Background(), pack, t, w)
 	})
 }
 
