@@ -73,6 +73,7 @@ func (m *Model) loadPacksTab() {
 	pk.loaded, pk.err = true, err
 	if err != nil {
 		pk.rows = nil
+		m.counts[tabPacks] = notLoaded
 		return
 	}
 	sort.SliceStable(rows, func(i, j int) bool {
@@ -161,6 +162,7 @@ func (m *Model) packsKey(msg tea.KeyPressMsg) tea.Cmd {
 	case "?":
 		m.help = true
 	case "/":
+		pk.detail = false
 		pk.filter.focus()
 	case "g":
 		m.togglePacksGlobal()
@@ -169,7 +171,7 @@ func (m *Model) packsKey(msg tea.KeyPressMsg) tea.Cmd {
 	case "up", "k":
 		m.packsMove(-1)
 	case "enter", "right", "l":
-		if p := m.selectedPack(); p != nil && len(p.Items) > 0 && m.width >= wideWidth {
+		if p := m.selectedPack(); p != nil && len(p.Items) > 0 {
 			pk.detail = true
 		}
 	case "esc", "left", "h":
@@ -304,6 +306,10 @@ func (m *Model) packsBody(w, h int) []string {
 		return m.packsMessage(stMuted.Render("no packs yet — create one from the Catalog tab (p, then n), or with ipm pack new"), w, h)
 	}
 	wide := w >= wideWidth
+	if pk.detail && !wide {
+		// No room beside the table: the item list takes the whole body.
+		return m.packDetail(vis[pk.sel], w, h)
+	}
 	tw := w
 	if wide {
 		tw = w * 58 / 100

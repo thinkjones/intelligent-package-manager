@@ -224,8 +224,8 @@ func TestPacksLoadErrorShowsAndRetries(t *testing.T) {
 	m, f := newTestWith(t, packsSetup)
 	f.p.listErr = errors.New("ipm.toml is broken")
 	press(t, m, "down", "2")
-	if !strings.Contains(view(m), "ipm.toml is broken") {
-		t.Errorf("the error shows in the body:\n%s", view(m))
+	if !strings.Contains(view(m), "ipm.toml is broken") || !strings.Contains(view(m), "PACKS (…)") {
+		t.Errorf("the error shows in the body, the count is unknown:\n%s", view(m))
 	}
 	press(t, m, "1")
 	if m.tab != tabCatalog {
@@ -264,15 +264,46 @@ func TestPacksFirstVisitLoads(t *testing.T) {
 	}
 }
 
-func TestPacksNarrowHidesDetail(t *testing.T) {
+func TestPacksNarrowHidesDetailBesideTable(t *testing.T) {
 	m, _ := packsModel(t)
 	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
 	if strings.Contains(view(m), "C# lifecycle") {
 		t.Error("the detail pane hides below 100 columns")
 	}
 	press(t, m, "enter")
-	if m.pk.detail {
-		t.Error("no item list to focus while its pane is hidden")
+	v := view(m)
+	if !m.pk.detail || strings.Contains(v, "NAME") || !strings.Contains(v, "csharp-sdlc (3)") || !strings.Contains(v, "▶ skill tdd") {
+		t.Fatalf("enter shows the item list at full width:\n%s", v)
+	}
+}
+
+func TestPacksNarrowRemoveItem(t *testing.T) {
+	m, f := packsModel(t)
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	press(t, m, "enter", "down")
+	if !strings.Contains(view(m), "▶ agent csharp-pro") {
+		t.Fatalf("shown:\n%s", view(m))
+	}
+	press(t, m, "x")
+	if got := f.p.calls; len(got) != 1 || !strings.HasPrefix(got[0], "remove csharp-sdlc agent:") {
+		t.Fatalf("calls %v", got)
+	}
+	press(t, m, "esc")
+	if m.pk.detail || !strings.Contains(view(m), "NAME") {
+		t.Errorf("esc returns to the table:\n%s", view(m))
+	}
+}
+
+func TestPacksResizeKeepsItemListVisible(t *testing.T) {
+	m, _ := packsModel(t)
+	press(t, m, "enter", "down")
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	if v := view(m); strings.Contains(v, "NAME") || !strings.Contains(v, "▶ agent csharp-pro") {
+		t.Errorf("after narrowing:\n%s", v)
+	}
+	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
+	if v := view(m); !strings.Contains(v, "NAME") || !strings.Contains(v, "▶ agent csharp-pro") {
+		t.Errorf("after widening:\n%s", v)
 	}
 }
 
@@ -300,6 +331,12 @@ func TestGoldenPacks(t *testing.T) {
 			m.Update(tea.WindowSizeMsg{Width: 72, Height: 20})
 			return m
 		},
+		"packs-narrow-items": func(t *testing.T) *Model {
+			m, _ := packsModel(t)
+			m.Update(tea.WindowSizeMsg{Width: 72, Height: 20})
+			press(t, m, "enter", "down")
+			return m
+		},
 		"packs-error": func(t *testing.T) *Model {
 			m, f := newTestWith(t, packsSetup)
 			f.p.listErr = errors.New("ipm.toml is broken")
@@ -309,5 +346,13 @@ func TestGoldenPacks(t *testing.T) {
 	}
 	for name, build := range cases {
 		t.Run(name, func(t *testing.T) { golden(t, name, build(t)) })
+	}
+}
+
+func TestPacksSlashLeavesItemList(t *testing.T) {
+	m, _ := packsModel(t)
+	press(t, m, "enter", "/")
+	if m.pk.detail || !m.pk.filter.typing {
+		t.Errorf("detail %v typing %v", m.pk.detail, m.pk.filter.typing)
 	}
 }

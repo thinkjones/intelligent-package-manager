@@ -43,7 +43,7 @@ var tabKeys = [][2]string{
 // packsKeys is the Packs tab's ? overlay.
 var packsKeys = [][2]string{
 	{"↑ ↓  j k", "move through the packs, or the items"},
-	{"enter  →", "focus the selected pack's items (wide screens)"},
+	{"enter  →", "focus the selected pack's items (the whole body when narrow)"},
 	{"esc  ←", "back to the packs; esc also clears the filter"},
 	{"x", "remove the selected item from the pack"},
 	{"b", "build every pack"},

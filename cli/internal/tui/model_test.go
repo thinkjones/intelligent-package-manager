@@ -599,7 +599,7 @@ func TestQuitIgnoredDuringInstall(t *testing.T) {
 			t.Errorf("%s during install returned a command", k)
 		}
 	}
-	if m.inst == nil || !strings.Contains(m.status, "install is running") {
+	if m.inst == nil || !strings.Contains(m.status, "build is running") {
 		t.Errorf("modal %v status %q", m.inst, m.status)
 	}
 	close(f.b.gate)
