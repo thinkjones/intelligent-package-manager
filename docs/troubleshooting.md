@@ -48,7 +48,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | --- | --- |
 | `ipm sync was renamed: use ipm catalog sync` (exit 2) | The old names `source`, `stats`, `sync`, `index`, `load`, `serve`, `scan`, `tree`, `graph` and `deploy` are gone, and each says where it went: `ipm marketplace …`, `ipm marketplace stats`, `ipm catalog sync`, `ipm catalog rebuild` (for `index` and `load`), `ipm catalog serve`, `ipm catalog scan`, `ipm show tree`, `ipm show graph`, `ipm install claude`. The commands reference lists them all. |
 | `ipm install` no longer builds on its own | `ipm install` now installs: `ipm install claude [pack]` builds when `.ipm/` is out of date, then installs. `ipm pack build` only builds. |
-| `install: say claude or gascity — nothing is recorded for this scope yet` | Bare `ipm install` reinstalls what `ipm install claude` recorded earlier (in `ipm.toml`, or `$IPM_HOME/installs.json` with `-g`). Nothing is recorded yet, so name a target: `ipm install claude <pack>`. |
+| `install: say claude — nothing is recorded for this scope yet` | Bare `ipm install` reinstalls what `ipm install claude` recorded earlier (in `ipm.toml`, or `$IPM_HOME/installs.json` with `-g`). Nothing is recorded yet, so name a target: `ipm install claude <pack>`. |
 
 ## Marketplace and catalog
 

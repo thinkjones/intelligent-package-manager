@@ -3,6 +3,9 @@ package cli
 import (
 	"fmt"
 	"io"
+	"maps"
+	"slices"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -22,6 +25,16 @@ var installers = map[string]installer{
 	"claude": installClaude,
 }
 
+// targetNames is the install targets for a message, sorted: "claude", or
+// "claude or gascity".
+func targetNames() string {
+	names := slices.Sorted(maps.Keys(installers))
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+}
+
 // newInstallCmd is ipm install, also ipm pack install: with a target it
 // installs one pack there; bare, it replays the scope's recorded installs.
 func newInstallCmd(sys System) *cobra.Command {
@@ -31,7 +44,7 @@ func newInstallCmd(sys System) *cobra.Command {
 		Short: "install a pack into claude or gascity (same as pack install)",
 		Args: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
-				return usagef("install: unknown target %q%s — use claude. Try `ipm help install`.", args[0], didYouMean(c, args[0]))
+				return usagef("install: unknown target %q%s — use %s. Try `ipm help install`.", args[0], didYouMean(c, args[0]), targetNames())
 			}
 			return nil
 		},
@@ -92,7 +105,7 @@ func replayInstalls(sys System, global bool) error {
 		return err
 	}
 	if len(recs) == 0 {
-		return usagef("install: say claude or gascity — nothing is recorded for this scope yet. Try `ipm help install`.")
+		return usagef("install: say %s — nothing is recorded for this scope yet. Try `ipm help install`.", targetNames())
 	}
 	for _, rec := range recs {
 		inst, found := installers[rec.Target]

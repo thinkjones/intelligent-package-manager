@@ -166,7 +166,7 @@ func TestBareInstallNothingRecorded(t *testing.T) {
 	f, _ := claudeFake(t)
 	err := f.run("install")
 	var usage *UsageError
-	want := "install: say claude or gascity — nothing is recorded for this scope yet. Try `ipm help install`."
+	want := "install: say claude — nothing is recorded for this scope yet. Try `ipm help install`."
 	if !errors.As(err, &usage) || err.Error() != want {
 		t.Errorf("got %v", err)
 	}
@@ -198,5 +198,42 @@ func TestInstallClaudeShortFlags(t *testing.T) {
 	}
 	if !slices.ContainsFunc(runs[0], func(c string) bool { return strings.HasSuffix(c, "--scope local") }) || !reflect.DeepEqual(runs[0], runs[1]) {
 		t.Errorf("short %v\nlong %v", runs[0], runs[1])
+	}
+}
+
+func TestTargetNamesFollowInstallers(t *testing.T) {
+	saved := installers
+	t.Cleanup(func() { installers = saved })
+	for _, c := range []struct {
+		names []string
+		want  string
+	}{
+		{[]string{"claude"}, "claude"},
+		{[]string{"gascity", "claude"}, "claude or gascity"},
+		{[]string{"zed", "gascity", "claude"}, "claude, gascity or zed"},
+	} {
+		installers = map[string]installer{}
+		for _, n := range c.names {
+			installers[n] = installClaude
+		}
+		if got := targetNames(); got != c.want {
+			t.Errorf("%v: got %q want %q", c.names, got, c.want)
+		}
+	}
+}
+
+func TestInstallUnknownTargetNamesTargets(t *testing.T) {
+	saved := installers
+	t.Cleanup(func() { installers = saved })
+	installers = map[string]installer{"claude": installClaude, "gascity": installClaude}
+	f, _ := claudeFake(t)
+	err := f.run("install", "zed")
+	if err == nil || !strings.Contains(err.Error(), "— use claude or gascity.") {
+		t.Errorf("got %v", err)
+	}
+	f.out.Reset()
+	err = f.run("install")
+	if err == nil || !strings.Contains(err.Error(), "install: say claude or gascity — nothing is recorded") {
+		t.Errorf("got %v", err)
 	}
 }
