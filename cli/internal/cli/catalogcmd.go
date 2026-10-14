@@ -19,7 +19,7 @@ import (
 func newCatalogCmd(sys System) *cobra.Command {
 	cmd := verbs(&cobra.Command{
 		Use:   "catalog",
-		Short: "fetch sources, build the catalog and serve search over it",
+		Short: "what's in your catalog (sync, rebuild, serve, scan, search)",
 	}, "sync, rebuild, serve, scan, search")
 	cmd.RunE = func(*cobra.Command, []string) error { return catalogSummary(sys) }
 	cmd.AddCommand(

@@ -1568,9 +1568,9 @@ func TestPackGlobalFlagEitherSide(t *testing.T) {
 
 func TestCommandLineHints(t *testing.T) {
 	for args, want := range map[string]string{
-		"serach tdd":    "did you mean search?",
-		"pack ad kit":   "did you mean add?",
-		"sync -upgrade": "long flags take two dashes: --upgrade",
+		"serach tdd":            "did you mean search?",
+		"pack ad kit":           "did you mean add?",
+		"catalog sync -upgrade": "long flags take two dashes: --upgrade",
 	} {
 		err := newFake("").run(strings.Fields(args)...)
 		if err == nil || !strings.Contains(err.Error(), want) {
@@ -2289,5 +2289,84 @@ func TestTopLevelSearchMatchesCatalogSearch(t *testing.T) {
 	a, b := run("search", "x"), run("catalog", "search", "x")
 	if a == "" || a != b {
 		t.Errorf("top level:\n%s\ncatalog:\n%s", a, b)
+	}
+}
+
+func TestRootHelpGroups(t *testing.T) {
+	f := newFake("")
+	if err := f.run("-h"); err != nil {
+		t.Fatal(err)
+	}
+	out := f.out.String()
+	titles := []string{
+		"Workflow: onboard → marketplace → catalog → search → pack → install",
+		"Getting started:",
+		"Marketplace — curated repos you can follow:",
+		"Catalog — the repos you follow, fetched and searchable:",
+		"Packs — your picks, built and installed:",
+		"Tools:",
+	}
+	at := -1
+	for _, title := range titles {
+		i := strings.Index(out, title)
+		if i < 0 || i < at {
+			t.Fatalf("%q missing or out of order:\n%s", title, out)
+		}
+		at = i
+	}
+	section := func(from, to string) string {
+		a := strings.Index(out, from)
+		b := len(out)
+		if to != "" {
+			b = strings.Index(out, to)
+		}
+		return out[a:b]
+	}
+	for _, c := range []struct {
+		from, to string
+		names    []string
+	}{
+		{titles[1], titles[2], []string{"onboard"}},
+		{titles[2], titles[3], []string{"marketplace"}},
+		{titles[3], titles[4], []string{"catalog", "search", "show"}},
+		{titles[4], titles[5], []string{"pack", "install"}},
+		{titles[5], "", []string{"tui", "doctor", "uninstall", "version", "completion", "help"}},
+	} {
+		sec := section(c.from, c.to)
+		for _, n := range c.names {
+			if !strings.Contains(sec, "\n  "+n+" ") {
+				t.Errorf("%q lacks %s:\n%s", c.from, n, sec)
+			}
+		}
+	}
+	for _, gone := range []string{"source", "stats", "sync", "index", "load", "serve", "scan", "tree", "graph", "deploy"} {
+		if strings.Contains(out, "\n  "+gone+" ") {
+			t.Errorf("help lists removed %s:\n%s", gone, out)
+		}
+	}
+}
+
+func TestRenamedCommands(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"deploy", "--scope", "user", "kit"}, "ipm deploy was renamed: use ipm install claude"},
+		{[]string{"source", "list"}, "use ipm marketplace"},
+		{[]string{"stats"}, "ipm marketplace stats"},
+		{[]string{"sync", "--upgrade"}, "ipm catalog sync"},
+		{[]string{"index"}, "ipm catalog rebuild"},
+		{[]string{"load"}, "ipm catalog rebuild"},
+		{[]string{"serve"}, "ipm catalog serve"},
+		{[]string{"scan"}, "ipm catalog scan"},
+		{[]string{"tree", "x"}, "ipm show tree"},
+		{[]string{"graph", "x"}, "ipm show graph"},
+	} {
+		f := newFake("")
+		err := f.run(c.args...)
+		var usage *UsageError
+		if !errors.As(err, &usage) || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%v: err = %v, want a usage error with %q", c.args, err, c.want)
+		}
 	}
 }

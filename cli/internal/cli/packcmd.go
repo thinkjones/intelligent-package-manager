@@ -21,7 +21,7 @@ func newPackCmd(sys System) *cobra.Command {
 	var description string
 	cmd := verbs(&cobra.Command{
 		Use:   "pack",
-		Short: "create and edit packs of catalog items in ipm.toml (-g for your user scope)",
+		Short: "create, edit and build packs (new, add, remove, list, show, build, install)",
 	}, "new, add, remove, list, show, build or install")
 	cmd.PersistentFlags().BoolVarP(&global, "global", "g", false, "use your user scope ($IPM_HOME/global) instead of the project")
 	// inScope runs f in the project's scope, or the user's with -g.

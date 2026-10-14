@@ -26,6 +26,15 @@ func newSyncCmd(sys System) *cobra.Command {
 // runSync has pnpm fetch and pin every source (never running their
 // scripts), then reindexes and loads search when the server is up. A failed pnpm run leaves the catalog as it was.
 func runSync(sys System, upgrade bool) error {
+	if err := syncSources(sys, upgrade); err != nil {
+		return err
+	}
+	return loadIfUp(sys)
+}
+
+// syncSources is runSync without the search load, for callers (ipm onboard)
+// that load search themselves after another step.
+func syncSources(sys System, upgrade bool) error {
 	p, err := ipmPaths(sys)
 	if err != nil {
 		return err
@@ -66,8 +75,5 @@ func runSync(sys System, upgrade bool) error {
 		return &ExitError{Code: 1}
 	}
 	fmt.Fprintf(sys.Stdout, "%s sources synced\n\n", ok)
-	if err := runIndex(sys); err != nil {
-		return err
-	}
-	return loadIfUp(sys)
+	return runIndex(sys)
 }

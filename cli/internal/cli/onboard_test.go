@@ -81,7 +81,7 @@ func TestBackupRenamesBoth(t *testing.T) {
 		t.Error("home and cache should now live at the backup paths only")
 	}
 	hint := restoreHint(p, moved)
-	if want := "to restore: rm -rf " + p.Home + " " + p.Cache + " && mv " + want[0] + " " + p.Home + " && mv " + want[1] + " " + p.Cache + " && ipm serve"; hint != want {
+	if want := "to restore: rm -rf " + p.Home + " " + p.Cache + " && mv " + want[0] + " " + p.Home + " && mv " + want[1] + " " + p.Cache + " && ipm catalog serve"; hint != want {
 		t.Errorf("restore hint = %q, want %q", hint, want)
 	}
 	if strings.Contains(hint, "uninstall") {
@@ -202,7 +202,7 @@ func TestOnboardFreshWithYes(t *testing.T) {
 		t.Errorf("sources = %s, want the two pre-ticked lists", got)
 	}
 	out := f.out.String()
-	for _, want := range []string{"✓ added 3 sources (0 already followed)", "✓ sync", "- stats skipped: gh is not installed", "- search skipped: start Docker, then ipm serve && ipm load", "✓ library ready — 3 sources, 3 artifacts"} {
+	for _, want := range []string{"✓ added 3 sources (0 already followed)", "✓ sync", "- stats skipped: gh is not installed", "- search skipped: start Docker, then ipm catalog serve && ipm catalog rebuild", "✓ library ready — 3 sources, 3 artifacts"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
@@ -322,7 +322,7 @@ func TestOnboardSyncFailureStops(t *testing.T) {
 		t.Fatalf("got %v, want exit 1\n%s", err, f.out.String())
 	}
 	out := f.out.String()
-	if !strings.Contains(out, "✗ sync") || !strings.Contains(out, "rerun: ipm sync") || strings.Contains(out, "stats") || strings.Contains(out, "library ready") {
+	if !strings.Contains(out, "✗ sync") || !strings.Contains(out, "rerun: ipm catalog sync") || strings.Contains(out, "stats") || strings.Contains(out, "library ready") {
 		t.Errorf("want the pipeline to stop at sync:\n%s", out)
 	}
 	if len(followed(t, f)) != 3 {
@@ -390,7 +390,7 @@ func TestRestoreHintWorks(t *testing.T) {
 		t.Fatal(err)
 	}
 	makeData(t, p) // the fresh run's data
-	hint := strings.TrimSuffix(strings.TrimPrefix(restoreHint(p, moved), "to restore: "), " && ipm serve")
+	hint := strings.TrimSuffix(strings.TrimPrefix(restoreHint(p, moved), "to restore: "), " && ipm catalog serve")
 	if out, err := exec.Command("sh", "-c", hint).CombinedOutput(); err != nil {
 		t.Fatalf("%s: %v %s", hint, err, out)
 	}
@@ -414,5 +414,22 @@ func TestOnboardResumeInTerminal(t *testing.T) {
 	}
 	if !strings.Contains(f.out.String(), "✓ sync") {
 		t.Errorf("resuming with nothing new should still sync:\n%s", f.out.String())
+	}
+}
+
+func TestOnboardPrintsConcepts(t *testing.T) {
+	f, list := onboardFake(t)
+	installed(t, f, "o/hooks", "o/skills", "o/tdd")
+	if err := f.run("onboard", "--yes", "--list", list); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	want := `ipm in four steps:
+  marketplace  curated repos you can follow — pick the ones you care about
+  catalog      the repos you follow, fetched, pinned and searchable
+  pack         the skills, agents and plugins you pick from the catalog
+  install      a pack, built and installed into Claude Code
+`
+	if !strings.HasPrefix(f.out.String(), want) {
+		t.Errorf("output should begin with the intro:\n%s", f.out.String())
 	}
 }

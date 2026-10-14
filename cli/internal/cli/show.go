@@ -31,7 +31,7 @@ func newShowCmd(sys System) *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "show <id>",
-		Short: "an artifact's fields, GitHub stats and neighbours, or its tree or graph (reads the catalog, no search server)",
+		Short: "an item's fields and neighbours (tree, graph)",
 		Args:  exactArgs(1, "one artifact ID (find IDs with `ipm search`)"),
 		RunE:  func(_ *cobra.Command, args []string) error { return runShow(sys, args[0], asJSON) },
 	}

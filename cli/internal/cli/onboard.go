@@ -138,7 +138,7 @@ func restoreHint(p paths.Paths, moved []string) string {
 		origs = append(origs, orig)
 		mvs = append(mvs, "mv "+m+" "+orig)
 	}
-	return "to restore: rm -rf " + strings.Join(origs, " ") + " && " + strings.Join(mvs, " && ") + " && ipm serve"
+	return "to restore: rm -rf " + strings.Join(origs, " ") + " && " + strings.Join(mvs, " && ") + " && ipm catalog serve"
 }
 
 // defaultLists are pre-ticked when onboarding starts from nothing.
@@ -157,7 +157,7 @@ func newOnboardCmd(sys System) *cobra.Command {
 	var o onboardOpts
 	cmd := &cobra.Command{
 		Use:   "onboard",
-		Short: "pick sources from a curated list and build your library",
+		Short: "learn the concepts, pick repos from the marketplace, build your catalog",
 		Args:  noArgs,
 		RunE:  func(*cobra.Command, []string) error { return runOnboard(sys, o) },
 	}
@@ -169,6 +169,15 @@ func newOnboardCmd(sys System) *cobra.Command {
 	f.BoolVar(&o.Yes, "yes", false, "follow the pre-ticked lists without showing the checklist")
 	return cmd
 }
+
+// onboardIntro is the four concepts, printed before anything else.
+const onboardIntro = `ipm in four steps:
+  marketplace  curated repos you can follow — pick the ones you care about
+  catalog      the repos you follow, fetched, pinned and searchable
+  pack         the skills, agents and plugins you pick from the catalog
+  install      a pack, built and installed into Claude Code
+
+`
 
 // runOnboard takes a user from nothing (or an old setup) to a searchable
 // library: keep or back up existing data, pick curated sources, then add,
@@ -187,6 +196,8 @@ func runOnboard(sys System, o onboardOpts) error {
 	if sys.Now != nil {
 		now = sys.Now()
 	}
+
+	fmt.Fprint(sys.Stdout, onboardIntro)
 
 	// Everything that can fail without changing anything comes first: the
 	// flags, then the curated list and the names in --lists. Only then is
@@ -328,8 +339,8 @@ func onboardPipeline(sys System, p paths.Paths, lists []curated.List, picks []st
 	say("%s added %d %s (%d already followed)\n\n", ok, len(added), plural(len(added), "source"), len(skipped))
 
 	pr.begin(2, "sync")
-	if err := runSync(step, false); err != nil {
-		return fail("sync", err, "ipm sync")
+	if err := syncSources(step, false); err != nil {
+		return fail("sync", err, "ipm catalog sync")
 	}
 	say("%s sync%s\n\n", ok, pr.summary())
 
@@ -337,21 +348,21 @@ func onboardPipeline(sys System, p paths.Paths, lists []curated.List, picks []st
 	if reason := ghMissing(sys); reason != "" {
 		say("- stats skipped: %s\n", reason)
 	} else if err := runStats(step); err != nil {
-		return fail("stats", err, "ipm stats")
+		return fail("stats", err, "ipm marketplace stats")
 	} else {
 		say("%s stats%s\n\n", ok, pr.summary())
 	}
 
 	pr.begin(4, "search server")
 	if dockerReady(sys) != nil {
-		say("- search skipped: start Docker, then ipm serve && ipm load\n")
+		say("- search skipped: start Docker, then ipm catalog serve && ipm catalog rebuild\n")
 	} else {
 		if err := runServe(step, false); err != nil {
-			return fail("search", err, "ipm serve && ipm load")
+			return fail("search", err, "ipm catalog serve && ipm catalog rebuild")
 		}
 		pr.begin(5, "search index")
 		if err := runLoad(step); err != nil {
-			return fail("search", err, "ipm load")
+			return fail("search", err, "ipm catalog rebuild")
 		}
 		say("%s search%s\n", ok, pr.summary())
 	}

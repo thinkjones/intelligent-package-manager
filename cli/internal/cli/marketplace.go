@@ -28,7 +28,7 @@ func newMarketplaceCmd(sys System) *cobra.Command {
 	var o marketOpts
 	cmd := &cobra.Command{
 		Use:   "marketplace",
-		Short: "browse the curated repos and follow, unfollow or import your own",
+		Short: "the curated repos and which you follow (add, remove, import, stats)",
 		Long: `Browse the curated lists of repos, with a check mark on the ones you follow.
 Run alone it lists them; add, remove, import and stats change what you follow.`,
 		Args: func(c *cobra.Command, args []string) error {

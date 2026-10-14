@@ -28,7 +28,7 @@ func newInstallCmd(sys System) *cobra.Command {
 	var global bool
 	cmd := &cobra.Command{
 		Use:   "install [target] [pack]",
-		Short: "install a pack into Claude Code; bare, redo every recorded install (-g for your user scope)",
+		Short: "install a pack into claude or gascity (same as pack install)",
 		Args: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				return usagef("install: unknown target %q%s — use claude. Try `ipm help install`.", args[0], didYouMean(c, args[0]))
