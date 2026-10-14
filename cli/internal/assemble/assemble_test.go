@@ -294,14 +294,22 @@ func TestResolveRecordsPluginParts(t *testing.T) {
 }
 
 func TestResolveFillsPartsForOldLock(t *testing.T) {
-	locked := project.LockItem{ID: "plugin:o/r:plugins/tools", Type: "plugin", Name: "tools", Repo: "o/r", Path: "plugins/tools", SHA: shaB}
-	items, err := Resolve([]project.Pack{{Name: "p", Items: []string{locked.ID}}}, map[string]project.LockItem{locked.ID: locked}, fixtureCatalog(t))
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := items[locked.ID]
-	if got.SHA != shaB || !reflect.DeepEqual(got.Parts, toolsParts) {
-		t.Errorf("got %+v", got)
+	for _, tc := range []struct {
+		sha   string
+		parts []string
+	}{
+		{shaA, toolsParts}, // catalog is at the locked commit
+		{shaB, nil},        // catalog moved on: its parts may not exist at the pin
+	} {
+		locked := project.LockItem{ID: "plugin:o/r:plugins/tools", Type: "plugin", Name: "tools", Repo: "o/r", Path: "plugins/tools", SHA: tc.sha}
+		items, err := Resolve([]project.Pack{{Name: "p", Items: []string{locked.ID}}}, map[string]project.LockItem{locked.ID: locked}, fixtureCatalog(t))
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := items[locked.ID]
+		if got.SHA != tc.sha || len(got.Parts) != len(tc.parts) || (tc.parts != nil && !reflect.DeepEqual(got.Parts, tc.parts)) {
+			t.Errorf("sha %s: got %+v", tc.sha[:4], got)
+		}
 	}
 }
 

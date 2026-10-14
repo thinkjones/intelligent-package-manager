@@ -58,9 +58,10 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 			}
 			if l.Type == catalog.TypePlugin && l.Path != "" && l.Parts == nil {
 				// A lock from before parts were recorded: read them from
-				// the catalog, keeping the pinned commit. Without a
-				// catalog the plugin stays whole-only.
-				if r, err := lookup(id); err == nil && r != nil {
+				// the catalog, but only when it is at the locked commit —
+				// part IDs from a newer commit may not exist at the pin.
+				// Without a catalog the plugin stays whole-only.
+				if r, err := lookup(id); err == nil && r != nil && str(r, "commit") == l.SHA {
 					l.Parts = pluginParts(r)
 				}
 			}
