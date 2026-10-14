@@ -41,8 +41,13 @@ func (m *Model) openDeploy() {
 		m.status = "no pack to deploy — press p to create one"
 		return
 	}
-	def := m.d.Installer.Default(p.Name, "claude")
-	dm := &deployModal{pack: p.Name, path: newInput("folder")}
+	m.openDeployFor(p.Name)
+}
+
+// openDeployFor starts deploying the named pack.
+func (m *Model) openDeployFor(pack string) {
+	def := m.d.Installer.Default(pack, "claude")
+	dm := &deployModal{pack: pack, path: newInput("folder")}
 	for i, s := range deployScopes {
 		if s[0] == def.Scope {
 			dm.sel = i

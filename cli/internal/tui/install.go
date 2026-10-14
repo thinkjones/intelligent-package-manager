@@ -129,7 +129,11 @@ func (m *Model) helpLines(w, rows int) []string {
 	}
 	var lines []string
 	if m.tab != tabCatalog {
-		lines = keyTable("Keys", tabKeys, w)
+		keys := tabKeys
+		if m.tab == tabPacks {
+			keys = packsKeys
+		}
+		lines = keyTable("Keys", keys, w)
 	} else if w >= 100 {
 		half := w / 2
 		left, right := keyTable("Search mode", searchKeys, half-2), keyTable("Tree mode", treeKeys, w-half)

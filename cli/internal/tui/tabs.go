@@ -77,6 +77,8 @@ func (m *Model) statsStrip(w int) string {
 	switch m.tab {
 	case tabCatalog:
 		return fit(m.catalogStats(), w)
+	case tabPacks:
+		return fit(m.packsStats(), w)
 	}
 	return spaces(w)
 }
@@ -100,6 +102,9 @@ func (m *Model) hints() string {
 	if m.tab == tabCatalog {
 		return m.catalogHints()
 	}
+	if m.tab == tabPacks && m.pk.filter.typing {
+		return strings.Join(m.packsHints(), "  ")
+	}
 	return strings.Join(append(m.otherHints(), helpQuit), "  ")
 }
 
@@ -107,7 +112,12 @@ func (m *Model) hints() string {
 const helpQuit = "? help  q quit"
 
 // otherHints are the footer hints of a tab with no keys of its own yet.
-func (m *Model) otherHints() []string { return []string{"1-4 tabs", "[ ] switch"} }
+func (m *Model) otherHints() []string {
+	if m.tab == tabPacks {
+		return m.packsHints()
+	}
+	return []string{"1-4 tabs", "[ ] switch"}
+}
 
 // footer is the hints cut to w: the middle hints drop from the end first, so
 // "? help  q quit" stays visible.
@@ -115,6 +125,8 @@ func (m *Model) footer(w int) string {
 	var parts []string
 	switch {
 	case m.inst != nil, m.deploy != nil, m.ext != nil, m.help, m.picker != nil:
+		return m.hints()
+	case m.tab == tabPacks && m.pk.filter.typing:
 		return m.hints()
 	case m.tab != tabCatalog:
 		parts = m.otherHints()

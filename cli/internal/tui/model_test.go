@@ -137,17 +137,25 @@ func (f *fakeCatalog) Node(id string) (Node, error) {
 type fakePacks struct {
 	scope   string
 	packs   []Pack
+	global  []Pack // the user scope's packs, listed when global is set
 	listErr error
 	addErr  error
 	calls   []string
 }
 
 func (f *fakePacks) Scope() string { return f.scope }
-func (f *fakePacks) List(bool) ([]Pack, error) {
+func (f *fakePacks) List(global bool) ([]Pack, error) {
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
-	return append([]Pack(nil), f.packs...), nil
+	out := append([]Pack(nil), f.packs...)
+	if global {
+		for _, p := range f.global {
+			p.Global = true
+			out = append(out, p)
+		}
+	}
+	return out, nil
 }
 func (f *fakePacks) find(name string) *Pack {
 	for i := range f.packs {

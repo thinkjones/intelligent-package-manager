@@ -55,6 +55,7 @@ type Model struct {
 	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
 	backStack []string // external entries jumped from, newest last
 
+	pk       packsTab // the Packs tab
 	packs    []Pack
 	active   string // the active pack's name
 	traySel  int
@@ -90,6 +91,7 @@ func New(d Deps) *Model {
 	in.Placeholder = "type to search"
 	in.Focus()
 	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
+	m.pk.filter = newFilterBox()
 	m.catCounts = d.Catalog.Counts()
 	for i := range m.counts {
 		m.counts[i] = notLoaded
@@ -186,15 +188,17 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.pickerKey(msg)
 		return nil
 	}
-	if m.focus != focusSearch || m.tab != tabCatalog {
-		if m.tabKey(k) {
-			return nil
-		}
+	if !m.textFocused() && m.tabKey(k) {
+		m.enterTab()
+		return nil
 	}
-	if m.tab != tabCatalog {
-		return m.otherTabKey(k)
+	switch m.tab {
+	case tabCatalog:
+		return m.catalogKey(msg)
+	case tabPacks:
+		return m.packsKey(msg)
 	}
-	return m.catalogKey(msg)
+	return m.otherTabKey(k)
 }
 
 func (m *Model) setFocus(f focus) {
@@ -270,6 +274,8 @@ func (m *Model) render() string {
 		mid = panel(stTitle.Render("packs"), m.pickerLines(w-4, body-2), w, true)
 	case m.tab == tabCatalog:
 		mid = m.catalogBody(w, body)
+	case m.tab == tabPacks:
+		mid = m.packsBody(w, body)
 	default:
 		for range body {
 			mid = append(mid, spaces(w))
