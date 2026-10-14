@@ -70,3 +70,12 @@ func TestCommas(t *testing.T) {
 		}
 	}
 }
+
+func TestEscLeavesSearchForTabKeys(t *testing.T) {
+	m, _ := newTest(t)
+	typeText(t, m, "tdd")
+	press(t, m, "esc", "3")
+	if m.tab != tabInstalls {
+		t.Errorf("esc leaves the search box so 3 switches tabs: tab %d", m.tab)
+	}
+}

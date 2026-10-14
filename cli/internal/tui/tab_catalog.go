@@ -59,7 +59,7 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	if m.focus == focusSearch {
 		switch k {
-		case "down", "tab":
+		case "down", "tab", "esc":
 			m.setFocus(focusResults)
 			return nil
 		}
@@ -129,7 +129,7 @@ func (m *Model) catalogStats() string {
 func (m *Model) catalogHints() string {
 	switch m.focus {
 	case focusSearch:
-		return "type to search  ↓ results  ctrl+c quit"
+		return "type to search  ↓/esc results  ctrl+c quit"
 	case focusTree:
 		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help"
 	case focusTray:
