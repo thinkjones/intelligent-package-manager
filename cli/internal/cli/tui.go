@@ -42,7 +42,7 @@ func runTui(sys System, global bool) error {
 	}
 	g, err := catgraph.Load(p.Catalog())
 	if err != nil {
-		return errors.New("no catalog — run `ipm sync`")
+		return errors.New("no catalog — run `ipm catalog sync`")
 	}
 	scope, err := currentScope(sys, global)
 	if err != nil {
@@ -60,8 +60,8 @@ func runTui(sys System, global bool) error {
 }
 
 const (
-	noticeServerOff  = "server off: keyword search only — run `ipm serve` and `ipm load` for semantic search"
-	noticeIndexEmpty = "search index empty — run `ipm load`"
+	noticeServerOff  = "server off: keyword search only — run `ipm catalog serve` and `ipm catalog rebuild` for semantic search"
+	noticeIndexEmpty = "search index empty — run `ipm catalog rebuild`"
 	tuiLimit         = 50
 )
 
@@ -336,7 +336,7 @@ func (p tuiPacks) Remove(pack string, ids ...string) error {
 	return err
 }
 
-// tuiInstaller runs ipm install with its output going to the TUI.
+// tuiInstaller runs ipm pack build with its output going to the TUI.
 type tuiInstaller struct {
 	sys    System
 	global bool
@@ -345,10 +345,10 @@ type tuiInstaller struct {
 func (in tuiInstaller) Install(_ context.Context, out io.Writer) error {
 	sys := in.sys
 	sys.Stdout = out
-	err := runInstall(sys, in.global, false, false)
+	err := runBuild(sys, in.global, false, false)
 	var exit *ExitError
 	if errors.As(err, &exit) {
-		return errors.New("install failed — see the output above")
+		return errors.New("build failed — see the output above")
 	}
 	return err
 }
@@ -370,7 +370,7 @@ func strList(v any) []string {
 	return out
 }
 
-// tuiDeployer deploys the scope's packs with the code behind ipm deploy.
+// tuiDeployer installs the scope's packs with the code behind ipm install claude.
 type tuiDeployer struct {
 	sys    System
 	scope  project.Scope
@@ -378,7 +378,7 @@ type tuiDeployer struct {
 }
 
 func (d tuiDeployer) Default(string) tui.Target {
-	t := deployDefaults(d.scope, deployTarget{})
+	t := claudeDefaults(d.scope, claudeTarget{})
 	return tui.Target{Scope: t.Scope, Path: t.Path}
 }
 
@@ -386,7 +386,7 @@ func (d tuiDeployer) Plan(pack string, t tui.Target) (tui.Target, []string, erro
 	if err := needClaude(d.sys); err != nil {
 		return t, nil, err
 	}
-	target, err := cleanTarget(deployTarget{Scope: t.Scope, Path: t.Path}, workDir(d.sys, d.scope), d.sys.Getenv("HOME"))
+	target, err := cleanTarget(claudeTarget{Scope: t.Scope, Path: t.Path}, workDir(d.sys, d.scope), d.sys.Getenv("HOME"))
 	if err != nil {
 		return t, nil, err
 	}
@@ -394,7 +394,7 @@ func (d tuiDeployer) Plan(pack string, t tui.Target) (tui.Target, []string, erro
 	if err != nil {
 		return t, nil, err
 	}
-	build := "ipm install"
+	build := "ipm pack build"
 	if d.global {
 		build += " -g"
 	}
@@ -406,6 +406,6 @@ func (d tuiDeployer) Plan(pack string, t tui.Target) (tui.Target, []string, erro
 }
 
 func (d tuiDeployer) Deploy(_ context.Context, pack string, t tui.Target, out io.Writer) error {
-	_, err := runDeploy(d.sys, d.global, pack, deployTarget{Scope: t.Scope, Path: t.Path}, out)
+	_, err := installClaude(d.sys, d.scope, pack, project.Install{Target: "claude", Scope: t.Scope, Path: t.Path}, installOpts{Global: d.global}, out)
 	return err
 }

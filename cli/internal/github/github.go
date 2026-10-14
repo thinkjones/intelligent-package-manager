@@ -1,7 +1,7 @@
 // Package github fetches repo stats — stars, forks, description, topics — for
 // the catalog, through the gh CLI so the user's own login is used. Stats
 // change daily, so they live in their own file, catalog/github.jsonl,
-// refreshed only by `ipm stats`.
+// refreshed only by `ipm marketplace stats`.
 package github
 
 import (

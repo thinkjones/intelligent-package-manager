@@ -26,7 +26,7 @@ const (
 func TestServeLoadSearch(t *testing.T) {
 	docker, pnpm, node := testtool.Need(t, "docker"), testtool.Need(t, "pnpm"), testtool.Need(t, "node")
 	if err := exec.Command(docker, "inspect", tsContainer).Run(); err == nil {
-		t.Fatalf("an %s container already exists — this test would replace it; run it in CI, or remove yours with ipm serve --stop && docker rm %s", tsContainer, tsContainer)
+		t.Fatalf("an %s container already exists — this test would replace it; run it in CI, or remove yours with ipm catalog serve --stop && docker rm %s", tsContainer, tsContainer)
 	}
 	if c, err := net.DialTimeout("tcp", tsAddr, time.Second); err == nil {
 		c.Close()

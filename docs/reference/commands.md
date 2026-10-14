@@ -7,7 +7,7 @@ nav_order: 1
 # Commands
 {: .no_toc }
 
-Every `ipm` command and flag. `ipm help <command>` prints the same from the CLI.
+Every `ipm` command and flag, in the order of the workflow: onboard → marketplace → catalog → search → pack → install. `ipm help <command>` prints the same from the CLI.
 {: .fs-6 .fw-300 }
 
 1. TOC
@@ -15,7 +15,7 @@ Every `ipm` command and flag. `ipm help <command>` prints the same from the CLI.
 
 Flags may come before or after positional arguments. Long flags take two dashes (`--update`); `-g` is short for `--global`. `ipm <command> --help` and `ipm help <command>` print a command's usage and flags, and a mistyped command gets a suggestion.
 
-## Setup
+## Getting started
 
 ### `ipm onboard`
 
@@ -23,9 +23,9 @@ Flags may come before or after positional arguments. Long flags take two dashes 
 ipm onboard [--list <path|url>] [--lists <name>]… [--keep|--fresh] [--yes]
 ```
 
-Takes you from nothing to a searchable library: picks sources from a curated list, adds them, then runs `ipm sync`, `ipm stats` and `ipm serve` with `ipm load`, printing `✓` or `✗` for each step. Stats are skipped when `gh` is missing or not logged in; search is skipped when Docker isn't running (`start Docker, then ipm serve && ipm load`). A failed step prints `rerun: <command>` and exits 1. It ends with `✓ library ready — N sources, M artifacts` and `try: ipm search … · ipm tui`.
+Takes you from nothing to a searchable library. It first prints the four concepts, one line each (marketplace, catalog, pack, install), then picks sources from the marketplace's curated list, adds them, and runs `ipm catalog sync`, `ipm marketplace stats` and `ipm catalog serve` with `ipm catalog rebuild`, printing `✓` or `✗` for each step. Stats are skipped when `gh` is missing or not logged in; search is skipped when Docker isn't running (`start Docker, then ipm catalog serve && ipm catalog rebuild`). A failed step prints `rerun: <command>` and exits 1. It ends with `✓ library ready — N sources, M artifacts` and `try: ipm search … · ipm tui`.
 
-If `ipm` already has sources or a catalog, it prints, for example, `found existing ipm data: 26 sources · 3,280 artifacts · synced 2026-10-09` and asks `[u]se it · [b]ack it up and start fresh · [q]uit`. Backing up renames the home and cache folders to `<folder>.backup-YYYYMMDD-HHMM` and prints how to undo it: `to restore: rm -rf <home> <cache> && mv <home>.backup-… <home> && mv <cache>.backup-… <cache> && ipm serve`. If you then quit the checklist, it says `no sources added; your data was backed up to …` and prints the same line. With sources you already follow, `enter` with nothing new ticked continues with those (`0 new repos — y continue with the N you follow`), so rerunning `ipm onboard` after a failed step resumes it. While filtering, space on a list ticks only the repos shown.
+If `ipm` already has sources or a catalog, it prints, for example, `found existing ipm data: 26 sources · 3,280 artifacts · synced 2026-10-09` and asks `[u]se it · [b]ack it up and start fresh · [q]uit`. Backing up renames the home and cache folders to `<folder>.backup-YYYYMMDD-HHMM` and prints how to undo it: `to restore: rm -rf <home> <cache> && mv <home>.backup-… <home> && mv <cache>.backup-… <cache> && ipm catalog serve`. If you then quit the checklist, it says `no sources added; your data was backed up to …` and prints the same line. With sources you already follow, `enter` with nothing new ticked continues with those (`0 new repos — y continue with the N you follow`), so rerunning `ipm onboard` after a failed step resumes it. While filtering, space on a list ticks only the repos shown.
 
 The curated list is fetched each time and cached under the cache folder's `curated/`; offline, the cached copy is used. In a terminal it shows a checklist of the lists, which expand into their repos; see [Getting started](../getting-started.md#onboard) for the keys. The line above the key hints shows the highlighted repo's topics and homepage. On a fresh start "AI · Agentic Engineering Methods" and "AI · Skills, Plugins & Registries" are ticked; repos you already follow show `✓` and nothing is ticked. Rerunning `ipm onboard` adds only what is new.
 
@@ -39,66 +39,103 @@ The curated list is fetched each time and cached under the cache folder's `curat
 
 When not in a terminal, `--lists` or `--yes` is required, and so is `--keep` or `--fresh` if data exists. `--keep` and `--fresh` together are a usage error.
 
-It then runs five steps: add the sources, `ipm sync`, `ipm stats`, `ipm serve` and `ipm load`. In a terminal, one line is redrawn while they run:
+It then runs five steps: add the sources, `ipm catalog sync`, `ipm marketplace stats`, `ipm catalog serve` and `ipm catalog rebuild`'s load. In a terminal, one line is redrawn while they run:
 
 ```text
 [████████░░░░░░░░░░░░] 3/5 stats · 17/42 anthropics/skills · 0:48
 ```
 
-The bar covers all five steps and moves inside `stats` (per repo) and `load` (per 500 documents); after the step comes the last line it printed or its count, then the time since the steps began. The steps' own output is not shown. Each finished step leaves one line, such as `✓ sync · catalog: 3280 record(s), 2 warning(s)`; run `ipm index` to read the warnings. If a step fails, everything it printed is shown, then `✗ <step>` and `rerun: <command>`. When stdout is not a terminal there is no bar and each step prints what it prints on its own.
+The bar covers all five steps and moves inside `stats` (per repo) and `load` (per 500 documents); after the step comes the last line it printed or its count, then the time since the steps began. The steps' own output is not shown. Each finished step leaves one line, such as `✓ sync · catalog: 3280 record(s), 2 warning(s)`; run `ipm catalog rebuild` to read the warnings. If a step fails, everything it printed is shown, then `✗ <step>` and `rerun: <command>`. When stdout is not a terminal there is no bar and each step prints what it prints on its own.
 
-## Sources
+## Marketplace
 
-### `ipm source`
+The marketplace is the curated list of repos worth following (by default this repo's `source-packs.toml`). Following a repo makes it a source: `ipm` fetches, pins and catalogs it.
+
+### `ipm marketplace`
 
 ```text
-ipm source add <repo>…
-ipm source remove <repo>…
-ipm source list
-ipm source import <path/to/manifest.toml>
+ipm marketplace [--list <path|url>] [--lists <name>]… [--followed]
+ipm marketplace add <repo>…
+ipm marketplace remove <repo>…
+ipm marketplace import <path/to/manifest.toml>
+ipm marketplace stats
 ```
+
+Run alone, it shows the curated repos grouped by list, each with a `✓` when you follow it, its stars and its description, then the repos you follow that no list holds under `Other`, and ends with `✓ follows N of the repos shown`. The curated list is fetched each time and cached under the cache folder's `curated/`; offline, the cached copy is used.
+
+| Flag | Does |
+| --- | --- |
+| `--list L` | The curated list: a URL or a file. Default `https://raw.githubusercontent.com/thinkjones/intelligent-package-manager/main/source-packs.toml`. |
+| `--lists NAME` | Show only this list, by exact name (repeatable). |
+| `--followed` | Show only the repos you follow, grouped by list, each with its alias, repo, stars, ref and pinned commit (`not synced` until `ipm catalog sync`), then its description, topics and homepage. See [List and remove](../guides/sources.md#list-and-remove). |
 
 | Subcommand | Does |
 | --- | --- |
-| `add` | Add sources: `owner/repo[@ref]`, a git URL (`https://`, `ssh://`, `file://`, `git@`) with an optional `#ref`, or an external plugin ID (`plugin:<marketplace repo>#<name>`), which adds the repo the plugin lives in. A repo already listed, or two repos that would share an alias, is refused and nothing is written. |
-| `remove` | Remove sources. An unknown repo is an error and nothing is written. |
-| `list` | Every source under the list it belongs to in the curated list, each with its alias, repo, stars, ref and pinned commit (`not synced` until `ipm sync`), then its description, topics and homepage. See [List and remove](../guides/sources.md#list-and-remove). |
+| `add` | Follow repos: `owner/repo[@ref]`, a git URL (`https://`, `ssh://`, `file://`, `git@`) with an optional `#ref`, or an external plugin ID (`plugin:<marketplace repo>#<name>`), which follows the repo the plugin lives in. A repo already followed, or two repos that would share an alias, is refused and nothing is written. |
+| `remove` | Stop following repos. An unknown repo is an error and nothing is written. |
 | `import` | One-time migration from an aihs-era `manifest.toml`. |
+| `stats` | Fetch GitHub stars, forks, topics, licence, description and last push for every repo in the catalog into `github.jsonl`. Needs `gh`, logged in. |
 
-`add`, `remove` and `import` only edit the source list; run `ipm sync` after.
+`add`, `remove` and `import` only edit the source list; run `ipm catalog sync` after.
 
-### `ipm sync`
+## Catalog
+
+### `ipm catalog`
 
 ```text
-ipm sync [--upgrade]
+ipm catalog
+ipm catalog sync [--upgrade]
+ipm catalog rebuild
+ipm catalog serve [--stop]
+ipm catalog scan [--paths] [owner/repo…]
+ipm catalog search [flags] <query>
 ```
 
-Has pnpm fetch and pin every source, then runs `ipm index`. If pnpm fails, the catalog is unchanged and `ipm` exits 1.
+Run alone, it prints a summary: how many sources you follow and how many are synced, the items by type, when the catalog was last built, and the search server's state (`running, N document(s)`, or how to set it up).
+
+```text
+sources     0 followed, 0 synced
+items       none
+last index  never — run `ipm catalog sync`
+search      no search server set up — run `ipm catalog serve`
+```
+
+### `ipm catalog sync`
+
+```text
+ipm catalog sync [--upgrade]
+```
+
+Has pnpm fetch and pin every source, then rebuilds the catalog and, when the search server is up, reloads the search index. With the server off it prints `- search not loaded: run ipm catalog serve then ipm catalog rebuild`. If pnpm fails, the catalog is unchanged and `ipm` exits 1.
 
 | Flag | Does |
 | --- | --- |
 | `--upgrade` | Move every source to the latest commit of its branch or tag first. |
 
-### `ipm index`
+### `ipm catalog rebuild`
 
 ```text
-ipm index
+ipm catalog rebuild
 ```
 
-Rebuilds the catalog from your synced sources, without fetching.
+Rebuilds the catalog from your synced sources, without fetching, then reloads the search index when the server is up (the same hint otherwise). Use it after `ipm marketplace stats` to refresh the stars in search.
 
-### `ipm stats`
+### `ipm catalog serve`
 
 ```text
-ipm stats
+ipm catalog serve [--stop]
 ```
 
-Fetches GitHub stars, forks, topics, licence, description and last push for every repo in the catalog. Needs `gh`, logged in.
+Starts Typesense in Docker as container `ipm-typesense` on `127.0.0.1:8108`, with its data in your cache folder.
 
-### `ipm scan`
+| Flag | Does |
+| --- | --- |
+| `--stop` | Stop the server. Its data is kept. |
+
+### `ipm catalog scan`
 
 ```text
-ipm scan [--paths] [owner/repo…]
+ipm catalog scan [--paths] [owner/repo…]
 ```
 
 Reports each synced source's commit and its plugins, Copilot plugins, marketplaces, and `skills`, `hooks` and `agents` folders.
@@ -109,33 +146,14 @@ Reports each synced source's commit and its plugins, Copilot plugins, marketplac
 
 ## Search
 
-### `ipm serve`
-
-```text
-ipm serve [--stop]
-```
-
-Starts Typesense in Docker as container `ipm-typesense` on `127.0.0.1:8108`, with its data in your cache folder.
-
-| Flag | Does |
-| --- | --- |
-| `--stop` | Stop the server. Its data is kept. |
-
-### `ipm load`
-
-```text
-ipm load
-```
-
-Rebuilds the search index from the catalog and GitHub stats. Run it after `ipm sync` or `ipm stats`.
-
 ### `ipm search`
 
 ```text
 ipm search [flags] <query>
+ipm catalog search [flags] <query>
 ```
 
-Hybrid keyword and semantic search. Needs `ipm serve` and `ipm load`. Each hit's full ID is printed on the line under it. The table fits the terminal width (or `COLUMNS`), dropping DESCRIPTION, then PLUGINS, then REPO when narrow; piped output isn't cut.
+Hybrid keyword and semantic search; the two spellings are the same command. Needs `ipm catalog serve` and a loaded index (`ipm catalog sync` and `ipm catalog rebuild` load it). Each hit's full ID is printed on the line under it. The table fits the terminal width (or `COLUMNS`), dropping DESCRIPTION, then PLUGINS, then REPO when narrow; piped output isn't cut.
 
 | Flag | Does |
 | --- | --- |
@@ -154,6 +172,8 @@ Hybrid keyword and semantic search. Needs `ipm serve` and `ipm load`. Each hit's
 
 ```text
 ipm show [--json] <id>
+ipm show tree [flags] <id>
+ipm show graph [flags] <id>
 ```
 
 An artifact's fields, its repo's GitHub stats, and its neighbours: `up:` (what contains it, within its repo), `down:` (what it contains) and `used by:` (external entries in other repos that reference it — for a repo, anything in it). Reads the catalog; no search server needed.
@@ -162,10 +182,10 @@ An artifact's fields, its repo's GitHub stats, and its neighbours: `up:` (what c
 | --- | --- |
 | `--json` | Print the catalog record as JSON. |
 
-### `ipm tree`
+### `ipm show tree`
 
 ```text
-ipm tree [flags] <id>
+ipm show tree [flags] <id>
 ```
 
 An artifact's relationships as a tree. Reads the catalog.
@@ -176,10 +196,10 @@ An artifact's relationships as a tree. Reads the catalog.
 | `--depth N` | Levels to show. Default: 3 from a repo, otherwise all. |
 | `--all` | Show every child, not the first 25. |
 
-### `ipm graph`
+### `ipm show graph`
 
 ```text
-ipm graph [flags] <id>
+ipm show graph [flags] <id>
 ```
 
 An artifact's neighbourhood as a Mermaid or Graphviz graph. Reads the catalog.
@@ -201,6 +221,8 @@ ipm pack add <pack> <id>… [-g]
 ipm pack remove <pack> <id>… [-g]
 ipm pack list [-g]
 ipm pack show <pack> [-g]
+ipm pack build [-g] [--update] [--no-validate]
+ipm pack install claude [pack] …      (same as ipm install claude)
 ```
 
 | Subcommand | Does |
@@ -209,26 +231,51 @@ ipm pack show <pack> [-g]
 | `add` | Add catalog items. Every ID is checked first; if any is unknown or can't be picked, nothing is added. Duplicates are ignored. |
 | `remove` | Remove items. |
 | `list` | Every pack in the scope: name, item count, description. |
-| `show` | A pack's items: type, name, repo, stars and ID. |
+| `show` | A pack's items: type, name, repo, stars and ID, then one `installed:` line for each place the pack is installed. |
+| `build` | Build the scope's packs into plugins; see [`ipm pack build`](#ipm-pack-build). |
+| `install` | The same as [`ipm install`](#ipm-install). |
 
 | Flag | Does |
 | --- | --- |
 | `--description D` | The pack's description (`new`). |
 | `-g` | Use your user scope (`$IPM_HOME/global`) instead of the project. |
 
-### `ipm install`
+### `ipm pack build`
 
 ```text
-ipm install [-g] [--update] [--no-validate]
+ipm pack build [-g] [--update] [--no-validate]
 ```
 
-Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, writes `.ipm/.claude-plugin/marketplace.json` and `.ipm/ipm.lock`, and validates the result with `claude plugin validate --strict`. A failure leaves the previous build and lock in place.
+Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, writes `.ipm/.claude-plugin/marketplace.json` and `.ipm/ipm.lock`, and validates the result with `claude plugin validate --strict`. Last, it writes `.ipm/build.stamp`, a hash of the packs, the lock and the ipm version, which lets `ipm install` skip a build that is already current. A failure leaves the previous build and lock in place. It only builds: it never touches your Claude Code configuration.
 
 | Flag | Does |
 | --- | --- |
 | `-g` | Build your user scope's packs. |
 | `--update` | Re-pin every item to the commit in your current catalog, instead of keeping the pins in `.ipm/ipm.lock`. |
 | `--no-validate` | Skip `claude plugin validate --strict`. |
+
+### `ipm install`
+
+```text
+ipm install claude [pack] [--scope user|project|local] [--path DIR] [-g] [--update] [--dry-run]
+ipm install [-g]
+```
+
+`ipm install claude` installs `pack` into Claude Code. `pack` may be left out when the scope has only one. It builds first when `.ipm/` is out of date (the build stamp no longer matches), printing `build is current` when it is not needed, then prints each `claude` command before running it and needs no confirmation: typing the command is the decision. Afterwards it records the install: in the pack's `[[packs.<name>.installs]]` table in `ipm.toml` for a project pack (a path inside the project is stored relative to it), or in `$IPM_HOME/installs.json` for a user-scope pack. Installing the same pack to the same target, path and scope again replaces its record; project and local scope at one folder are two records. `ipm pack install claude` is the same command.
+
+| Flag | Does |
+| --- | --- |
+| `-s`, `--scope S` | `user` (every project, just you), `project` (a folder, shared through its `.claude/settings.json`) or `local` (a folder, just you). Default `project`; `user` with `-g`. |
+| `-p`, `--path DIR` | The folder for project or local scope. Default: the pack's project. `~` and relative paths work. |
+| `-g`, `--global` | Install a pack from your user scope. |
+| `--update` | Re-pin every item to your current catalog and rebuild first. |
+| `--dry-run` | Print the `claude` commands without building, running or recording anything. |
+
+The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (always — Claude Code accepts a repeat), `claude plugin marketplace update <name>` when Claude Code already knows the marketplace, then `claude plugin install <pack>@<name> --scope S`, or `claude plugin update …` when the pack is already installed there. Needs `claude` on your `PATH`.
+
+Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `claude` is a usage error. Before running anything it checks every record's target: a record of a target this ipm doesn't know is reported as `<pack> → <target> …: unknown target`, and nothing is installed. A record that fails (a stale one whose folder was deleted, say) doesn't stop the others: its error is printed as `✗ <pack> → <target> <scope or name> <path>: <error>`, and the replay ends with exit 1 and `✗ N of M recorded installs failed; if a record is stale, remove it from <file>`, where the file is `ipm.toml` for a project or `$IPM_HOME/installs.json` with `-g`, each with its path. There is no command to forget a record: delete it from that file.
+
+## Tools
 
 ### `ipm tui`
 
@@ -241,24 +288,6 @@ Search, see each artifact in its tree, collect into packs, build and deploy, in 
 | Flag | Does |
 | --- | --- |
 | `-g`, `--global` | Use your user scope's packs (`$IPM_HOME/global`). |
-
-### `ipm deploy`
-
-```text
-ipm deploy [pack] [--scope user|project|local] [--path DIR] [-g]
-```
-
-Builds the scope's packs (as `ipm install`), then installs `pack` into Claude Code. `pack` may be left out when the scope has only one. It prints each command before running it and needs no confirmation: typing the command is the decision.
-
-| Flag | Does |
-| --- | --- |
-| `--scope S` | `user` (every project, just you), `project` (a folder, shared through its `.claude/settings.json`) or `local` (a folder, just you). Default `project`; `user` with `-g`. |
-| `--path DIR` | The folder for project or local scope. Default: the pack's project. `~` and relative paths work. |
-| `-g`, `--global` | Deploy a pack from your user scope. |
-
-The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (always — Claude Code accepts a repeat), `claude plugin marketplace update <name>` when Claude Code already knows the marketplace, then `claude plugin install <pack>@<name> --scope S`, or `claude plugin update …` when the pack is already installed there. Needs `claude` on your `PATH`.
-
-## Other
 
 ### `ipm doctor`
 
@@ -298,6 +327,23 @@ ipm completion zsh|bash|fish|powershell
 ```
 
 Prints a shell completion script for commands and flags. For zsh: `ipm completion zsh > "${fpath[1]}/_ipm"`, then start a new shell; `ipm completion <shell> --help` shows the steps for each shell.
+
+## Renamed commands
+
+The old command names are removed. Typing one is a usage error (exit 2) that names its replacement.
+
+| Old | New |
+| --- | --- |
+| `ipm source add`, `remove`, `import` | `ipm marketplace add`, `remove`, `import` |
+| `ipm source list` | `ipm marketplace` (the curated list with `✓`), or `ipm marketplace --followed` (your sources) |
+| `ipm stats` | `ipm marketplace stats` |
+| `ipm sync [--upgrade]` | `ipm catalog sync [--upgrade]` |
+| `ipm index`, `ipm load` | `ipm catalog rebuild` |
+| `ipm serve [--stop]` | `ipm catalog serve [--stop]` |
+| `ipm scan` | `ipm catalog scan` |
+| `ipm tree`, `ipm graph` | `ipm show tree`, `ipm show graph` |
+| `ipm install` (the build) | `ipm pack build` |
+| `ipm deploy` | `ipm install claude` |
 
 ## Exit codes
 

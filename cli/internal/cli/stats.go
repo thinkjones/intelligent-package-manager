@@ -20,7 +20,7 @@ var ownerRepoRE = regexp.MustCompile(`^[\w.-]+/[\w.-]+$`)
 func newStatsCmd(sys System) *cobra.Command {
 	return &cobra.Command{
 		Use:   "stats",
-		Short: "fetch GitHub stats for every repo in the catalog into catalog/github.jsonl",
+		Short: "refresh GitHub stars, topics and descriptions into catalog/github.jsonl",
 		Args:  noArgs,
 		RunE:  func(*cobra.Command, []string) error { return runStats(sys) },
 	}
@@ -34,7 +34,7 @@ func runStats(sys System) error {
 		return err
 	}
 	if _, err := sys.LookPath("gh"); err != nil {
-		return fmt.Errorf("ipm stats needs the GitHub CLI: install gh and run `gh auth login`")
+		return fmt.Errorf("ipm marketplace stats needs the GitHub CLI: install gh and run `gh auth login`")
 	}
 	if out, err := sys.Output("", "gh", "auth", "status"); err != nil {
 		return fmt.Errorf("gh is not logged in — run `gh auth login`: %s", strings.TrimSpace(out))

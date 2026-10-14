@@ -18,7 +18,7 @@ func newSearchCmd(sys System) *cobra.Command {
 	var asJSON, all, explain, ids bool
 	cmd := &cobra.Command{
 		Use:   "search <query>",
-		Short: "hybrid search over the catalog (needs ipm serve and ipm load)",
+		Short: "search your catalog (same as catalog search)",
 		RunE: func(_ *cobra.Command, args []string) error {
 			q.Text = strings.TrimSpace(strings.Join(args, " "))
 			if q.Text == "" {

@@ -300,7 +300,7 @@ func TestTreeUnresolvedExternal(t *testing.T) {
 	c["plugin:a/m#cloudflare"] = e
 	tv, _ := buildTree(c, "plugin:a/m#cloudflare", nil)
 	text := ansi.Strip(strings.Join(tv.lines(140, 12, -1, false), "\n"))
-	if !strings.Contains(text, "↗ c/missing (not a source — ipm source add plugin:a/m#cloudflare)") {
+	if !strings.Contains(text, "↗ c/missing (not a source — ipm marketplace add plugin:a/m#cloudflare)") {
 		t.Errorf("unresolved:\n%s", text)
 	}
 }

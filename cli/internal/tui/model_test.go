@@ -1005,7 +1005,7 @@ func TestJumpUnresolved(t *testing.T) {
 	f.c.details["plugin:a/m#cf"] = e
 	typeText(t, m, "cf")
 	press(t, m, "down", "right")
-	if m.cursor != "plugin:a/m#cf" || !strings.Contains(m.status, "ipm source add plugin:a/m#cf") {
+	if m.cursor != "plugin:a/m#cf" || !strings.Contains(m.status, "ipm marketplace add plugin:a/m#cf") {
 		t.Errorf("cursor %q status %q", m.cursor, m.status)
 	}
 }

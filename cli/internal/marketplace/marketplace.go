@@ -3,7 +3,7 @@
 // repo, `git-subdir` (a sparse checkout) for a path, `url` for a non-GitHub
 // git URL — pinned to a commit. Every entry carries OwnerTag, which is how an
 // existing file is recognised as ipm's to overwrite. Part 3 of the ipm design
-// (packs and `ipm install`) builds on it.
+// (packs and `ipm pack build`) builds on it.
 package marketplace
 
 import (

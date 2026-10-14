@@ -6,18 +6,7 @@ import (
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
-
-	"github.com/spf13/cobra"
 )
-
-func newIndexCmd(sys System) *cobra.Command {
-	return &cobra.Command{
-		Use:   "index",
-		Short: "rebuild the catalog from your synced sources",
-		Args:  noArgs,
-		RunE:  func(*cobra.Command, []string) error { return runIndex(sys) },
-	}
-}
 
 // runIndex writes the catalog from every synced source at its pinned commit.
 // It reads only what pnpm installed, and writes nothing unless every source
@@ -32,7 +21,7 @@ func runIndex(sys System) error {
 		return err
 	}
 	if len(srcs) == 0 {
-		return fmt.Errorf("no sources to index — add some with `ipm source add owner/repo`, then `ipm sync`")
+		return fmt.Errorf("no sources to index — add some with `ipm marketplace add owner/repo`, then `ipm catalog sync`")
 	}
 	cos := make([]catalog.Checkout, 0, len(srcs))
 	for _, s := range srcs {

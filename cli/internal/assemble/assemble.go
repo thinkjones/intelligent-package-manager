@@ -53,7 +53,7 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 		}
 		if l, ok := lock[id]; ok {
 			if err := check(l); err != nil {
-				return fmt.Errorf("%s in ipm.lock: %v — fix it, or run `ipm install --update` to re-resolve from the catalog", id, err)
+				return fmt.Errorf("%s in ipm.lock: %v — fix it, or run `ipm pack build --update` to re-resolve from the catalog", id, err)
 			}
 			out[id] = l
 			if l.Type == catalog.TypeCopilotPlugin {
@@ -71,7 +71,7 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 			return fmt.Errorf("can't resolve %s without the catalog: %v", id, err)
 		}
 		if r == nil {
-			return fmt.Errorf("%s is not in the catalog or ipm.lock — drop it with `ipm pack remove %s %s`, or run `ipm sync` if it's new upstream", id, packName, id)
+			return fmt.Errorf("%s is not in the catalog or ipm.lock — drop it with `ipm pack remove %s %s`, or run `ipm catalog sync` if it's new upstream", id, packName, id)
 		}
 		it := project.LockItem{ID: id, Type: str(r, "type"), Name: str(r, "name"), Repo: str(r, "repo"), Path: str(r, "path"), SHA: str(r, "commit")}
 		switch it.Type {
@@ -224,7 +224,7 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 		}
 		a := sources.Alias(it.Repo)
 		if prev, ok := plan.Repos[a]; ok && prev != spec {
-			return fmt.Errorf("%s is pinned at two commits in ipm.lock — run `ipm install --update`", it.Repo)
+			return fmt.Errorf("%s is pinned at two commits in ipm.lock — run `ipm pack build --update`", it.Repo)
 		}
 		plan.Repos[a] = spec
 		return nil

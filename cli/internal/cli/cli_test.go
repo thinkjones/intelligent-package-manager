@@ -155,11 +155,11 @@ func checkout(t *testing.T) string {
 
 func TestHelpAndVersion(t *testing.T) {
 	f := newFake("")
-	if err := f.run(); err != nil || !strings.Contains(f.out.String(), "source") {
+	if err := f.run(); err != nil || !strings.Contains(f.out.String(), "marketplace") {
 		t.Fatalf("help: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("help", "sync"); err != nil || !strings.Contains(f.out.String(), "-upgrade") {
+	if err := f.run("help", "catalog", "sync"); err != nil || !strings.Contains(f.out.String(), "-upgrade") {
 		t.Fatalf("help sync: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
@@ -167,7 +167,7 @@ func TestHelpAndVersion(t *testing.T) {
 		t.Fatalf("search --help: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("help", "install"); err != nil || strings.Contains(f.out.String(), "-no-validate claude") {
+	if err := f.run("help", "pack", "build"); err != nil || strings.Contains(f.out.String(), "-no-validate claude") {
 		t.Fatalf("a backquoted usage turns into a flag argument name:\n%s", f.out.String())
 	}
 	f.out.Reset()
@@ -180,14 +180,14 @@ func TestUsageErrors(t *testing.T) {
 	for _, args := range [][]string{
 		{"nope"},
 		{"--nope"},
-		{"sync", "--bogus"},
-		{"sync", "stray"},
+		{"catalog", "sync", "--bogus"},
+		{"catalog", "sync", "stray"},
 		{"help", "nope"},
 		{"help", "a", "b"},
-		{"sync", "-upgrade"}, // POSIX flags: long flags take two dashes
-		{"source"},
-		{"source", "bogus"},
-		{"source", "add"},
+		{"catalog", "sync", "-upgrade"}, // POSIX flags: long flags take two dashes
+		{"marketplace", "stats", "x"},
+		{"marketplace", "bogus"},
+		{"marketplace", "add"},
 		{"pack", "add", "kit"},
 		{"pack", "new"},
 		{"show"},
@@ -205,7 +205,7 @@ func TestDoctorRows(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	f.run("sync")
+	f.run("catalog", "sync")
 	f.out.Reset()
 	if err := f.run("doctor"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
@@ -244,7 +244,7 @@ func TestStatsCommand(t *testing.T) {
 	f.onPath["gh"] = true
 	f.results["gh auth"] = result{"Logged in", nil}
 	f.results["gh api"] = result{ghRepoJSON, nil}
-	if err := f.run("stats"); err != nil {
+	if err := f.run("marketplace", "stats"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	data, _ := os.ReadFile(filepath.Join(cacheOf(root), "catalog", "github.jsonl"))
@@ -266,7 +266,7 @@ func TestStatsKeepsPreviousRecordOnFailure(t *testing.T) {
 	f.onPath["gh"] = true
 	f.results["gh api"] = result{"HTTP 502", errors.New("exit 1")}
 	var exit *ExitError
-	if err := f.run("stats"); !errors.As(err, &exit) || exit.Code != 1 {
+	if err := f.run("marketplace", "stats"); !errors.As(err, &exit) || exit.Code != 1 {
 		t.Errorf("want exit 1, got %v", err)
 	}
 	if data, _ := os.ReadFile(filepath.Join(cacheOf(root), "catalog", "github.jsonl")); string(data) != prev {
@@ -277,7 +277,7 @@ func TestStatsKeepsPreviousRecordOnFailure(t *testing.T) {
 func TestStatsNeedsGh(t *testing.T) {
 	root := checkout(t)
 	withRepos(t, root, "o/r")
-	err := newFake(root).run("stats")
+	err := newFake(root).run("marketplace", "stats")
 	if err == nil || !strings.Contains(err.Error(), "gh") {
 		t.Errorf("got %v", err)
 	}
@@ -338,7 +338,7 @@ func callWith(f *fake, prefix string) string {
 
 func TestServeCreatesContainer(t *testing.T) {
 	f, root := dockerFake(t, result{"Error: No such object", errors.New("exit 1")})
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	keyFile := filepath.Join(cacheOf(root), "typesense", "api-key")
@@ -354,7 +354,7 @@ func TestServeCreatesContainer(t *testing.T) {
 	}
 	f2, _ := dockerFake(t, result{"Error", errors.New("exit 1")})
 	f2.env = f.env
-	f2.run("serve")
+	f2.run("catalog", "serve")
 	if again, _ := os.ReadFile(keyFile); string(again) != string(key) {
 		t.Error("the key must be reused")
 	}
@@ -362,7 +362,7 @@ func TestServeCreatesContainer(t *testing.T) {
 
 func TestServeLeavesRunningContainer(t *testing.T) {
 	f, _ := dockerFake(t, result{"true\n", nil})
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatal(err)
 	}
 	if callWith(f, "docker run") != "" || callWith(f, "docker start") != "" {
@@ -372,7 +372,7 @@ func TestServeLeavesRunningContainer(t *testing.T) {
 
 func TestServeStartsStoppedContainer(t *testing.T) {
 	f, _ := dockerFake(t, result{"false\n", nil})
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatal(err)
 	}
 	if callWith(f, "docker start ipm-typesense") == "" {
@@ -382,7 +382,7 @@ func TestServeStartsStoppedContainer(t *testing.T) {
 
 func TestServeStop(t *testing.T) {
 	f, _ := dockerFake(t, result{"true", nil})
-	if err := f.run("serve", "--stop"); err != nil {
+	if err := f.run("catalog", "serve", "--stop"); err != nil {
 		t.Fatal(err)
 	}
 	if callWith(f, "docker stop ipm-typesense") == "" {
@@ -392,12 +392,12 @@ func TestServeStop(t *testing.T) {
 
 func TestServeWithoutDocker(t *testing.T) {
 	f := newFake(checkout(t))
-	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "Docker") {
+	if err := f.run("catalog", "serve"); err == nil || !strings.Contains(err.Error(), "Docker") {
 		t.Errorf("no docker: %v", err)
 	}
 	f.onPath["docker"] = true
 	f.results["docker info"] = result{"Cannot connect", errors.New("exit 1")}
-	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "not running") {
+	if err := f.run("catalog", "serve"); err == nil || !strings.Contains(err.Error(), "not running") {
 		t.Errorf("docker down: %v", err)
 	}
 }
@@ -409,7 +409,7 @@ func TestServeHealthTimeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
 	defer srv.Close()
 	typesenseAt(f, srv)
-	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "docker logs ipm-typesense") {
+	if err := f.run("catalog", "serve"); err == nil || !strings.Contains(err.Error(), "docker logs ipm-typesense") {
 		t.Errorf("got %v", err)
 	}
 }
@@ -493,7 +493,7 @@ func loadFake(t *testing.T, n int) (*fake, *tsRecorder) {
 
 func TestLoadRebuildsCollection(t *testing.T) {
 	f, rec := loadFake(t, 1200)
-	if err := f.run("load"); err != nil {
+	if err := runLoad(f.system()); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if len(rec.requests) < 3 || rec.requests[0] != "DELETE /collections/artifacts" || rec.requests[1] != "POST /collections" {
@@ -511,7 +511,7 @@ func TestLoadReportsFailures(t *testing.T) {
 	f, rec := loadFake(t, 3)
 	rec.fail = map[string]bool{"skill:o/r:s0001": true}
 	var exit *ExitError
-	if err := f.run("load"); !errors.As(err, &exit) || exit.Code != 1 {
+	if err := runLoad(f.system()); !errors.As(err, &exit) || exit.Code != 1 {
 		t.Errorf("want exit 1, got %v", err)
 	}
 	if !strings.Contains(f.out.String(), "skill:o/r:s0001") || !strings.Contains(f.out.String(), "bad") {
@@ -523,14 +523,14 @@ func TestLoadNeedsServer(t *testing.T) {
 	root := checkout(t)
 	withCatalog(t, root, 1)
 	os.Remove(filepath.Join(cacheOf(root), "typesense", "api-key"))
-	if err := newFake(root).run("load"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
+	if err := runLoad(newFake(root).system()); err == nil || !strings.Contains(err.Error(), "ipm catalog serve") {
 		t.Errorf("no key: %v", err)
 	}
 	f, _ := loadFake(t, 1)
 	srv := httptest.NewServer(http.NotFoundHandler())
 	typesenseAt(f, srv)
 	srv.Close()
-	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
+	if err := runLoad(f.system()); err == nil || !strings.Contains(err.Error(), "ipm catalog serve") {
 		t.Errorf("server down: %v", err)
 	}
 }
@@ -538,7 +538,7 @@ func TestLoadNeedsServer(t *testing.T) {
 func TestLoadWrongKey(t *testing.T) {
 	f, rec := loadFake(t, 1)
 	rec.status = 401
-	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "port 8108") {
+	if err := runLoad(f.system()); err == nil || !strings.Contains(err.Error(), "port 8108") {
 		t.Errorf("got %v", err)
 	}
 }
@@ -546,7 +546,7 @@ func TestLoadWrongKey(t *testing.T) {
 func TestLoadWithoutCatalog(t *testing.T) {
 	f, rec := loadFake(t, 1)
 	os.RemoveAll(filepath.Join(f.env["IPM_CACHE_DIR"], "catalog"))
-	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "ipm index") {
+	if err := runLoad(f.system()); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 		t.Errorf("got %v", err)
 	}
 	if len(rec.requests) != 0 {
@@ -622,13 +622,13 @@ func TestSearchNeedsQuery(t *testing.T) {
 
 func TestSearchNoIndex(t *testing.T) {
 	f, _ := searchFake(t, 404)
-	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm load") {
+	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 		t.Errorf("404: %v", err)
 	}
 	srv := httptest.NewServer(http.NotFoundHandler())
 	typesenseAt(f, srv)
 	srv.Close()
-	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
+	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm catalog serve") {
 		t.Errorf("down: %v", err)
 	}
 }
@@ -692,7 +692,7 @@ func TestShowExternalPlugin(t *testing.T) {
 	f := graphFake(t)
 	f.run("show", "plugin:o/r#e")
 	lines := strings.Split(strings.TrimSpace(f.out.String()), "\n")
-	if lines[len(lines)-1] != "add its source: ipm source add plugin:o/r#e" {
+	if lines[len(lines)-1] != "add its source: ipm marketplace add plugin:o/r#e" {
 		t.Errorf("output:\n%s", f.out.String())
 	}
 }
@@ -708,30 +708,49 @@ func TestShowJSON(t *testing.T) {
 
 func TestTreeAndGraphCommands(t *testing.T) {
 	f := graphFake(t)
-	if err := f.run("tree", "--up", "skill:o/r:p/skills/s1"); err != nil || !strings.HasPrefix(f.out.String(), "skill       s1\n└─ plugin      p") {
+	if err := f.run("show", "tree", "--up", "skill:o/r:p/skills/s1"); err != nil || !strings.HasPrefix(f.out.String(), "skill       s1\n└─ plugin      p") {
 		t.Errorf("tree --up: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("graph", "--format", "dot", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "digraph") {
+	if err := f.run("show", "graph", "--format", "dot", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "digraph") {
 		t.Errorf("graph dot: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("graph", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "flowchart LR") {
+	if err := f.run("show", "graph", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "flowchart LR") {
 		t.Errorf("graph default: %v\n%s", err, f.out.String())
 	}
 	var usage *UsageError
-	if err := f.run("graph", "--format", "svg", "plugin:o/r:p"); !errors.As(err, &usage) {
+	if err := f.run("show", "graph", "--format", "svg", "plugin:o/r:p"); !errors.As(err, &usage) {
 		t.Errorf("svg: %v", err)
 	}
-	if err := f.run("tree"); !errors.As(err, &usage) {
+	if err := f.run("show", "tree"); !errors.As(err, &usage) {
 		t.Errorf("no id: %v", err)
+	}
+}
+
+func TestShowTreeNeedsID(t *testing.T) {
+	f := graphFake(t)
+	err := f.run("show", "tree")
+	var usage *UsageError
+	if !errors.As(err, &usage) || !strings.Contains(err.Error(), "give one artifact ID") {
+		t.Errorf("show tree: %v", err)
+	}
+	if err := f.run("show", "tree", "--up"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "give one artifact ID") {
+		t.Errorf("show tree --up: %v", err)
+	}
+}
+
+func TestShowStillShows(t *testing.T) {
+	f := graphFake(t)
+	if err := f.run("show", "skill:o/r:p/skills/s1"); err != nil || !strings.Contains(f.out.String(), "description") {
+		t.Errorf("%v\n%s", err, f.out.String())
 	}
 }
 
 func TestShowWithoutCatalog(t *testing.T) {
 	f := newFake(checkout(t))
-	for _, cmd := range []string{"show", "tree", "graph"} {
-		if err := f.run(cmd, "skill:o/r:x"); err == nil || !strings.Contains(err.Error(), "ipm index") {
+	for _, cmd := range [][]string{{"show"}, {"show", "tree"}, {"show", "graph"}} {
+		if err := f.run(append(cmd, "skill:o/r:x")...); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 			t.Errorf("%s: %v", cmd, err)
 		}
 	}
@@ -739,13 +758,13 @@ func TestShowWithoutCatalog(t *testing.T) {
 
 func TestTreeDefaultDepth(t *testing.T) {
 	f := graphFake(t)
-	f.run("tree", "repo:o/r")
+	f.run("show", "tree", "repo:o/r")
 	// repo (0) → marketplace (1) → plugin p (2) → skill/hook (3): depth 3 shows s1
 	if !strings.Contains(f.out.String(), "skill       s1") {
 		t.Errorf("repo tree:\n%s", f.out.String())
 	}
 	f.out.Reset()
-	f.run("tree", "--depth", "1", "repo:o/r")
+	f.run("show", "tree", "--depth", "1", "repo:o/r")
 	if strings.Contains(f.out.String(), "plugin      p") {
 		t.Errorf("--depth 1 shows grandchildren:\n%s", f.out.String())
 	}
@@ -769,13 +788,13 @@ func TestServeRecreatesContainerWithStaleKey(t *testing.T) {
 	}))
 	defer srv.Close()
 	typesenseAt(f, srv)
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if callWith(f, "docker rm -f ipm-typesense") == "" || callWith(f, "docker run") == "" {
 		t.Errorf("calls %v", f.calls)
 	}
-	if strings.Contains(f.out.String(), "ipm load") {
+	if strings.Contains(f.out.String(), "ipm catalog rebuild") {
 		t.Errorf("a populated index needs no load hint:\n%s", f.out.String())
 	}
 }
@@ -815,7 +834,7 @@ func TestDoctorWarnsOnEmptyIndex(t *testing.T) {
 	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
 	typesenseAt(f, healthy(t, 0))
 	f.run("doctor")
-	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "ipm load") {
+	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "ipm catalog rebuild") {
 		t.Errorf("doctor:\n%s", f.out.String())
 	}
 }
@@ -916,38 +935,35 @@ func withSources(t *testing.T, f *fake, repos map[string]map[string]string) {
 
 func TestSourceAddListRemove(t *testing.T) {
 	f := newFake(checkout(t))
-	if err := f.run("source", "add", "obra/superpowers", "anthropics/skills@v1"); err != nil {
+	if err := f.run("marketplace", "add", "obra/superpowers", "anthropics/skills@v1"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(f.out.String(), "ipm sync") {
+	if !strings.Contains(f.out.String(), "ipm catalog sync") {
 		t.Errorf("add output:\n%s", f.out.String())
 	}
 	f.out.Reset()
-	f.run("source", "list")
+	f.run("marketplace", "--followed")
 	if !regexpMatch(`anthropics--skills\s+anthropics/skills\s+★ —\s+v1\s+not synced`, f.out.String()) || !strings.Contains(f.out.String(), "obra/superpowers") {
 		t.Errorf("list:\n%s", f.out.String())
 	}
-	if err := f.run("source", "remove", "obra/superpowers"); err != nil {
+	if err := f.run("marketplace", "remove", "obra/superpowers"); err != nil {
 		t.Fatal(err)
 	}
 	f.out.Reset()
-	f.run("source", "list")
+	f.run("marketplace", "--followed")
 	if strings.Contains(f.out.String(), "obra") {
 		t.Errorf("after remove:\n%s", f.out.String())
 	}
 	var usage *UsageError
-	if err := f.run("source", "frob"); !errors.As(err, &usage) {
+	if err := f.run("marketplace", "frob"); !errors.As(err, &usage) {
 		t.Errorf("unknown verb: %v", err)
-	}
-	if err := f.run("source"); !errors.As(err, &usage) {
-		t.Errorf("no verb: %v", err)
 	}
 }
 
 func TestSourceListShowsCommits(t *testing.T) {
 	f := newFake(checkout(t))
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/a/SKILL.md": "---\nname: a\n---\n"}})
-	f.run("source", "list")
+	f.run("marketplace", "--followed")
 	if !strings.Contains(f.out.String(), strings.Repeat("a", 7)) {
 		t.Errorf("list:\n%s", f.out.String())
 	}
@@ -957,14 +973,14 @@ func TestSourceAddPluginID(t *testing.T) {
 	f := newFake(checkout(t))
 	write(t, filepath.Join(f.env["IPM_CACHE_DIR"], "catalog", "plugins.jsonl"),
 		`{"id":"plugin:o/r#c","type":"plugin","name":"c","repo":"o/r","source_repo":"x/c"}`+"\n")
-	if err := f.run("source", "add", "plugin:o/r#c"); err != nil {
+	if err := f.run("marketplace", "add", "plugin:o/r#c"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := sources.Load(filepath.Join(f.env["IPM_HOME"], "sources"))
 	if len(got) != 1 || got[0].Repo != "x/c" {
 		t.Errorf("got %+v", got)
 	}
-	if err := f.run("source", "add", "plugin:o/r#nope"); err == nil || !strings.Contains(err.Error(), "plugin:o/r#nope") {
+	if err := f.run("marketplace", "add", "plugin:o/r#nope"); err == nil || !strings.Contains(err.Error(), "plugin:o/r#nope") {
 		t.Errorf("unknown plugin: %v", err)
 	}
 }
@@ -974,7 +990,7 @@ func TestSourceImport(t *testing.T) {
 	write(t, filepath.Join(root, "old", "manifest.toml"), "[[repo]]\nrepo = \"o/r\"\n\n[[repo]]\nrepo = \"x/y\"\nversion = \"v2\"\n")
 	write(t, filepath.Join(root, "old", "catalog", "github.jsonl"), `{"repo":"o/r","stars":5}`+"\n")
 	f := newFake(root)
-	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
+	if err := f.run("marketplace", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := sources.Load(filepath.Join(f.env["IPM_HOME"], "sources"))
@@ -991,7 +1007,7 @@ func TestSyncRunsPnpmThenIndexes(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {".claude-plugin/plugin.json": `{"name":"p"}`, "skills/one/SKILL.md": "---\nname: one\n---\n"}})
-	if err := f.run("sync"); err != nil {
+	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	home := f.env["IPM_HOME"]
@@ -1011,7 +1027,7 @@ func TestSyncUpgrade(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	f.run("sync", "--upgrade")
+	f.run("catalog", "sync", "--upgrade")
 	if !strings.HasPrefix(callWith(f, "pnpm update"), "pnpm update --latest --ignore-scripts") {
 		t.Errorf("calls %v", f.calls)
 	}
@@ -1026,7 +1042,7 @@ func TestSyncPnpmFailureKeepsCatalog(t *testing.T) {
 	write(t, cat, "old\n")
 	f.results["pnpm inst"] = result{"ERR_PNPM_FETCH_404 nope", errors.New("exit 1")}
 	var exit *ExitError
-	if err := f.run("sync"); !errors.As(err, &exit) || exit.Code != 1 {
+	if err := f.run("catalog", "sync"); !errors.As(err, &exit) || exit.Code != 1 {
 		t.Errorf("got %v", err)
 	}
 	if data, _ := os.ReadFile(cat); string(data) != "old\n" || !strings.Contains(f.out.String(), "ERR_PNPM_FETCH_404") {
@@ -1036,12 +1052,12 @@ func TestSyncPnpmFailureKeepsCatalog(t *testing.T) {
 
 func TestSyncNeedsPnpmAndSources(t *testing.T) {
 	f := newFake(checkout(t))
-	if err := f.run("sync"); err == nil || !strings.Contains(err.Error(), "pnpm") {
+	if err := f.run("catalog", "sync"); err == nil || !strings.Contains(err.Error(), "pnpm") {
 		t.Errorf("no pnpm: %v", err)
 	}
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
-	if err := f.run("sync"); err == nil || !strings.Contains(err.Error(), "ipm source add") {
+	if err := f.run("catalog", "sync"); err == nil || !strings.Contains(err.Error(), "ipm marketplace add") {
 		t.Errorf("no sources: %v", err)
 	}
 }
@@ -1049,7 +1065,7 @@ func TestSyncNeedsPnpmAndSources(t *testing.T) {
 func TestIndexNeedsSync(t *testing.T) {
 	f := newFake(checkout(t))
 	sources.Add(filepath.Join(f.env["IPM_HOME"], "sources"), []string{"o/r"})
-	if err := f.run("index"); err == nil || !strings.Contains(err.Error(), "ipm sync") {
+	if err := f.run("catalog", "rebuild"); err == nil || !strings.Contains(err.Error(), "ipm catalog sync") {
 		t.Errorf("got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(f.env["IPM_CACHE_DIR"], "catalog")); !os.IsNotExist(err) {
@@ -1060,13 +1076,13 @@ func TestIndexNeedsSync(t *testing.T) {
 func TestScanSources(t *testing.T) {
 	f := newFake(checkout(t))
 	withSources(t, f, map[string]map[string]string{"o/r": {".claude-plugin/plugin.json": "{}", "skills/one/SKILL.md": "x", "skills/two/SKILL.md": "x"}})
-	if err := f.run("scan", "--paths"); err != nil {
+	if err := f.run("catalog", "scan", "--paths"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if !strings.Contains(f.out.String(), "o/r") || !strings.Contains(f.out.String(), "1 (2)") || len(f.calls) != 0 {
 		t.Errorf("output:\n%s\ncalls %v", f.out.String(), f.calls)
 	}
-	if err := f.run("scan", "x/y"); err == nil || !strings.Contains(err.Error(), "ipm source add") {
+	if err := f.run("catalog", "scan", "x/y"); err == nil || !strings.Contains(err.Error(), "ipm marketplace add") {
 		t.Errorf("unknown: %v", err)
 	}
 }
@@ -1076,7 +1092,7 @@ func TestSyncWritesPnpmfile(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	if err := f.run("sync"); err != nil {
+	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(f.env["IPM_HOME"], "sources", ".pnpmfile.cjs"))
@@ -1093,7 +1109,7 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 	f.onPath["pnpm"], f.onPath["npx"] = true, true
 	f.results["pnpm --ve"] = result{"10.33.2\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	if err := f.run("sync"); err != nil {
+	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if !strings.HasPrefix(callWith(f, "npx "), "npx -y pnpm@12.10.1 install --no-frozen-lockfile --ignore-scripts") {
@@ -1103,7 +1119,7 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"10.33.2\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	if err := f.run("sync"); err == nil || !strings.Contains(err.Error(), "12") {
+	if err := f.run("catalog", "sync"); err == nil || !strings.Contains(err.Error(), "12") {
 		t.Errorf("old pnpm and no npx: %v", err)
 	}
 }
@@ -1111,13 +1127,13 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 func TestServeRemovesLegacyContainer(t *testing.T) {
 	f, _ := dockerFake(t, result{"Error: No such object", errors.New("exit 1")})
 	f.results["docker ps"] = result{"aihs-typesense\n", nil}
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if callWith(f, "docker rm -f aihs-typesense") == "" || callWith(f, "docker run -d --name ipm-typesense") == "" {
 		t.Errorf("calls %v", f.calls)
 	}
-	if !strings.Contains(f.out.String(), "ipm load") {
+	if !strings.Contains(f.out.String(), "ipm catalog rebuild") {
 		t.Errorf("output:\n%s", f.out.String())
 	}
 }
@@ -1141,10 +1157,10 @@ func TestSourceImportIsRepeatable(t *testing.T) {
 	root := checkout(t)
 	write(t, filepath.Join(root, "old", "manifest.toml"), "[[repo]]\nrepo = \"o/r\"\n")
 	f := newFake(root)
-	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
+	if err := f.run("marketplace", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil || !strings.Contains(f.out.String(), "already") {
+	if err := f.run("marketplace", "import", filepath.Join(root, "old", "manifest.toml")); err != nil || !strings.Contains(f.out.String(), "already") {
 		t.Errorf("second import: %v\n%s", err, f.out.String())
 	}
 }
@@ -1202,7 +1218,7 @@ func TestPackAddRefusesUnpickable(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "plugin:o/r:p") || !strings.Contains(err.Error(), "ipm pack add kit") {
 		t.Errorf("hook: %v", err)
 	}
-	if err := f.run("pack", "add", "kit", "repo:o/r"); err == nil || !strings.Contains(err.Error(), "ipm tree") {
+	if err := f.run("pack", "add", "kit", "repo:o/r"); err == nil || !strings.Contains(err.Error(), "ipm show tree") {
 		t.Errorf("repo: %v", err)
 	}
 }
@@ -1279,9 +1295,9 @@ func installFake(t *testing.T) (*fake, string) {
 	return f, root
 }
 
-func TestInstallBuildsPlugin(t *testing.T) {
+func TestPackBuildBuildsPlugin(t *testing.T) {
 	f, root := installFake(t)
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	ipm := filepath.Join(root, ".ipm")
@@ -1303,7 +1319,7 @@ func TestInstallBuildsPlugin(t *testing.T) {
 		t.Errorf("marketplace.json:\n%s", mp)
 	}
 	gi, _ := os.ReadFile(filepath.Join(ipm, ".gitignore"))
-	if string(gi) != "node_modules/\nplugins/\nplugins.tmp/\n" {
+	if string(gi) != "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n" {
 		t.Errorf(".gitignore %q", gi)
 	}
 	if got := callWith(f, "pnpm install"); !strings.Contains(got, "--dir "+ipm) {
@@ -1316,36 +1332,56 @@ func TestInstallBuildsPlugin(t *testing.T) {
 	if !strings.Contains(f.out.String(), "plugin:o/r#e is not pinned upstream") {
 		t.Errorf("want the unpinned warning:\n%s", f.out.String())
 	}
-	if !strings.Contains(f.out.String(), "claude plugin marketplace add "+ipm) || !strings.Contains(f.out.String(), "/plugin install kit@work-ipm") {
+	if !strings.Contains(f.out.String(), "claude plugin marketplace add "+ipm) || !strings.Contains(f.out.String(), "ipm install claude") {
 		t.Errorf("hints:\n%s", f.out.String())
 	}
 }
 
-func TestInstallKeepsPinsUnlessUpdate(t *testing.T) {
+func TestPackBuildWritesStamp(t *testing.T) {
 	f, root := installFake(t)
-	f.run("install")
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	scope, _ := currentScope(f.system(), false)
+	if _, err := os.Stat(filepath.Join(root, ".ipm", "build.stamp")); err != nil {
+		t.Fatal("missing build.stamp")
+	}
+	if !buildCurrent(f.system(), scope) {
+		t.Error("a fresh build must be current")
+	}
+	packs, _ := project.LoadPacks(root)
+	packs[0].Items = []string{"agent:o/r:p/agents/rev.md"}
+	project.SavePacks(root, packs)
+	if buildCurrent(f.system(), scope) {
+		t.Error("editing ipm.toml items must make the build stale")
+	}
+}
+
+func TestPackBuildKeepsPinsUnlessUpdate(t *testing.T) {
+	f, root := installFake(t)
+	f.run("pack", "build")
 	ipm := filepath.Join(root, ".ipm")
 	lock, _ := project.LoadLock(ipm)
 	s1 := lock["skill:o/r:p/skills/s1"]
 	s1.SHA = strings.Repeat("d", 40)
 	lock[s1.ID] = s1
 	project.SaveLock(ipm, lock)
-	f.run("install")
+	f.run("pack", "build")
 	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != strings.Repeat("d", 40) {
 		t.Errorf("install must keep the pin: %+v", l[s1.ID])
 	}
-	f.run("install", "--update")
+	f.run("pack", "build", "--update")
 	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1" {
 		t.Errorf("--update must re-pin: %+v", l[s1.ID])
 	}
 }
 
-func TestInstallFromLockWithoutCatalog(t *testing.T) {
+func TestPackBuildFromLockWithoutCatalog(t *testing.T) {
 	f, root := installFake(t)
-	f.run("install")
+	f.run("pack", "build")
 	os.RemoveAll(filepath.Join(cacheOf(root), "catalog"))
 	os.RemoveAll(filepath.Join(root, ".ipm", "plugins"))
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "agents", "reviewer.md")); err != nil {
@@ -1353,12 +1389,12 @@ func TestInstallFromLockWithoutCatalog(t *testing.T) {
 	}
 }
 
-func TestInstallUnknownItem(t *testing.T) {
+func TestPackBuildUnknownItem(t *testing.T) {
 	f, root := installFake(t)
 	packs, _ := project.LoadPacks(root)
 	packs[0].Items = append(packs[0].Items, "skill:gone")
 	project.SavePacks(root, packs)
-	if err := f.run("install"); err == nil || !strings.Contains(err.Error(), "skill:gone") {
+	if err := f.run("pack", "build"); err == nil || !strings.Contains(err.Error(), "skill:gone") {
 		t.Errorf("got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, ".ipm", "ipm.lock")); !os.IsNotExist(err) {
@@ -1366,9 +1402,9 @@ func TestInstallUnknownItem(t *testing.T) {
 	}
 }
 
-func TestInstallIsDeterministic(t *testing.T) {
+func TestPackBuildIsDeterministic(t *testing.T) {
 	f, root := installFake(t)
-	f.run("install")
+	f.run("pack", "build")
 	snap := func() map[string]string {
 		m := map[string]string{}
 		filepath.WalkDir(filepath.Join(root, ".ipm"), func(p string, d os.DirEntry, err error) error {
@@ -1383,22 +1419,22 @@ func TestInstallIsDeterministic(t *testing.T) {
 	first := snap()
 	packs, _ := project.LoadPacks(root)
 	project.SavePacks(root, packs)
-	f.run("install")
+	f.run("pack", "build")
 	if !reflect.DeepEqual(first, snap()) {
-		t.Error("a second install changed .ipm")
+		t.Error("a second build changed .ipm")
 	}
 	packs[0].Items = []string{"agent:o/r:p/agents/rev.md"}
 	project.SavePacks(root, packs)
-	f.run("install")
+	f.run("pack", "build")
 	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "skills")); !os.IsNotExist(err) {
 		t.Error("a removed item's files must go")
 	}
 }
 
-func TestInstallValidates(t *testing.T) {
+func TestPackBuildValidates(t *testing.T) {
 	f, root := installFake(t)
 	f.onPath["claude"] = true
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatal(err)
 	}
 	if callWith(f, "claude plugin validate --strict "+filepath.Join(root, ".ipm")) == "" {
@@ -1406,17 +1442,17 @@ func TestInstallValidates(t *testing.T) {
 	}
 	f.results["claude plug"] = result{"✘ Validation failed", errors.New("exit 1")}
 	var exit *ExitError
-	if err := f.run("install"); !errors.As(err, &exit) || !strings.Contains(f.out.String(), "Validation failed") {
+	if err := f.run("pack", "build"); !errors.As(err, &exit) || !strings.Contains(f.out.String(), "Validation failed") {
 		t.Errorf("got %v\n%s", err, f.out.String())
 	}
 }
 
-func TestInstallGlobal(t *testing.T) {
+func TestPackBuildGlobal(t *testing.T) {
 	f, _ := installFake(t)
 	f.run("pack", "-g", "new", "mine")
 	f.run("pack", "-g", "add", "mine", "agent:o/r:p/agents/rev.md")
 	write(t, filepath.Join(f.env["IPM_HOME"], "global", ".ipm", "node_modules", "o--r", "p", "agents", "rev.md"), "x")
-	if err := f.run("install", "-g"); err != nil {
+	if err := f.run("pack", "build", "-g"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	mp, _ := os.ReadFile(filepath.Join(f.env["IPM_HOME"], "global", ".ipm", ".claude-plugin", "marketplace.json"))
@@ -1425,9 +1461,9 @@ func TestInstallGlobal(t *testing.T) {
 	}
 }
 
-func TestInstallFailureKeepsPreviousBuild(t *testing.T) {
+func TestPackBuildFailureKeepsPreviousBuild(t *testing.T) {
 	f, root := installFake(t)
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatal(err)
 	}
 	lockBefore, _ := os.ReadFile(filepath.Join(root, ".ipm", "ipm.lock"))
@@ -1435,7 +1471,7 @@ func TestInstallFailureKeepsPreviousBuild(t *testing.T) {
 	packs, _ := project.LoadPacks(root)
 	packs[0].Description = "changed"
 	project.SavePacks(root, packs)
-	if err := f.run("install"); err == nil {
+	if err := f.run("pack", "build"); err == nil {
 		t.Fatal("want a failure")
 	}
 	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "agents", "reviewer.md")); err != nil {
@@ -1498,8 +1534,8 @@ func TestSearchUsesTheTerminalWidth(t *testing.T) {
 
 func TestCobraCommandLine(t *testing.T) {
 	f := newFake("")
-	err := f.run("instal")
-	if err == nil || !strings.Contains(err.Error(), "did you mean install?") {
+	err := f.run("pack", "buidl")
+	if err == nil || !strings.Contains(err.Error(), "did you mean build?") {
 		t.Errorf("want a suggestion, got %v", err)
 	}
 	f.out.Reset()
@@ -1532,9 +1568,9 @@ func TestPackGlobalFlagEitherSide(t *testing.T) {
 
 func TestCommandLineHints(t *testing.T) {
 	for args, want := range map[string]string{
-		"serach tdd":    "did you mean search?",
-		"pack ad kit":   "did you mean add?",
-		"sync -upgrade": "long flags take two dashes: --upgrade",
+		"serach tdd":            "did you mean search?",
+		"pack ad kit":           "did you mean add?",
+		"catalog sync -upgrade": "long flags take two dashes: --upgrade",
 	} {
 		err := newFake("").run(strings.Fields(args)...)
 		if err == nil || !strings.Contains(err.Error(), want) {
@@ -1642,7 +1678,7 @@ func TestTuiSearcherFallsBack(t *testing.T) {
 	f = newFake(root)
 	typesenseAt(f, srv)
 	s = newTuiSearcher(f.system(), nil, "")
-	if s.Mode() != "local" || s.Notice() != "search index empty — run `ipm load`" {
+	if s.Mode() != "local" || s.Notice() != "search index empty — run `ipm catalog rebuild`" {
 		t.Errorf("empty index: mode %q notice %q", s.Mode(), s.Notice())
 	}
 	docs = 3
@@ -1710,7 +1746,7 @@ func TestTuiNeedsTerminal(t *testing.T) {
 		t.Errorf("no terminal: %v", err)
 	}
 	f.width = 120
-	if err := f.run("tui"); err == nil || err.Error() != "no catalog — run `ipm sync`" {
+	if err := f.run("tui"); err == nil || err.Error() != "no catalog — run `ipm catalog sync`" {
 		t.Errorf("no catalog: %v", err)
 	}
 }
@@ -1756,9 +1792,9 @@ func TestTuiSearcherConcurrentFirstSearches(t *testing.T) {
 	}
 }
 
-// deployFake is installFake with claude on PATH and empty claude listings;
+// claudeFake is installFake with claude on PATH and empty claude listings;
 // it builds the project first so .ipm/ exists.
-func deployFake(t *testing.T) (*fake, string) {
+func claudeFake(t *testing.T) (*fake, string) {
 	t.Helper()
 	f, root := installFake(t)
 	f.onPath["claude"] = true
@@ -1766,7 +1802,7 @@ func deployFake(t *testing.T) (*fake, string) {
 		"claude plugin marketplace list --json": {"[]", nil},
 		"claude plugin list --json":             {"[]", nil},
 	}
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	f.calls, f.dirs = nil, nil
@@ -1793,9 +1829,9 @@ func cmdLines(cmds []claudeCmd) []string {
 }
 
 func TestPlanDeployFirstTime(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", claudeTarget{Scope: "project", Path: root})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope project",
 		root + " | claude plugin install kit@work-ipm --scope project",
@@ -1806,11 +1842,11 @@ func TestPlanDeployFirstTime(t *testing.T) {
 }
 
 func TestPlanDeployAgain(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
 	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", claudeTarget{Scope: "project", Path: root})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope project",
 		root + " | claude plugin marketplace update work-ipm",
@@ -1822,11 +1858,11 @@ func TestPlanDeployAgain(t *testing.T) {
 }
 
 func TestPlanDeployUserScope(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
 	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "user"})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", claudeTarget{Scope: "user"})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope user",
 		root + " | claude plugin marketplace update work-ipm",
@@ -1838,38 +1874,39 @@ func TestPlanDeployUserScope(t *testing.T) {
 }
 
 func TestPlanDeployUnreadableClaudeJSON(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	f.full["claude plugin list --json"] = result{"not json", nil}
-	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", claudeTarget{Scope: "project", Path: root})
 	if err == nil || !strings.Contains(err.Error(), "claude plugin list --json") {
 		t.Errorf("got %v", err)
 	}
 }
 
-func TestDeployTargetPathExpanded(t *testing.T) {
+func TestClaudeTargetPathExpanded(t *testing.T) {
 	home := t.TempDir()
 	os.MkdirAll(filepath.Join(home, "work"), 0o755)
 	os.WriteFile(filepath.Join(home, "file"), []byte("x"), 0o644)
-	got, err := cleanTarget(deployTarget{Scope: "project", Path: "~/work/"}, "/elsewhere", home)
+	got, err := cleanTarget(claudeTarget{Scope: "project", Path: "~/work/"}, "/elsewhere", home)
 	if err != nil || got.Path != filepath.Join(home, "work") {
 		t.Errorf("~ expansion: %+v %v", got, err)
 	}
-	if got, err := cleanTarget(deployTarget{Scope: "local", Path: "work"}, home, home); err != nil || got.Path != filepath.Join(home, "work") {
+	if got, err := cleanTarget(claudeTarget{Scope: "local", Path: "work"}, home, home); err != nil || got.Path != filepath.Join(home, "work") {
 		t.Errorf("relative path: %+v %v", got, err)
 	}
-	for _, bad := range []deployTarget{{Scope: "project", Path: "~/file"}, {Scope: "project", Path: "~/missing"}, {Scope: "team"}, {Scope: "project"}} {
+	for _, bad := range []claudeTarget{{Scope: "project", Path: "~/file"}, {Scope: "project", Path: "~/missing"}, {Scope: "team"}, {Scope: "project"}} {
 		if _, err := cleanTarget(bad, home, home); err == nil {
 			t.Errorf("%+v accepted", bad)
 		}
 	}
-	if got, err := cleanTarget(deployTarget{Scope: "user", Path: "~/work"}, home, home); err != nil || got.Path != "" {
+	if got, err := cleanTarget(claudeTarget{Scope: "user", Path: "~/work"}, home, home); err != nil || got.Path != "" {
 		t.Errorf("user scope keeps no path: %+v %v", got, err)
 	}
 }
 
-func TestRunDeployBuildsThenRuns(t *testing.T) {
-	f, root := deployFake(t)
-	if err := f.run("deploy", "kit"); err != nil {
+func TestInstallClaudeBuildsWhenStale(t *testing.T) {
+	f, root := claudeFake(t)
+	os.Remove(filepath.Join(root, ".ipm", project.StampFile))
+	if err := f.run("install", "claude", "kit"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	var order []string
@@ -1883,33 +1920,33 @@ func TestRunDeployBuildsThenRuns(t *testing.T) {
 		t.Errorf("order %v", order)
 	}
 	out := f.out.String()
-	if !strings.Contains(out, "$ claude plugin install kit@work-ipm --scope project") || !strings.Contains(out, "✓ deployed kit (project "+root+")") {
+	if !strings.Contains(out, "$ claude plugin install kit@work-ipm --scope project") || !strings.Contains(out, "✓ installed kit (project "+root+")") {
 		t.Errorf("output:\n%s", out)
 	}
 }
 
-func TestRunDeployStopsOnFailure(t *testing.T) {
-	f, root := deployFake(t)
+func TestInstallClaudeStopsOnFailure(t *testing.T) {
+	f, root := claudeFake(t)
 	f.full["claude plugin install kit@work-ipm --scope project"] = result{"boom", errors.New("exit status 1")}
-	err := f.run("deploy", "kit", "--path", root)
-	if err == nil || !strings.Contains(err.Error(), "claude plugin install kit@work-ipm") || strings.Contains(f.out.String(), "✓ deployed") {
+	err := f.run("install", "claude", "kit", "--path", root)
+	if err == nil || !strings.Contains(err.Error(), "claude plugin install kit@work-ipm") || strings.Contains(f.out.String(), "✓ installed") {
 		t.Errorf("err %v\n%s", err, f.out.String())
 	}
 }
 
-func TestDeployNeedsClaude(t *testing.T) {
-	f, _ := deployFake(t)
+func TestInstallClaudeNeedsClaude(t *testing.T) {
+	f, _ := claudeFake(t)
 	f.onPath["claude"] = false
-	if err := f.run("deploy", "kit"); err == nil || !strings.Contains(err.Error(), "claude") {
+	if err := f.run("install", "claude", "kit"); err == nil || !strings.Contains(err.Error(), "claude") {
 		t.Errorf("got %v", err)
 	}
 }
 
-func TestDeployPackRequired(t *testing.T) {
-	f, _ := deployFake(t)
+func TestInstallClaudePackRequired(t *testing.T) {
+	f, _ := claudeFake(t)
 	f.run("pack", "new", "second")
 	var usage *UsageError
-	if err := f.run("deploy"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "name a pack") {
+	if err := f.run("install", "claude"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "name a pack") {
 		t.Errorf("got %v", err)
 	}
 }
@@ -1952,7 +1989,7 @@ func TestTuiDeployerPlan(t *testing.T) {
 	if cleaned.Path != root {
 		t.Errorf("Plan should return the cleaned target: %+v", cleaned)
 	}
-	want := []string{"ipm install", "claude plugin marketplace add " + filepath.Join(root, ".ipm") + " --scope project", "claude plugin install kit@work-ipm --scope project"}
+	want := []string{"ipm pack build", "claude plugin marketplace add " + filepath.Join(root, ".ipm") + " --scope project", "claude plugin install kit@work-ipm --scope project"}
 	if err != nil || !reflect.DeepEqual(plan, want) {
 		t.Errorf("plan %v %v\nwant %v", plan, err, want)
 	}
@@ -1962,31 +1999,31 @@ func TestTuiDeployerPlan(t *testing.T) {
 	}
 }
 
-func TestDeployOutputSaysEachThingOnce(t *testing.T) {
-	f, root := deployFake(t)
+func TestInstallClaudeOutputSaysEachThingOnce(t *testing.T) {
+	f, root := claudeFake(t)
 	var out bytes.Buffer
 	if err := (tuiDeployer{sys: f.system(), scope: project.Scope{Root: root}}).Deploy(context.Background(), "kit", tui.Target{Scope: "project", Path: root}, &out); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
-	if strings.Contains(out.String(), "✓ deployed") || strings.Contains(out.String(), "Install in Claude Code") {
-		t.Errorf("the TUI shows its own result, and deploy installs it itself:\n%s", out.String())
+	if strings.Contains(out.String(), "✓ installed") || strings.Contains(out.String(), "Install in Claude Code") {
+		t.Errorf("the TUI shows its own result, and install claude installs it itself:\n%s", out.String())
 	}
 	f.out.Reset()
-	if err := f.run("deploy", "kit"); err != nil {
+	if err := f.run("install", "claude", "kit"); err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(f.out.String(), "✓ deployed kit"); n != 1 || strings.Contains(f.out.String(), "Install in Claude Code") {
-		t.Errorf("ipm deploy prints its result once (%d) and no install hints:\n%s", n, f.out.String())
+	if n := strings.Count(f.out.String(), "✓ installed kit"); n != 1 || strings.Contains(f.out.String(), "Install in Claude Code") {
+		t.Errorf("ipm install claude prints its result once (%d) and no install hints:\n%s", n, f.out.String())
 	}
 }
 
 func TestPlanDeployRefusesOtherProjectsMarketplace(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	other := filepath.Join(t.TempDir(), "work")
 	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", other), nil}
-	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", claudeTarget{Scope: "project", Path: root})
 	if err == nil || !strings.Contains(err.Error(), "work-ipm") || !strings.Contains(err.Error(), other) {
-		t.Errorf("a same-named marketplace from another folder must stop the deploy: %v", err)
+		t.Errorf("a same-named marketplace from another folder must stop the install: %v", err)
 	}
 }
 
@@ -2001,7 +2038,7 @@ func TestTuiDeployerPlanGlobal(t *testing.T) {
 	os.MkdirAll(filepath.Join(home, "global"), 0o755)
 	d := tuiDeployer{sys: f.system(), scope: project.Scope{Root: filepath.Join(home, "global"), Global: true}, global: true}
 	_, plan, err := d.Plan("kit", tui.Target{Scope: "user"})
-	if err != nil || len(plan) == 0 || plan[0] != "ipm install -g" {
+	if err != nil || len(plan) == 0 || plan[0] != "ipm pack build -g" {
 		t.Errorf("plan %v %v", plan, err)
 	}
 }
@@ -2029,7 +2066,7 @@ func TestSearchOldIndex(t *testing.T) {
 	t.Cleanup(srv.Close)
 	f := newFake(root)
 	typesenseAt(f, srv)
-	if err := f.run("search", "x"); err == nil || err.Error() != "the search index is from an older ipm — run ipm load" {
+	if err := f.run("search", "x"); err == nil || err.Error() != "the search index is from an older ipm — run `ipm catalog rebuild`" {
 		t.Errorf("got %v", err)
 	}
 }
@@ -2122,12 +2159,219 @@ func TestShowSourceHintOnlyWhenUnresolved(t *testing.T) {
 	}
 	f := newFake(root)
 	f.run("show", "plugin:a/m#cf")
-	if strings.Contains(f.out.String(), "ipm source add") {
+	if strings.Contains(f.out.String(), "ipm marketplace add") {
 		t.Errorf("b/s is already a source:\n%s", f.out.String())
 	}
 	f.out.Reset()
 	f.run("show", "plugin:a/m#other")
-	if !strings.Contains(f.out.String(), "ipm source add plugin:a/m#other") {
+	if !strings.Contains(f.out.String(), "ipm marketplace add plugin:a/m#other") {
 		t.Errorf("c/x isn't a source:\n%s", f.out.String())
+	}
+}
+
+// upServer is a Typesense stand-in that is healthy and records imports.
+func upServer(t *testing.T, f *fake, rec *tsRecorder) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"ok":true}`)
+			return
+		}
+		rec.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	typesenseAt(f, srv)
+}
+
+func syncFake(t *testing.T) *fake {
+	t.Helper()
+	f := newFake(checkout(t))
+	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "---\nname: one\n---\n"}})
+	return f
+}
+
+func TestCatalogSyncLoadsWhenServerUp(t *testing.T) {
+	f := syncFake(t)
+	f.onPath["docker"] = true
+	f.results["docker info"] = result{"ok", nil}
+	write(t, filepath.Join(f.env["IPM_CACHE_DIR"], "typesense", "api-key"), "k")
+	rec := &tsRecorder{}
+	upServer(t, f, rec)
+	if err := f.run("catalog", "sync"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if callWith(f, "pnpm install") == "" {
+		t.Errorf("pnpm not called: %v", f.calls)
+	}
+	if data, _ := os.ReadFile(filepath.Join(f.env["IPM_CACHE_DIR"], "catalog", "skills.jsonl")); !strings.Contains(string(data), "skill:o/r:skills/one") {
+		t.Errorf("catalog %q", data)
+	}
+	if !slices.Contains(rec.requests, "POST /collections/artifacts/documents/import") || len(rec.batches) == 0 {
+		t.Errorf("documents not imported: %v", rec.requests)
+	}
+}
+
+func TestCatalogSyncWithoutDocker(t *testing.T) {
+	f := syncFake(t)
+	if err := f.run("catalog", "sync"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if !strings.Contains(f.out.String(), "ipm catalog serve") || !strings.Contains(f.out.String(), "ipm catalog rebuild") {
+		t.Errorf("want the serve hint:\n%s", f.out.String())
+	}
+}
+
+func TestCatalogRebuild(t *testing.T) {
+	f := syncFake(t)
+	if err := f.run("catalog", "rebuild"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if !strings.Contains(f.out.String(), "catalog: ") || !strings.Contains(f.out.String(), "ipm catalog serve") {
+		t.Errorf("without a server:\n%s", f.out.String())
+	}
+	g := syncFake(t)
+	g.onPath["docker"] = true
+	g.results["docker info"] = result{"ok", nil}
+	write(t, filepath.Join(g.env["IPM_CACHE_DIR"], "typesense", "api-key"), "k")
+	rec := &tsRecorder{}
+	upServer(t, g, rec)
+	if err := g.run("catalog", "rebuild"); err != nil {
+		t.Fatalf("%v\n%s", err, g.out.String())
+	}
+	if len(rec.batches) == 0 || strings.Contains(g.out.String(), "search not loaded") {
+		t.Errorf("want index then load:\n%s", g.out.String())
+	}
+}
+
+func TestCatalogSummary(t *testing.T) {
+	f := syncFake(t)
+	if _, err := sources.Add(filepath.Join(f.env["IPM_HOME"], "sources"), []string{"x/y"}); err != nil {
+		t.Fatal(err)
+	}
+	cat := filepath.Join(f.env["IPM_CACHE_DIR"], "catalog")
+	write(t, filepath.Join(cat, catalog.Files[catalog.TypeSkill]), "{}\n{}\n{}\n")
+	write(t, filepath.Join(cat, catalog.Files[catalog.TypeAgent]), "{}\n")
+	write(t, filepath.Join(cat, catalog.Files[catalog.TypeRepo]), "")
+	if err := f.run("catalog"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	out := f.out.String()
+	for _, want := range []string{`(?m)^sources\s+2 followed, 1 synced$`, `(?m)^items\s+skill 3 · agent 1$`, `(?m)^last index\s+\d{4}-\d\d-\d\d`, `(?m)^search\s+\S`} {
+		if !regexpMatch(want, out) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	// A fresh home has never been indexed.
+	g := newFake(checkout(t))
+	if err := g.run("catalog"); err != nil || !strings.Contains(g.out.String(), "never — run `ipm catalog sync`") {
+		t.Errorf("%v\n%s", err, g.out.String())
+	}
+}
+
+func TestCatalogUnknownWord(t *testing.T) {
+	var usage *UsageError
+	err := newFake(checkout(t)).run("catalog", "bogus")
+	if !errors.As(err, &usage) || !strings.Contains(err.Error(), "sync, rebuild, serve, scan, search") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestTopLevelSearchMatchesCatalogSearch(t *testing.T) {
+	run := func(args ...string) string {
+		f, _ := searchFake(t, 0)
+		if err := f.run(args...); err != nil {
+			t.Fatal(err)
+		}
+		return f.out.String()
+	}
+	a, b := run("search", "x"), run("catalog", "search", "x")
+	if a == "" || a != b {
+		t.Errorf("top level:\n%s\ncatalog:\n%s", a, b)
+	}
+}
+
+func TestRootHelpGroups(t *testing.T) {
+	f := newFake("")
+	if err := f.run("-h"); err != nil {
+		t.Fatal(err)
+	}
+	out := f.out.String()
+	titles := []string{
+		"Workflow: onboard → marketplace → catalog → search → pack → install",
+		"Getting started:",
+		"Marketplace — curated repos you can follow:",
+		"Catalog — the repos you follow, fetched and searchable:",
+		"Packs — your picks, built and installed:",
+		"Tools:",
+	}
+	at := -1
+	for _, title := range titles {
+		i := strings.Index(out, title)
+		if i < 0 || i < at {
+			t.Fatalf("%q missing or out of order:\n%s", title, out)
+		}
+		at = i
+	}
+	section := func(from, to string) string {
+		a := strings.Index(out, from)
+		b := len(out)
+		if to != "" {
+			b = strings.Index(out, to)
+		}
+		return out[a:b]
+	}
+	for _, c := range []struct {
+		from, to string
+		names    []string
+	}{
+		{titles[1], titles[2], []string{"onboard"}},
+		{titles[2], titles[3], []string{"marketplace"}},
+		{titles[3], titles[4], []string{"catalog", "search", "show"}},
+		{titles[4], titles[5], []string{"pack", "install"}},
+		{titles[5], "", []string{"tui", "doctor", "uninstall", "version", "completion", "help"}},
+	} {
+		sec := section(c.from, c.to)
+		last := -1
+		for _, n := range c.names {
+			i := strings.Index(sec, "\n  "+n+" ")
+			if i < 0 {
+				t.Errorf("%q lacks %s:\n%s", c.from, n, sec)
+			} else if i < last {
+				t.Errorf("%q lists %s out of order:\n%s", c.from, n, sec)
+			}
+			last = i
+		}
+	}
+	for _, gone := range []string{"source", "stats", "sync", "index", "load", "serve", "scan", "tree", "graph", "deploy"} {
+		if strings.Contains(out, "\n  "+gone+" ") {
+			t.Errorf("help lists removed %s:\n%s", gone, out)
+		}
+	}
+}
+
+func TestRenamedCommands(t *testing.T) {
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"deploy", "--scope", "user", "kit"}, "ipm deploy was renamed: use ipm install claude"},
+		{[]string{"source", "list"}, "use ipm marketplace"},
+		{[]string{"stats"}, "ipm marketplace stats"},
+		{[]string{"sync", "--upgrade"}, "ipm catalog sync"},
+		{[]string{"index"}, "ipm catalog rebuild"},
+		{[]string{"load"}, "ipm catalog rebuild"},
+		{[]string{"serve"}, "ipm catalog serve"},
+		{[]string{"scan"}, "ipm catalog scan"},
+		{[]string{"tree", "x"}, "ipm show tree"},
+		{[]string{"graph", "x"}, "ipm show graph"},
+	} {
+		f := newFake("")
+		err := f.run(c.args...)
+		var usage *UsageError
+		if !errors.As(err, &usage) || !strings.Contains(err.Error(), c.want) {
+			t.Errorf("%v: err = %v, want a usage error with %q", c.args, err, c.want)
+		}
 	}
 }

@@ -23,7 +23,7 @@ import (
 )
 
 // DefaultURL is the curated list ipm onboard offers unless told otherwise,
-// and the one ipm source list groups by: this repo's source-packs.toml, the
+// and the one ipm marketplace groups by: this repo's source-packs.toml, the
 // repos of thinkjones/agentic-tools's starred_repos.toml that hold
 // something ipm can catalog (see internal/sourcepacks).
 const DefaultURL = "https://raw.githubusercontent.com/thinkjones/intelligent-package-manager/main/source-packs.toml"

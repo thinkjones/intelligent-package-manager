@@ -31,11 +31,12 @@ func newShowCmd(sys System) *cobra.Command {
 	var asJSON bool
 	cmd := &cobra.Command{
 		Use:   "show <id>",
-		Short: "an artifact's fields, GitHub stats and neighbours (reads the catalog, no search server)",
+		Short: "an item's fields and neighbours (tree, graph)",
 		Args:  exactArgs(1, "one artifact ID (find IDs with `ipm search`)"),
 		RunE:  func(_ *cobra.Command, args []string) error { return runShow(sys, args[0], asJSON) },
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "print the catalog record as JSON")
+	cmd.AddCommand(newTreeCmd(sys), newGraphCmd(sys))
 	return cmd
 }
 
@@ -111,7 +112,7 @@ func runShow(sys System, id string, asJSON bool) error {
 		}
 	}
 	if _, resolved := g.RefTarget(id); g.External(id) && !resolved {
-		fmt.Fprintf(sys.Stdout, "\nadd its source: ipm source add %s\n", id)
+		fmt.Fprintf(sys.Stdout, "\nadd its source: ipm marketplace add %s\n", id)
 	}
 	return nil
 }
@@ -130,7 +131,7 @@ func newTreeCmd(sys System) *cobra.Command {
 	var o catgraph.Options
 	cmd := &cobra.Command{
 		Use:   "tree <id>",
-		Short: "an artifact's relationships as a tree (reads the catalog, no search server)",
+		Short: "an artifact's relationships as a tree",
 		Args:  exactArgs(1, "one artifact ID (find IDs with `ipm search`)"),
 		RunE: func(_ *cobra.Command, args []string) error {
 			id := args[0]
@@ -158,7 +159,7 @@ func newGraphCmd(sys System) *cobra.Command {
 	var format string
 	cmd := &cobra.Command{
 		Use:   "graph <id>",
-		Short: "an artifact's neighbourhood as Mermaid or Graphviz (reads the catalog, no search server)",
+		Short: "an artifact's neighbourhood as Mermaid or Graphviz",
 		Args:  exactArgs(1, "one artifact ID (find IDs with `ipm search`)"),
 		RunE: func(_ *cobra.Command, args []string) error {
 			if format != "mermaid" && format != "dot" {

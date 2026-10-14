@@ -16,13 +16,13 @@ Find artifacts across all your sources, see where they come from, and get their 
 ## Start the search server
 
 ```bash
-ipm serve       # Typesense in Docker: container ipm-typesense on 127.0.0.1:8108
-ipm load        # index the catalog
+ipm catalog serve     # Typesense in Docker: container ipm-typesense on 127.0.0.1:8108
+ipm catalog rebuild   # rebuild the catalog and index it for search
 ```
 
-Run `ipm load` again after every `ipm sync` or `ipm stats`; it rebuilds the index from the catalog in a few seconds. `ipm serve --stop` stops the server and keeps its data.
+`ipm catalog sync` and `ipm catalog rebuild` reload the index themselves whenever the server is up, so it stays current; run `ipm catalog rebuild` after `ipm marketplace stats` to refresh the stars. Loading rebuilds the index from the catalog in a few seconds. `ipm catalog serve --stop` stops the server and keeps its data.
 
-The first `ipm load` also has Typesense download its small embedding model, which takes a minute. Embeddings are computed locally; nothing leaves your machine.
+The first load also has Typesense download its small embedding model, which takes a minute. Embeddings are computed locally; nothing leaves your machine.
 
 ## Search
 
@@ -50,7 +50,7 @@ The table fits your terminal. When it is too narrow, DESCRIPTION goes first, the
 
 Search is **hybrid**: keyword matches are fused with semantic matches. Names count most, then repo names and the names of owning plugins, then descriptions and tags, so `cloudflare` puts `cloudflare/skills`' artifacts first. Results that are otherwise equal go to the repo more other repos use (the `↗` column), then to more stars. Names split on `/`, `-` and `_`, so `tdd` finds `tdd-guard`; `c#` and `c++` are searchable as words.
 
-After upgrading `ipm`, run `ipm load` once: the index gains the fields this ranking uses.
+After upgrading `ipm`, run `ipm catalog rebuild` once: the index gains the fields this ranking uses.
 
 **SCORE** shows how each hit ranks against the best hit in the same query (100). It is not comparable between queries. SEM, with `--explain`, is comparable: it is the semantic similarity between your query and the artifact, from 0 to 1.
 
@@ -58,7 +58,7 @@ In hybrid mode `--all` returns the keyword matches plus about 100 nearest semant
 
 ## Get IDs
 
-Each hit's ID is on the line under it, indented under TYPE and never shortened, so you can copy it into `ipm show`, `ipm tree`, `ipm graph` or `ipm pack add`:
+Each hit's ID is on the line under it, indented under TYPE and never shortened, so you can copy it into `ipm show`, `ipm show tree`, `ipm show graph` or `ipm pack add`:
 
 ```text
 $ ipm search "c# testing" --limit 1
@@ -86,11 +86,11 @@ ipm show 'skill:obra/superpowers:skills/test-driven-development' --json
 ## See relationships
 
 ```bash
-ipm tree 'repo:obra/superpowers'                     # what it contains
-ipm tree 'repo:wshobson/agents' --depth 2 --all      # two levels, every child
-ipm tree 'skill:obra/superpowers:skills/test-driven-development' --up   # what contains it
-ipm graph 'repo:obra/superpowers'                    # Mermaid
-ipm graph 'repo:obra/superpowers' --format dot | dot -Tsvg > superpowers.svg
+ipm show tree 'repo:obra/superpowers'                     # what it contains
+ipm show tree 'repo:wshobson/agents' --depth 2 --all      # two levels, every child
+ipm show tree 'skill:obra/superpowers:skills/test-driven-development' --up   # what contains it
+ipm show graph 'repo:obra/superpowers'                    # Mermaid
+ipm show graph 'repo:obra/superpowers' --format dot | dot -Tsvg > superpowers.svg
 ```
 
 Repos contain marketplaces, marketplaces list plugins, and plugins own skills, agents, commands, hooks and MCP servers. A repo is the root of everything in it, so `--up` from a skill stops at its repo. Which other repos' marketplaces list it shows under `used by:` in `ipm show`, and under `e` in the TUI.

@@ -90,7 +90,7 @@ type Packs interface {
 	Remove(pack string, ids ...string) error
 }
 
-// Installer builds every pack, as ipm install does, writing its output to out.
+// Installer builds every pack, as ipm pack build does, writing its output to out.
 type Installer interface {
 	Install(ctx context.Context, out io.Writer) error
 }

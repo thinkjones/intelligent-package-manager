@@ -16,17 +16,17 @@ Choose the repos `ipm` follows, fetch and pin them, and keep them current.
 ## Add sources
 
 ```bash
-ipm source add obra/superpowers                  # a GitHub repo, default branch
-ipm source add anthropics/skills@main            # at a branch, tag or commit
-ipm source add https://gitlab.com/me/skills.git#v1
-ipm source add 'plugin:anthropics/claude-plugins-official#stripe'   # the repo an external plugin lives in
+ipm marketplace add obra/superpowers                  # a GitHub repo, default branch
+ipm marketplace add anthropics/skills@main            # at a branch, tag or commit
+ipm marketplace add https://gitlab.com/me/skills.git#v1
+ipm marketplace add 'plugin:anthropics/claude-plugins-official#stripe'   # the repo an external plugin lives in
 ```
 
 A source is `owner/repo[@ref]` for GitHub, or a git URL (`https://…`, `ssh://…`, `file://…`, `git@…`) with an optional `#ref`. Without a ref, a source follows the repo's default branch.
 
 An external plugin ID adds the repo that plugin lives in. It only works once the plugin is in your catalog, because some other source's marketplace lists it; find such plugins with `ipm search --type plugin`.
 
-`ipm source add`, `remove` and `import` only edit your source list. Run `ipm sync` afterwards.
+`ipm marketplace add`, `remove` and `import` only edit your source list. Run `ipm catalog sync` afterwards.
 
 ## Curated lists
 
@@ -59,17 +59,17 @@ A list fetched from a URL is cached under the cache folder's `curated/`. When th
 ## Sync
 
 ```bash
-ipm sync
+ipm catalog sync
 ```
 
-`ipm sync` prints the pnpm command it runs, then has pnpm fetch every source and pin it to a commit, and finally rebuilds the catalog. Later syncs keep the pinned commits, so the catalog doesn't change unless you ask it to.
+`ipm catalog sync` prints the pnpm command it runs, then has pnpm fetch every source and pin it to a commit, and finally rebuilds the catalog. Later syncs keep the pinned commits, so the catalog doesn't change unless you ask it to.
 
 If pnpm fails, its output is shown, `ipm` exits 1, and your catalog is left as it was.
 
 ## Upgrade
 
 ```bash
-ipm sync --upgrade
+ipm catalog sync --upgrade
 ```
 
 `--upgrade` moves every source to the latest commit of its branch or tag, then rebuilds the catalog. A source pinned to a commit stays there.
@@ -79,12 +79,13 @@ Packs you have already built keep their own pins; see [Keep it current](build-a-
 ## List and remove
 
 ```bash
-ipm source list                   # your sources, grouped
-ipm source remove anthropics/skills
-ipm sync
+ipm marketplace                              # the curated repos, ✓ on the ones you follow
+ipm marketplace --followed                   # your sources, grouped
+ipm marketplace remove anthropics/skills
+ipm catalog sync
 ```
 
-`ipm source list` groups your sources by the list each belongs to in the default [curated list](#curated-lists), and shows what is known about each:
+`ipm marketplace` on its own lists the curated repos by list, with a `✓` on the ones you follow, then any followed repo no list holds under `Other`; `--list` picks another curated list, `--lists NAME` shows only one list, and `--followed` shows what follows. `ipm marketplace --followed` groups your sources by the list each belongs to in the default [curated list](#curated-lists), and shows what is known about each:
 
 ```text
 AI · Agentic Engineering Methods (1)
@@ -98,37 +99,37 @@ Other (1)
 2 source(s) in ~/Library/ipm/sources
 ```
 
-Each row is the alias, the repo, its stars, the ref it follows (`—` for the default branch) and the pinned commit. A repo in several lists appears under the first. Sources in no list come last, under `Other`. Stars, description and topics come from the curated list, or from `ipm stats` for a source that isn't in it; the homepage comes from the curated list only. In a terminal, long lines are cut to its width.
+Each row is the alias, the repo, its stars, the ref it follows (`—` for the default branch) and the pinned commit. A repo in several lists appears under the first. Sources in no list come last, under `Other`. Stars, description and topics come from the curated list, or from `ipm marketplace stats` for a source that isn't in it; the homepage comes from the curated list only. In a terminal, long lines are cut to its width.
 
-The curated list is the copy `ipm onboard` saved; `ipm source list` fetches it when there is no copy or the copy is over a week old. With no copy and no network, every source is under `Sources` and a last line says `not grouped: no copy of the source packs yet`.
+The curated list is the copy `ipm onboard` saved; `ipm marketplace --followed` fetches it when there is no copy or the copy is over a week old. With no copy and no network, every source is under `Sources` and a last line says `not grouped: no copy of the source packs yet`.
 
-`list` shows `not synced` for a source added since the last sync.
+`--followed` shows `not synced` for a source added since the last sync.
 
 ## See what a source holds
 
 ```bash
-ipm scan                          # every source: commit, plugins, marketplaces, skills/hooks/agents folders
-ipm scan obra/superpowers --paths # one source, listing every folder found
-ipm tree 'repo:obra/superpowers'  # the catalog's view: marketplaces, plugins and what they own
+ipm catalog scan                          # every source: commit, plugins, marketplaces, skills/hooks/agents folders
+ipm catalog scan obra/superpowers --paths # one source, listing every folder found
+ipm show tree 'repo:obra/superpowers'  # the catalog's view: marketplaces, plugins and what they own
 ```
 
 ## GitHub stats
 
 ```bash
 gh auth login        # once
-ipm stats
-ipm load             # refresh search so results rank by the new stars
+ipm marketplace stats
+ipm catalog rebuild             # refresh search so results rank by the new stars
 ```
 
-`ipm stats` fetches stars, forks, topics, licence, description and last push for every repo in the catalog through `gh`. Stats are kept apart from the catalog, so `ipm sync` doesn't refetch them.
+`ipm marketplace stats` fetches stars, forks, topics, licence, description and last push for every repo in the catalog through `gh`. Stats are kept apart from the catalog, so `ipm catalog sync` doesn't refetch them.
 
 ## Coming from aihs
 
 `ipm` used to be called `aihs`. To bring across an aihs-era list of repos once:
 
 ```bash
-ipm source import path/to/old/checkout/manifest.toml
-ipm sync
+ipm marketplace import path/to/old/checkout/manifest.toml
+ipm catalog sync
 ```
 
 It adds each `[[repo]]` entry (a `version` becomes the ref) and copies the old `catalog/github.jsonl` into your cache, so stats needn't be refetched.

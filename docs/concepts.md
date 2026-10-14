@@ -9,20 +9,20 @@ nav_order: 3
 The handful of ideas `ipm` is built on.
 {: .fs-6 .fw-300 }
 
-![How ipm works: source add lists the repos you follow; sync has pnpm fetch and pin each repo and ipm catalogs it; search finds artifacts on your machine; pack add picks items; install builds one validated plugin per pack.](assets/brand/workflow.svg)
+![How ipm works: marketplace lists the repos you follow; catalog sync has pnpm fetch and pin each repo and ipm catalogs it; search finds artifacts on your machine; pack add picks items; install builds one validated plugin per pack and installs it.](assets/brand/workflow.svg)
 
 1. TOC
 {:toc}
 
 ## Sources
 
-A **source** is a repo of interest: a GitHub `owner/repo`, or any git URL, optionally at a tag, branch or commit. Your sources are personal: one list per user, kept in your ipm home and usable from any project.
+A **source** is a repo of interest: a GitHub `owner/repo`, or any git URL, optionally at a tag, branch or commit. Your sources are personal: one list per user, kept in your ipm home and usable from any project. The **marketplace** is the curated list of repos worth following (`ipm marketplace` shows it, with a check mark on the ones you follow); following a repo from it, or any other, makes it a source.
 
-Under the hood your sources are a single pnpm project with one git dependency per repo. `ipm source add` edits it; `ipm sync` has pnpm fetch every repo and pin it to a commit in `pnpm-lock.yaml`. Later syncs keep those commits until you run `ipm sync --upgrade`. See the [sources guide](guides/sources.md).
+Under the hood your sources are a single pnpm project with one git dependency per repo. `ipm marketplace add` edits it; `ipm catalog sync` has pnpm fetch every repo and pin it to a commit in `pnpm-lock.yaml`. Later syncs keep those commits until you run `ipm catalog sync --upgrade`. See the [sources guide](guides/sources.md).
 
 ## The catalog
 
-`ipm sync` ends by building the **catalog**: one record for every artifact in your sources, with the commit it came from and links to what owns it.
+`ipm catalog sync` ends by building the **catalog**: one record for every artifact in your sources, with the commit it came from and links to what owns it.
 
 | Type | What it is |
 | --- | --- |
@@ -36,7 +36,7 @@ Under the hood your sources are a single pnpm project with one git dependency pe
 | `hook` | A `hooks.json` hook |
 | `mcp` | An MCP server |
 
-The catalog is rebuilt from the pinned commits, so the same pins always give the same catalog. It lives in your cache folder and can be deleted at any time; `ipm index` rebuilds it.
+The catalog is rebuilt from the pinned commits, so the same pins always give the same catalog. It lives in your cache folder and can be deleted at any time; `ipm catalog rebuild` rebuilds it.
 
 ## Repos are roots; references are extra
 
@@ -56,7 +56,7 @@ IDs carry no commit, so they survive syncs and upgrades. `ipm search` prints the
 
 ## Search
 
-`ipm serve` runs [Typesense](https://typesense.org) in Docker on `127.0.0.1:8108`, and `ipm load` indexes the catalog into it. `ipm search` combines keyword matching on names, descriptions and tags with semantic matching on an embedding Typesense computes locally, so "c# testing" finds a ".NET test patterns" skill. Nothing leaves your machine. See [Search and explore](guides/search.md).
+`ipm catalog serve` runs [Typesense](https://typesense.org) in Docker on `127.0.0.1:8108`, and `ipm catalog rebuild` (or `ipm catalog sync`) indexes the catalog into it. `ipm search` combines keyword matching on names, descriptions and tags with semantic matching on an embedding Typesense computes locally, so "c# testing" finds a ".NET test patterns" skill. Nothing leaves your machine. See [Search and explore](guides/search.md).
 
 ## Packs
 
@@ -72,7 +72,7 @@ items = [
 ]
 ```
 
-`ipm install` builds every pack into a Claude Code plugin of the same name:
+`ipm pack build` builds every pack into a Claude Code plugin of the same name, and `ipm install claude` builds when needed and installs a pack into Claude Code:
 
 - **Skills, agents and file-based commands** are placed in the pack's plugin, so they load as `<pack>:<item>`.
 - **Copilot plugins** contribute their skills.
@@ -88,7 +88,7 @@ Packs live in a **scope**:
 
 ## Pins and the lock
 
-`ipm install` resolves every picked item to a repo, path and commit and records it in `.ipm/ipm.lock`. Later installs reuse those pins, so the plugin doesn't change under you when your sources move. `ipm install --update` re-pins everything to the commits in your current catalog.
+`ipm pack build` resolves every picked item to a repo, path and commit and records it in `.ipm/ipm.lock`. Later builds reuse those pins, so the plugin doesn't change under you when your sources move. `ipm pack build --update` (or `ipm install claude --update`) re-pins everything to the commits in your current catalog.
 
 Because the lock and pnpm's pins are committed, anyone with `ipm` can rebuild the same plugin from your project without your sources or catalog. See [Share packs with a team](guides/teams.md).
 
@@ -96,4 +96,4 @@ Because the lock and pnpm's pins are committed, anyone with `ipm` can rebuild th
 
 - **Run upstream code.** pnpm runs with `--ignore-scripts`, and sources' npm dependencies are never installed.
 - **Modify upstream repos.** Picked files are hard-linked (or copied) from pnpm's fetched copy.
-- **Install into Claude Code on its own.** Building writes only `.ipm/`; `ipm deploy` (or `D` in the TUI) installs a pack, at the scope you choose, only when you ask.
+- **Install into Claude Code on its own.** Building writes only `.ipm/`; `ipm install claude` (or `D` in the TUI) installs a pack, at the scope you choose, only when you ask. Each install is recorded (in the pack's `[[packs.<name>.installs]]` table in `ipm.toml`, or in `$IPM_HOME/installs.json` for user-scope packs), and a bare `ipm install` replays them.

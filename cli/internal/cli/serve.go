@@ -44,7 +44,7 @@ func apiKey(dir string, create bool) (string, error) {
 		return "", err
 	}
 	if !create {
-		return "", fmt.Errorf("no search server set up — run `ipm serve`")
+		return "", fmt.Errorf("no search server set up — run `ipm catalog serve`")
 	}
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
@@ -74,15 +74,15 @@ func tsClient(sys System) (*typesense.Client, error) {
 func tsError(err error) error {
 	switch {
 	case errors.Is(err, typesense.ErrMissingField):
-		return errors.New("the search index is from an older ipm — run ipm load")
+		return errors.New("the search index is from an older ipm — run `ipm catalog rebuild`")
 	case errors.Is(err, typesense.ErrUnreachable):
-		return fmt.Errorf("the search server is not running — run `ipm serve`")
+		return fmt.Errorf("the search server is not running — run `ipm catalog serve`")
 	case errors.Is(err, typesense.ErrUnauthorized):
 		return fmt.Errorf("the search server rejected the API key — another Typesense may be using port 8108 (check `docker ps`)")
 	case errors.Is(err, typesense.ErrTimeout):
 		return fmt.Errorf("the search server did not answer in time — it may still be busy (see `docker logs %s`)", tsContainer)
 	case errors.Is(err, typesense.ErrNoCollection):
-		return fmt.Errorf("the search index is empty — run `ipm load`")
+		return fmt.Errorf("the search index is empty — run `ipm catalog rebuild`")
 	}
 	return err
 }
@@ -101,7 +101,7 @@ func newServeCmd(sys System) *cobra.Command {
 
 func dockerReady(sys System) error {
 	if _, err := sys.LookPath("docker"); err != nil {
-		return fmt.Errorf("ipm serve runs Typesense in Docker — install Docker (or OrbStack) first")
+		return fmt.Errorf("ipm catalog serve runs Typesense in Docker — install Docker (or OrbStack) first")
 	}
 	if out, err := sys.Output("", "docker", "info", "--format", "{{.ServerVersion}}"); err != nil {
 		return fmt.Errorf("Docker is not running — start it, then rerun: %s", strings.TrimSpace(out))
@@ -131,7 +131,7 @@ func runServe(sys System, stop bool) error {
 		return err
 	}
 	if out, _ := sys.Output("", "docker", "ps", "-a", "--filter", "name=^"+legacyContainer+"$", "--format", "{{.Names}}"); strings.TrimSpace(out) == legacyContainer {
-		fmt.Fprintf(sys.Stdout, "%s removing the old %s container (ipm was called aihs); run `ipm load` after this\n", warn, legacyContainer)
+		fmt.Fprintf(sys.Stdout, "%s removing the old %s container (ipm was called aihs); run `ipm catalog rebuild` after this\n", warn, legacyContainer)
 		if out, err := sys.Output("", "docker", "rm", "-f", legacyContainer); err != nil {
 			return fmt.Errorf("docker rm %s: %v: %s", legacyContainer, err, strings.TrimSpace(out))
 		}
@@ -175,7 +175,7 @@ func runServe(sys System, stop bool) error {
 	}
 	fmt.Fprintf(sys.Stdout, "%s Typesense running at %s (container %s)\n", ok, tsURL, tsContainer)
 	if n == 0 {
-		fmt.Fprintln(sys.Stdout, "Next: ipm load")
+		fmt.Fprintln(sys.Stdout, "Next: ipm catalog rebuild")
 	}
 	return nil
 }
@@ -221,7 +221,7 @@ func waitHealthy(c *typesense.Client) error {
 // are warnings at worst — search is optional.
 func searchHealth(sys System) ([2]string, [2]string) {
 	if err := dockerReady(sys); err != nil {
-		return [2]string{warn, err.Error()}, [2]string{warn, "not running — run `ipm serve`"}
+		return [2]string{warn, err.Error()}, [2]string{warn, "not running — run `ipm catalog serve`"}
 	}
 	dockerRow := [2]string{ok, "available"}
 	c, err := tsClient(sys)
@@ -233,7 +233,7 @@ func searchHealth(sys System) ([2]string, [2]string) {
 		return dockerRow, [2]string{warn, tsError(err).Error()}
 	}
 	if n == 0 {
-		return dockerRow, [2]string{warn, "running, but the index is empty — run `ipm load`"}
+		return dockerRow, [2]string{warn, "running, but the index is empty — run `ipm catalog rebuild`"}
 	}
 	return dockerRow, [2]string{ok, fmt.Sprintf("%s, %d document(s)", tsURL, n)}
 }

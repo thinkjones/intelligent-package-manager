@@ -1,212 +1,166 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
+	"io"
+	"maps"
 	"path/filepath"
-	"regexp"
+	"slices"
 	"strings"
 
-	"github.com/thinkjones/intelligent-package-manager/cli/internal/assemble"
-	"github.com/thinkjones/intelligent-package-manager/cli/internal/marketplace"
-	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
-	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
-
 	"github.com/spf13/cobra"
+
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
 )
 
-func newInstallCmd(sys System) *cobra.Command {
-	var global, update, noValidate bool
-	cmd := &cobra.Command{
-		Use:   "install",
-		Short: "build each pack in ipm.toml into a Claude Code plugin under .ipm/ (-g for your user scope)",
-		Args:  noArgs,
-		RunE:  func(*cobra.Command, []string) error { return runInstall(sys, global, update, noValidate) },
+// installOpts are the flags every install target shares.
+type installOpts struct{ Global, Update, DryRun bool }
+
+// installer installs pack from scope at in, writing what it does to out, and
+// returns what it installed where.
+type installer func(sys System, scope project.Scope, pack string, in project.Install, o installOpts, out io.Writer) (string, error)
+
+// installers are the install targets, by the name ipm install takes and
+// records.
+var installers = map[string]installer{
+	"claude": installClaude,
+}
+
+// targetNames is the install targets for a message, sorted: "claude", or
+// "claude or gascity".
+func targetNames() string {
+	names := slices.Sorted(maps.Keys(installers))
+	if len(names) < 2 {
+		return strings.Join(names, "")
 	}
-	cmd.Flags().BoolVarP(&global, "global", "g", false, "build your user scope's packs ($IPM_HOME/global)")
-	cmd.Flags().BoolVar(&update, "update", false, "re-pin every item to the commit in your current catalog")
-	cmd.Flags().BoolVar(&noValidate, "no-validate", false, "skip claude plugin validate --strict")
+	return strings.Join(names[:len(names)-1], ", ") + " or " + names[len(names)-1]
+}
+
+// newInstallCmd is ipm install, also ipm pack install: with a target it
+// installs one pack there; bare, it replays the scope's recorded installs.
+func newInstallCmd(sys System) *cobra.Command {
+	var global bool
+	cmd := &cobra.Command{
+		Use:   "install [target] [pack]",
+		Short: "install a pack into claude or gascity (same as pack install)",
+		Args: func(c *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return usagef("install: unknown target %q%s — use %s. Try `ipm help install`.", args[0], didYouMean(c, args[0]), targetNames())
+			}
+			return nil
+		},
+		RunE: func(*cobra.Command, []string) error { return replayInstalls(sys, global) },
+	}
+	cmd.Flags().BoolVarP(&global, "global", "g", false, "redo the installs of your user scope ($IPM_HOME/global)")
+	cmd.AddCommand(newInstallClaudeCmd(sys))
 	return cmd
 }
 
-// pluginJSON is a built pack's manifest, fields in a fixed order.
-type pluginJSON struct {
-	Name        string `json:"name"`
-	Description string `json:"description,omitempty"`
-	Version     string `json:"version"`
-	Author      struct {
-		Name string `json:"name"`
-	} `json:"author"`
-	Dependencies []string `json:"dependencies,omitempty"`
-	Metadata     struct {
-		IPM struct {
-			Items []map[string]string `json:"items"`
-		} `json:"ipm"`
-	} `json:"metadata"`
+func newInstallClaudeCmd(sys System) *cobra.Command {
+	var o installOpts
+	var in project.Install
+	cmd := &cobra.Command{
+		Use:   "claude [pack]",
+		Short: "build a pack if needed and install it into Claude Code (user, project or local scope)",
+		Args: func(c *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				return usagef("install claude: give at most one pack. Try `ipm help install claude`.")
+			}
+			return nil
+		},
+		RunE: func(_ *cobra.Command, args []string) error {
+			pack := ""
+			if len(args) == 1 {
+				pack = args[0]
+			}
+			scope, err := currentScope(sys, o.Global)
+			if err != nil {
+				return err
+			}
+			done, err := installClaude(sys, scope, pack, in, o, sys.Stdout)
+			if err != nil || o.DryRun {
+				return err
+			}
+			fmt.Fprintf(sys.Stdout, "%s installed %s\n", ok, done)
+			return nil
+		},
+	}
+	f := cmd.Flags()
+	f.StringVarP(&in.Scope, "scope", "s", "", "user, project or local (default project; user with -g)")
+	f.StringVarP(&in.Path, "path", "p", "", "the folder for project or local scope (default: the pack's project)")
+	f.BoolVarP(&o.Global, "global", "g", false, "install a pack from your user scope ($IPM_HOME/global)")
+	f.BoolVar(&o.Update, "update", false, "re-pin every item to your current catalog and rebuild first")
+	f.BoolVar(&o.DryRun, "dry-run", false, "print the claude commands without building, running or recording anything")
+	return cmd
 }
 
-var unsafeName = regexp.MustCompile(`[^a-z0-9._-]+`)
-
-// runInstall builds every pack in the scope's ipm.toml into a plugin under
-// .ipm/plugins and writes .ipm's marketplace. Nothing is written until every
-// item resolves.
-func runInstall(sys System, global, update, noValidate bool) error {
-	return build(sys, global, update, noValidate, true)
-}
-
-// build is ipm install; hints adds the commands to install the result in
-// Claude Code, which deploy runs itself instead.
-func build(sys System, global, update, noValidate, hints bool) error {
+// replayInstalls is bare ipm install: every recorded install in the scope,
+// in loadInstalls order, through its target's installer. Every target is
+// checked before anything runs; a failing record doesn't stop the rest, and
+// the replay ends with exit 1 and the file that holds the records.
+func replayInstalls(sys System, global bool) error {
 	scope, err := currentScope(sys, global)
 	if err != nil {
 		return err
 	}
-	packs, err := project.LoadPacks(scope.Root)
+	recs, err := loadInstalls(sys, scope)
 	if err != nil {
 		return err
 	}
-	if len(packs) == 0 {
-		return fmt.Errorf("no packs in %s — create one with `ipm pack new <name>`", filepath.Join(scope.Root, project.File))
+	if len(recs) == 0 {
+		return usagef("install: say %s — nothing is recorded for this scope yet. Try `ipm help install`.", targetNames())
 	}
-	p, err := ipmPaths(sys)
+	file, err := installsFileName(sys, scope)
 	if err != nil {
 		return err
 	}
-	dir := scope.IPMDir()
-	lock := map[string]project.LockItem{}
-	if !update {
-		if lock, err = project.LoadLock(dir); err != nil {
-			return err
+	var unknown []string
+	for _, rec := range recs {
+		if _, found := installers[rec.Target]; !found {
+			unknown = append(unknown, fmt.Sprintf("%s: unknown target %q (use %s)", describeRecord(rec), rec.Target, targetNames()))
 		}
 	}
-	items, err := assemble.Resolve(packs, lock, p.Catalog())
-	if err != nil {
-		return err
+	if len(unknown) > 0 {
+		return fmt.Errorf("%s\nnothing was installed; remove the stale record from %s or upgrade ipm", strings.Join(unknown, "\n"), file)
 	}
-	plan, err := assemble.Build(packs, items)
-	if err != nil {
-		return err
-	}
-	for _, w := range plan.Warnings {
-		fmt.Fprintf(sys.Stdout, "%s %s\n", warn, w)
-	}
-
-	root, err := sources.WriteProject(dir, plan.Repos)
-	if err != nil {
-		return err
-	}
-	hooks, err := writePnpmfile(dir, root)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte("node_modules/\nplugins/\nplugins.tmp/\n"), 0o644); err != nil {
-		return err
-	}
-	if len(plan.Repos) > 0 {
-		pn, err := findPnpm(sys)
+	failed := 0
+	for _, rec := range recs {
+		done, err := installers[rec.Target](sys, scope, rec.Pack, rec.Install, installOpts{Global: global}, sys.Stdout)
 		if err != nil {
-			return err
+			failed++
+			fmt.Fprintf(sys.Stdout, "%s %s: %v\n", bad, describeRecord(rec), err)
+			continue
 		}
-		args := []string{"install", "--no-frozen-lockfile", "--ignore-scripts", "--config.ignore-pnpmfile=false", "--config.pnpmfile=" + hooks,
-			"--store-dir", p.Store(), "--dir", dir}
-		fmt.Fprintf(sys.Stdout, "%s %s\n", pn, strings.Join(args, " "))
-		if out, err := sys.Output(dir, pn.name, append(append([]string{}, pn.prefix...), args...)...); err != nil {
-			fmt.Fprintln(sys.Stdout, strings.TrimSpace(out))
-			fmt.Fprintf(sys.Stdout, "%s pnpm failed\n", bad)
-			return &ExitError{Code: 1}
-		}
+		fmt.Fprintf(sys.Stdout, "%s installed %s\n", ok, done)
 	}
-
-	owner := "ipm"
-	if out, err := sys.Output(scope.Root, "git", "config", "user.name"); err == nil && strings.TrimSpace(out) != "" {
-		owner = strings.TrimSpace(out)
-	}
-	// Build into plugins.tmp and swap it in, so a failure keeps the last
-	// good build; the lock is written only once the build is in place.
-	plugins, staging := filepath.Join(dir, "plugins"), filepath.Join(dir, "plugins.tmp")
-	if err := os.RemoveAll(staging); err != nil {
-		return err
-	}
-	defer func() { _ = os.RemoveAll(staging) }()
-	var entries []any
-	var names []string
-	for _, pp := range plan.Packs {
-		pluginDir := filepath.Join(staging, pp.Name)
-		if err := assemble.Place(pp, filepath.Join(dir, "node_modules"), pluginDir, os.Link); err != nil {
-			return err
-		}
-		var pj pluginJSON
-		pj.Name, pj.Description, pj.Version, pj.Dependencies = pp.Name, pp.Description, "0.0.0-ipm", pp.DepNames()
-		pj.Author.Name = owner
-		pj.Metadata.IPM.Items = pp.Items()
-		if pj.Metadata.IPM.Items == nil {
-			pj.Metadata.IPM.Items = []map[string]string{}
-		}
-		if err := writeJSON(filepath.Join(pluginDir, ".claude-plugin", "plugin.json"), pj); err != nil {
-			return err
-		}
-		entries = append(entries, marketplace.Entry{Name: pp.Name, Description: pp.Description, Source: "./plugins/" + pp.Name,
-			Tags: []string{marketplace.OwnerTag, pp.Name}})
-		entries = append(entries, pp.Deps...)
-		names = append(names, pp.Name)
-		fmt.Fprintf(sys.Stdout, "%s %s: %d item(s), %d plugin dependency(ies)\n", ok, pp.Name, len(pp.Files), len(pp.Deps))
-	}
-	if err := os.MkdirAll(staging, 0o755); err != nil {
-		return err
-	}
-	if err := os.RemoveAll(plugins); err != nil {
-		return err
-	}
-	if err := os.Rename(staging, plugins); err != nil {
-		return err
-	}
-	name := marketName(scope)
-	m := marketplace.Build(entries, names, marketplace.Options{Name: name, Owner: owner, Description: "ipm packs: " + strings.Join(names, ", ")})
-	if err := marketplace.Write(filepath.Join(dir, ".claude-plugin", "marketplace.json"), m); err != nil {
-		return err
-	}
-	if err := project.SaveLock(dir, items); err != nil {
-		return err
-	}
-
-	if noValidate {
-		fmt.Fprintln(sys.Stdout, "validate: skipped (--no-validate)")
-	} else if _, err := sys.LookPath("claude"); err != nil {
-		fmt.Fprintln(sys.Stdout, "validate: skipped (claude not on PATH)")
-	} else if out, err := sys.Output(scope.Root, "claude", "plugin", "validate", "--strict", dir); err != nil {
-		fmt.Fprintln(sys.Stdout, strings.TrimSpace(out))
-		fmt.Fprintf(sys.Stdout, "%s claude plugin validate --strict failed\n", bad)
+	if failed > 0 {
+		fmt.Fprintf(sys.Stdout, "%s %d of %d recorded installs failed; if a record is stale, remove it from %s\n", bad, failed, len(recs), file)
 		return &ExitError{Code: 1}
-	} else {
-		fmt.Fprintln(sys.Stdout, "validate: ok")
-	}
-	if !hints {
-		return nil
-	}
-	fmt.Fprintf(sys.Stdout, "\nInstall in Claude Code:\n  claude plugin marketplace add %s\n", dir)
-	for _, n := range names {
-		fmt.Fprintf(sys.Stdout, "  /plugin install %s@%s\n", n, name)
 	}
 	return nil
 }
 
-func writeJSON(path string, v any) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+// describeRecord is rec as "<pack> → <target> <scope or name> <path>",
+// leaving out what is empty.
+func describeRecord(rec installRecord) string {
+	parts := []string{rec.Target}
+	for _, p := range []string{rec.Scope, rec.Name, rec.Path} {
+		if p != "" {
+			parts = append(parts, p)
+		}
 	}
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(path, append(data, '\n'), 0o644)
+	return rec.Pack + " → " + strings.Join(parts, " ")
 }
 
-// marketName is the name of the marketplace ipm install builds for scope:
-// <project folder>-ipm, or ipm-global for the user scope.
-func marketName(scope project.Scope) string {
-	if scope.Global {
-		return "ipm-global"
+// installsFileName names the file that holds scope's install records, with
+// its path: the project's ipm.toml, or $IPM_HOME/installs.json for -g.
+func installsFileName(sys System, scope project.Scope) (string, error) {
+	if !scope.Global {
+		return project.File + " (" + filepath.Join(scope.Root, project.File) + ")", nil
 	}
-	return strings.Trim(unsafeName.ReplaceAllString(strings.ToLower(filepath.Base(scope.Root)), "-"), "-.") + "-ipm"
+	path, err := globalInstallsPath(sys)
+	if err != nil {
+		return "", err
+	}
+	return "$IPM_HOME/" + installsFile + " (" + path + ")", nil
 }

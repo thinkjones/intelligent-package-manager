@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -20,8 +21,8 @@ func newPackCmd(sys System) *cobra.Command {
 	var description string
 	cmd := verbs(&cobra.Command{
 		Use:   "pack",
-		Short: "create and edit packs of catalog items in ipm.toml (-g for your user scope)",
-	}, "new, add, remove, list or show")
+		Short: "create, edit and build packs (new, add, remove, list, show, build, install)",
+	}, "new, add, remove, list, show, build or install")
 	cmd.PersistentFlags().BoolVarP(&global, "global", "g", false, "use your user scope ($IPM_HOME/global) instead of the project")
 	// inScope runs f in the project's scope, or the user's with -g.
 	inScope := func(f func(project.Scope, []string) error) func(*cobra.Command, []string) error {
@@ -64,6 +65,8 @@ func newPackCmd(sys System) *cobra.Command {
 			Args:  exactArgs(1, "one pack name"),
 			RunE:  inScope(func(s project.Scope, args []string) error { return packShow(sys, s, args[0]) }),
 		},
+		newPackBuildCmd(sys, &global),
+		newInstallCmd(sys),
 	)
 	return cmd
 }
@@ -130,7 +133,7 @@ func pickable(g *catgraph.Graph, packName, id string) error {
 			return nil
 		}
 	case catalog.TypeRepo, catalog.TypeMarketplace:
-		return fmt.Errorf("%s is a %s — pick the plugins, skills, agents or commands it holds (see `ipm tree %s`)", id, typ, id)
+		return fmt.Errorf("%s is a %s — pick the plugins, skills, agents or commands it holds (see `ipm show tree %s`)", id, typ, id)
 	}
 	var owners []string
 	if l, ok := n["plugins"].([]any); ok {
@@ -153,7 +156,7 @@ func packEdit(sys System, scope project.Scope, verb, name string, ids []string) 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(sys.Stdout, "%s pack %s: %d item(s)\n\nNext: ipm install\n", ok, name, len(p.Items))
+	fmt.Fprintf(sys.Stdout, "%s pack %s: %d item(s)\n\nNext: ipm pack build\n", ok, name, len(p.Items))
 	return nil
 }
 
@@ -271,5 +274,22 @@ func packShow(sys System, scope project.Scope, name string) error {
 	}
 	tw.Flush()
 	fmt.Fprintf(sys.Stdout, "\n%s — %d item(s)\n", packs[i].Description, len(packs[i].Items))
+	installs, err := loadInstalls(sys, scope)
+	if err != nil {
+		return err
+	}
+	for _, in := range installs {
+		if in.Pack != name {
+			continue
+		}
+		line := "installed: " + in.Target
+		if label := cmp.Or(in.Scope, in.Name); label != "" {
+			line += " " + label
+		}
+		if in.Path != "" {
+			line += " " + in.Path
+		}
+		fmt.Fprintln(sys.Stdout, line)
+	}
 	return nil
 }

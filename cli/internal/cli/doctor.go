@@ -65,10 +65,10 @@ func doctor(sys System) error {
 	case err != nil:
 		row(bad, "sources", err.Error())
 	case len(srcs) == 0:
-		row(warn, "sources", "none — add some with `ipm source add owner/repo`")
+		row(warn, "sources", "none — add some with `ipm marketplace add owner/repo`")
 	default:
 		if _, err := sources.Checkouts(p.Sources()); err != nil {
-			row(warn, "sources", fmt.Sprintf("%d, not all synced — run `ipm sync`", len(srcs)))
+			row(warn, "sources", fmt.Sprintf("%d, not all synced — run `ipm catalog sync`", len(srcs)))
 		} else {
 			row(ok, "sources", fmt.Sprintf("%d synced, in %s", len(srcs), p.Sources()))
 		}
@@ -84,7 +84,7 @@ func doctor(sys System) error {
 		records += len(recs)
 	}
 	if records < 0 {
-		row(warn, "catalog", "not built — run `ipm sync`")
+		row(warn, "catalog", "not built — run `ipm catalog sync`")
 	} else {
 		row(ok, "catalog", fmt.Sprintf("%d record(s), in %s", records, p.Catalog()))
 	}

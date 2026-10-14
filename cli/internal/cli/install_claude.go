@@ -9,16 +9,14 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/spf13/cobra"
-
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
 )
 
-// deployTarget is where a pack is installed in Claude Code: user scope, or
+// claudeTarget is where a pack is installed in Claude Code: user scope, or
 // project or local scope in the folder Path.
-type deployTarget struct{ Scope, Path string }
+type claudeTarget struct{ Scope, Path string }
 
-// claudeCmd is one claude command deploy runs, in the folder Dir.
+// claudeCmd is one claude command install claude runs, in the folder Dir.
 type claudeCmd struct {
 	Dir  string
 	Args []string
@@ -26,52 +24,20 @@ type claudeCmd struct {
 
 func (c claudeCmd) String() string { return "claude " + strings.Join(c.Args, " ") }
 
-func newDeployCmd(sys System) *cobra.Command {
-	var global bool
-	var t deployTarget
-	cmd := &cobra.Command{
-		Use:   "deploy [pack]",
-		Short: "build a pack and install it into Claude Code (user, project or local scope)",
-		Args: func(c *cobra.Command, args []string) error {
-			if len(args) > 1 {
-				return usagef("deploy: give at most one pack. Try `ipm help deploy`.")
-			}
-			return nil
-		},
-		RunE: func(_ *cobra.Command, args []string) error {
-			pack := ""
-			if len(args) == 1 {
-				pack = args[0]
-			}
-			deployed, err := runDeploy(sys, global, pack, t, sys.Stdout)
-			if err != nil {
-				return err
-			}
-			fmt.Fprintf(sys.Stdout, "%s deployed %s\n", ok, deployed)
-			return nil
-		},
-	}
-	f := cmd.Flags()
-	f.StringVar(&t.Scope, "scope", "", "user, project or local (default project; user with -g)")
-	f.StringVar(&t.Path, "path", "", "the folder for project or local scope (default: the pack's project)")
-	f.BoolVarP(&global, "global", "g", false, "deploy a pack from your user scope ($IPM_HOME/global)")
-	return cmd
-}
-
 // cleanTarget checks a target and makes its path absolute: a leading ~ is
 // home, a relative path is from cwd, and it must be an existing folder. User
 // scope keeps no path.
-func cleanTarget(t deployTarget, cwd, home string) (deployTarget, error) {
+func cleanTarget(t claudeTarget, cwd, home string) (claudeTarget, error) {
 	switch t.Scope {
 	case "user":
-		return deployTarget{Scope: "user"}, nil
+		return claudeTarget{Scope: "user"}, nil
 	case "project", "local":
 	default:
-		return deployTarget{}, fmt.Errorf("scope %q: use user, project or local", t.Scope)
+		return claudeTarget{}, fmt.Errorf("scope %q: use user, project or local", t.Scope)
 	}
 	p := strings.TrimSpace(t.Path)
 	if p == "" {
-		return deployTarget{}, fmt.Errorf("%s scope needs a folder", t.Scope)
+		return claudeTarget{}, fmt.Errorf("%s scope needs a folder", t.Scope)
 	}
 	if p == "~" || strings.HasPrefix(p, "~/") {
 		p = filepath.Join(home, strings.TrimPrefix(p, "~"))
@@ -81,9 +47,9 @@ func cleanTarget(t deployTarget, cwd, home string) (deployTarget, error) {
 	}
 	p = filepath.Clean(p)
 	if info, err := os.Stat(p); err != nil || !info.IsDir() {
-		return deployTarget{}, fmt.Errorf("%s is not a folder", p)
+		return claudeTarget{}, fmt.Errorf("%s is not a folder", p)
 	}
-	return deployTarget{Scope: t.Scope, Path: p}, nil
+	return claudeTarget{Scope: t.Scope, Path: p}, nil
 }
 
 // planDeploy is the claude commands that install pack from the marketplace
@@ -91,7 +57,7 @@ func cleanTarget(t deployTarget, cwd, home string) (deployTarget, error) {
 // target's scope (claude accepts a repeat), refresh it when claude already
 // knows it, then install the pack, or update it when it is already
 // installed there. It runs before the build, so it needs no built files.
-func planDeploy(sys System, ipmDir, mp, pack string, t deployTarget) ([]claudeCmd, error) {
+func planDeploy(sys System, ipmDir, mp, pack string, t claudeTarget) ([]claudeCmd, error) {
 	dir := t.Path
 	if dir == "" {
 		dir = filepath.Dir(ipmDir)
@@ -121,7 +87,7 @@ func planDeploy(sys System, ipmDir, mp, pack string, t deployTarget) ([]claudeCm
 		// the same name; adding ours would repoint it, and every plugin
 		// installed from it, at this project.
 		if m.Path != "" && !samePath(m.Path, ipmDir) {
-			return nil, fmt.Errorf("Claude Code already has a marketplace named %s, from %s — deploying %s would repoint it and every plugin installed from it; rename this project's folder, or remove the other with `claude plugin marketplace remove %s`", mp, m.Path, ipmDir, mp)
+			return nil, fmt.Errorf("Claude Code already has a marketplace named %s, from %s — installing %s would repoint it and every plugin installed from it; rename this project's folder, or remove the other with `claude plugin marketplace remove %s`", mp, m.Path, ipmDir, mp)
 		}
 		cmds = append(cmds, claudeCmd{dir, []string{"plugin", "marketplace", "update", mp}})
 		break
@@ -160,28 +126,41 @@ func samePath(a, b string) bool {
 	return errA == nil && errB == nil && ra == rb
 }
 
-// runDeploy builds the scope's packs, then installs pack into Claude Code at
-// t, writing everything it does to out. It returns what it deployed where,
-// as "kit (project /work)".
-func runDeploy(sys System, global bool, pack string, t deployTarget, out io.Writer) (string, error) {
+// installClaude installs pack into Claude Code at in's scope and path, writing
+// everything it does to out: it builds the scope's packs unless the build is
+// current (or always with o.Update), runs the claude commands, then records
+// the install. With o.DryRun it only prints the claude commands. It returns
+// what it installed where, as "kit (project /work)".
+func installClaude(sys System, scope project.Scope, pack string, in project.Install, o installOpts, out io.Writer) (string, error) {
 	if err := needClaude(sys); err != nil {
 		return "", err
 	}
-	scope, err := currentScope(sys, global)
+	pack, err := pickPack(scope, pack)
 	if err != nil {
 		return "", err
 	}
-	if pack, err = deployPack(scope, pack); err != nil {
-		return "", err
-	}
-	t = deployDefaults(scope, t)
+	t := claudeDefaults(scope, claudeTarget{Scope: in.Scope, Path: in.Path})
 	if t, err = cleanTarget(t, workDir(sys, scope), sys.Getenv("HOME")); err != nil {
 		return "", err
 	}
-	buildSys := sys
-	buildSys.Stdout = out
-	if err := build(buildSys, global, false, false, false); err != nil {
-		return "", err
+	if o.DryRun {
+		cmds, err := planDeploy(sys, scope.IPMDir(), marketName(scope), pack, t)
+		if err != nil {
+			return "", err
+		}
+		for _, c := range cmds {
+			fmt.Fprintf(out, "$ %s\n", c)
+		}
+		return pack + " (" + describeTarget(t) + ")", nil
+	}
+	if o.Update || !buildCurrent(sys, scope) {
+		buildSys := sys
+		buildSys.Stdout = out
+		if err := build(buildSys, o.Global, o.Update, false, false); err != nil {
+			return "", err
+		}
+	} else {
+		fmt.Fprintln(out, "build is current")
 	}
 	cmds, err := planDeploy(sys, scope.IPMDir(), marketName(scope), pack, t)
 	if err != nil {
@@ -197,11 +176,14 @@ func runDeploy(sys System, global bool, pack string, t deployTarget, out io.Writ
 			return "", fmt.Errorf("`%s` failed: %v", c, err)
 		}
 	}
+	if err := recordInstall(sys, scope, pack, project.Install{Target: "claude", Path: t.Path, Scope: t.Scope}); err != nil {
+		return "", err
+	}
 	return pack + " (" + describeTarget(t) + ")", nil
 }
 
-// deployPack is the pack to deploy: the one named, or the scope's only pack.
-func deployPack(scope project.Scope, pack string) (string, error) {
+// pickPack is the pack to install: the one named, or the scope's only pack.
+func pickPack(scope project.Scope, pack string) (string, error) {
 	packs, err := project.LoadPacks(scope.Root)
 	if err != nil {
 		return "", err
@@ -213,7 +195,7 @@ func deployPack(scope project.Scope, pack string) (string, error) {
 		case 1:
 			return packs[0].Name, nil
 		}
-		return "", usagef("deploy: name a pack — this scope has %d. Try `ipm pack list`.", len(packs))
+		return "", usagef("install claude: name a pack — this scope has %d. Try `ipm pack list`.", len(packs))
 	}
 	if findPack(packs, pack) < 0 {
 		return "", fmt.Errorf("no pack %s — `ipm pack list` shows the packs here", pack)
@@ -221,9 +203,9 @@ func deployPack(scope project.Scope, pack string) (string, error) {
 	return pack, nil
 }
 
-// deployDefaults fills an unset scope and path: project scope in the pack's
+// claudeDefaults fills an unset scope and path: project scope in the pack's
 // project, or user scope for the user's own packs.
-func deployDefaults(scope project.Scope, t deployTarget) deployTarget {
+func claudeDefaults(scope project.Scope, t claudeTarget) claudeTarget {
 	if t.Scope == "" {
 		t.Scope = "project"
 		if scope.Global {
@@ -237,7 +219,7 @@ func deployDefaults(scope project.Scope, t deployTarget) deployTarget {
 }
 
 // describeTarget is a target as people read it: "user" or "project /work".
-func describeTarget(t deployTarget) string {
+func describeTarget(t claudeTarget) string {
 	if t.Scope == "user" {
 		return "user"
 	}
@@ -246,12 +228,12 @@ func describeTarget(t deployTarget) string {
 
 func needClaude(sys System) error {
 	if _, err := sys.LookPath("claude"); err != nil {
-		return errors.New("ipm deploy needs claude (Claude Code) on PATH")
+		return errors.New("ipm install claude needs claude (Claude Code) on PATH")
 	}
 	return nil
 }
 
-// workDir is where relative deploy paths start: the working directory, or
+// workDir is where relative install paths start: the working directory, or
 // the scope's root.
 func workDir(sys System, scope project.Scope) string {
 	if sys.Getwd != nil {

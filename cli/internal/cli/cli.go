@@ -81,6 +81,9 @@ func Run(args []string, sys System) error {
 // newRootCmd is ipm's command tree. Every command writes to sys and returns
 // a UsageError for a malformed command line, so ipm exits 2 for those.
 func newRootCmd(sys System) *cobra.Command {
+	// Help lists commands in registration order, which is the workflow's.
+	// The setting is process-global; every ipm command tree wants it.
+	cobra.EnableCommandSorting = false
 	root := &cobra.Command{
 		Use:   "ipm",
 		Short: "ipm — intelligent package manager for agent skills, agents, commands and plugins",
@@ -88,6 +91,8 @@ func newRootCmd(sys System) *cobra.Command {
 
 Follow repos, search everything in them, and build the skills, agents,
 commands and plugins you pick into Claude Code plugins, pinned to commits.
+
+Workflow: onboard → marketplace → catalog → search → pack → install
 
 Config
   IPM_HOME        sources and the pnpm store (default ~/Library/ipm, ~/.local/share/ipm)
@@ -109,9 +114,21 @@ Config
 		}
 		return usagef("%s. Try `%s`.", msg, helpFor(cmd))
 	})
+	for _, g := range [][2]string{
+		{"start", "Getting started:"},
+		{"market", "Marketplace — curated repos you can follow:"},
+		{"catalog", "Catalog — the repos you follow, fetched and searchable:"},
+		{"packs", "Packs — your picks, built and installed:"},
+		{"tools", "Tools:"},
+	} {
+		root.AddGroup(&cobra.Group{ID: g[0], Title: g[1]})
+	}
+	root.SetHelpCommandGroupID("tools")
+	root.SetCompletionCommandGroupID("tools")
 	root.SetHelpCommand(&cobra.Command{
-		Use:   "help [command]",
-		Short: "help for ipm, or for one command",
+		Use:     "help [command]",
+		GroupID: "tools",
+		Short:   "help for ipm, or for one command",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			target, rest, err := root.Find(args)
 			if err != nil || len(rest) > 0 {
@@ -121,35 +138,65 @@ Config
 		},
 	})
 	root.AddCommand(
-		newSourceCmd(sys),
-		newSyncCmd(sys),
-		newDoctorCmd(sys),
-		newIndexCmd(sys),
-		newServeCmd(sys),
-		newLoadCmd(sys),
+		newOnboardCmd(sys),
+		newMarketplaceCmd(sys),
+		newCatalogCmd(sys),
 		newSearchCmd(sys),
 		newShowCmd(sys),
-		newTreeCmd(sys),
-		newGraphCmd(sys),
 		newPackCmd(sys),
 		newInstallCmd(sys),
-		newStatsCmd(sys),
-		newScanCmd(sys),
 		newTuiCmd(sys),
-		newDeployCmd(sys),
-		newOnboardCmd(sys),
+		newDoctorCmd(sys),
 		newUninstallCmd(sys),
+		renamed("source", "marketplace"),
+		renamed("stats", "marketplace stats"),
+		renamed("sync", "catalog sync"),
+		renamed("index", "catalog rebuild"),
+		renamed("load", "catalog rebuild"),
+		renamed("serve", "catalog serve"),
+		renamed("scan", "catalog scan"),
+		renamed("tree", "show tree"),
+		renamed("graph", "show graph"),
+		renamed("deploy", "install claude"),
 		&cobra.Command{
-			Use:   "version",
-			Short: "print ipm's version",
-			Args:  noArgs,
+			Use:     "version",
+			GroupID: "tools",
+			Short:   "print ipm's version",
+			Args:    noArgs,
 			RunE: func(*cobra.Command, []string) error {
 				fmt.Fprintf(sys.Stdout, "ipm %s\n", sys.Version)
 				return nil
 			},
 		},
 	)
+	groups := map[string]string{
+		"onboard": "start", "marketplace": "market",
+		"catalog": "catalog", "search": "catalog", "show": "catalog",
+		"pack": "packs", "install": "packs",
+		"tui": "tools", "doctor": "tools", "uninstall": "tools",
+	}
+	for _, c := range root.Commands() {
+		if g, ok := groups[c.Name()]; ok {
+			c.GroupID = g
+		}
+	}
+	// Cobra adds its help command first and completion after it; adding
+	// completion now puts help last, as the Tools list reads.
+	root.InitDefaultCompletionCmd()
 	return root
+}
+
+// renamed is a stub for a command that moved: hidden from help, it takes
+// any flags and arguments and says where the command went.
+func renamed(old, now string) *cobra.Command {
+	return &cobra.Command{
+		Use:                old,
+		Hidden:             true,
+		DisableFlagParsing: true,
+		RunE: func(*cobra.Command, []string) error {
+			return usagef("ipm %s was renamed: use ipm %s. Try `ipm help`.", old, now)
+		},
+	}
 }
 
 // helpFor is the help command for cmd: `ipm help sync`, or `ipm help`.

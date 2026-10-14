@@ -1,12 +1,11 @@
 // ipm is an intelligent package manager for agent skills, agents, commands
 // and plugins. Every command is Go code in internal/cli:
 //
-//	ipm onboard | uninstall      pick curated sources and build a library; remove ipm
-//	ipm source | sync | index    your repos of interest, fetched by pnpm
-//	ipm stats                    GitHub stats for the catalog
-//	ipm serve | load | search    local hybrid search over the catalog
-//	ipm show | tree | graph      an artifact and its relationships
-//	ipm scan | doctor            quick checks
+//	ipm onboard                  learn the concepts, pick repos, build your catalog
+//	ipm marketplace              the curated repos and which you follow (add, remove, import, stats)
+//	ipm catalog | search | show  what you follow, fetched and searchable (sync, rebuild, serve, scan)
+//	ipm pack | install           build picks into plugins and install them (claude, gascity)
+//	ipm tui | doctor | uninstall the TUI, checks, removal
 //	ipm version | help [command]
 //
 // Data lives in IPM_HOME and IPM_CACHE_DIR (see internal/paths). install.sh

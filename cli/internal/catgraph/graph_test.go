@@ -175,7 +175,7 @@ func TestUnknownID(t *testing.T) {
 			t.Errorf("got %v", err)
 		}
 	}
-	if _, err := Load(t.TempDir()); err == nil || !strings.Contains(err.Error(), "ipm index") {
+	if _, err := Load(t.TempDir()); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 		t.Errorf("missing catalog: %v", err)
 	}
 }

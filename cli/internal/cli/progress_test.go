@@ -66,13 +66,13 @@ func TestOnboardProgressInTerminal(t *testing.T) {
 	if err := f.run("onboard", "--yes", "--list", list); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	out := f.out.String()
+	out := strings.TrimPrefix(f.out.String(), onboardIntro)
 	for _, want := range []string{
 		"] 2/5 sync · pnpm install",
-		"✓ sync · catalog: 6 record(s), 0 warning(s)\n",
+		"✓ sync · ",
 		"] 3/5 stats · 3/3 o/",
 		"✓ stats · 3 fetched, 0 skipped, 0 failed\n",
-		"- search skipped: start Docker, then ipm serve && ipm load\n",
+		"- search skipped: start Docker, then ipm catalog serve && ipm catalog rebuild\n",
 		"✓ library ready — 3 sources, 3 artifacts\n",
 	} {
 		if !strings.Contains(out, want) {
@@ -80,7 +80,7 @@ func TestOnboardProgressInTerminal(t *testing.T) {
 		}
 	}
 	// the steps' own output stays out of the way
-	for _, hidden := range []string{"sources synced\n", "catalog/\n", "\n\n"} {
+	for _, hidden := range []string{"search not loaded", "sources synced\n", "catalog/\n", "\n\n"} {
 		if strings.Contains(out, hidden) {
 			t.Errorf("output should not hold %q:\n%q", hidden, out)
 		}
@@ -99,7 +99,7 @@ func TestOnboardProgressShowsOutputOnFailure(t *testing.T) {
 		t.Fatalf("got %v, want exit 1\n%s", err, f.out.String())
 	}
 	out := f.out.String()
-	if !strings.Contains(out, "\nERR_PNPM_FETCH_404 nope\n✗ pnpm failed — the catalog is unchanged\n✗ sync\nrerun: ipm sync\n") {
+	if !strings.Contains(out, "\nERR_PNPM_FETCH_404 nope\n✗ pnpm failed — the catalog is unchanged\n✗ sync\nrerun: ipm catalog sync\n") {
 		t.Errorf("want sync's whole output, then the failure:\n%q", out)
 	}
 }
