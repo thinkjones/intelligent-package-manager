@@ -1,0 +1,5 @@
+name = "web"
+url = "https://x.test/mcp"
+
+[headers]
+Authorization = "Bearer t"

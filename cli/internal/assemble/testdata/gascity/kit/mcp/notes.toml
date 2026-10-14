@@ -1,0 +1,6 @@
+name = "notes"
+command = "node"
+args = ["a.js"]
+
+[env]
+K = "v"

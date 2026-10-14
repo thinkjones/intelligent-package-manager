@@ -373,22 +373,9 @@ func Place(p PackPlan, nodeModules, pluginDir string, link func(oldname, newname
 		return err
 	}
 	for _, f := range p.Files {
-		root, err := filepath.EvalSymlinks(filepath.Join(nodeModules, f.Alias))
+		src, err := source(nodeModules, f)
 		if err != nil {
-			return fmt.Errorf("%s is not installed in %s: %v", f.Item.Repo, nodeModules, err)
-		}
-		from := filepath.FromSlash(f.From)
-		if !filepath.IsLocal(from) {
-			return fmt.Errorf("%s: %s is outside its repo", f.Item.ID, f.From)
-		}
-		// Resolve symlinks so neither the item nor a link inside it can
-		// reach outside the repo.
-		src, err := filepath.EvalSymlinks(filepath.Join(root, from))
-		if err != nil {
-			return fmt.Errorf("%s: %v", f.Item.ID, err)
-		}
-		if rel, err := filepath.Rel(root, src); err != nil || !filepath.IsLocal(rel) {
-			return fmt.Errorf("%s: %s leads outside its repo", f.Item.ID, f.From)
+			return err
 		}
 		dst := filepath.Join(pluginDir, filepath.FromSlash(f.To))
 		if !f.Dir {
@@ -409,6 +396,29 @@ func Place(p PackPlan, nodeModules, pluginDir string, link func(oldname, newname
 		}
 	}
 	return nil
+}
+
+// source is the file or folder f names inside its installed repo, with
+// symlinks resolved; it refuses a path that leads outside the repo.
+func source(nodeModules string, f Placed) (string, error) {
+	root, err := filepath.EvalSymlinks(filepath.Join(nodeModules, f.Alias))
+	if err != nil {
+		return "", fmt.Errorf("%s is not installed in %s: %v", f.Item.Repo, nodeModules, err)
+	}
+	from := filepath.FromSlash(f.From)
+	if !filepath.IsLocal(from) {
+		return "", fmt.Errorf("%s: %s is outside its repo", f.Item.ID, f.From)
+	}
+	// Resolve symlinks so neither the item nor a link inside it can
+	// reach outside the repo.
+	src, err := filepath.EvalSymlinks(filepath.Join(root, from))
+	if err != nil {
+		return "", fmt.Errorf("%s: %v", f.Item.ID, err)
+	}
+	if rel, err := filepath.Rel(root, src); err != nil || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("%s: %s leads outside its repo", f.Item.ID, f.From)
+	}
+	return src, nil
 }
 
 func put(src, dst string, link func(string, string) error) error {
