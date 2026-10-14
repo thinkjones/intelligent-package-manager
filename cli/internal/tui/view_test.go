@@ -112,7 +112,7 @@ func TestGoldenViews(t *testing.T) {
 		},
 		"install": func(t *testing.T) *Model {
 			m, f := newTestWith(t, setup)
-			f.i.lines = []string{"✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)", "validate: ok"}
+			f.b.lines = []string{"✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)", "validate: ok"}
 			typeText(t, m, "tdd")
 			press(t, m, "down", "i")
 			return m

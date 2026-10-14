@@ -164,6 +164,12 @@ func TestTuiInstallerPlanGascity(t *testing.T) {
 	if _, _, err := in.Plan("kit", tui.Target{Kind: "gascity", Path: filepath.Join(tmp, "missing"), Name: "kit"}); err == nil {
 		t.Error("a missing folder should be refused")
 	}
+	spaced := filepath.Join(tmp, "my dir")
+	os.Mkdir(spaced, 0o755)
+	_, plan, err = in.Plan("kit", tui.Target{Kind: "gascity", Path: spaced, Name: "kit"})
+	if err != nil || !reflect.DeepEqual(plan, []string{"ipm install gascity kit -C '" + spaced + "' --name kit"}) {
+		t.Errorf("spaced plan %v %v", plan, err)
+	}
 	d := in.Default("kit", "gascity")
 	if d.Kind != "gascity" || d.Name != "kit" || d.Path != scopeOf(t, f, false).Root {
 		t.Errorf("default %+v", d)

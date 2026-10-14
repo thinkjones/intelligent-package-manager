@@ -494,7 +494,7 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 		if err != nil {
 			return t, nil, err
 		}
-		line := "ipm install gascity " + pack + " -C " + dir + " --name " + name
+		line := "ipm install gascity " + shellQuote(pack) + " -C " + shellQuote(dir) + " --name " + shellQuote(name)
 		if t.Global {
 			line += " -g"
 		}
@@ -635,4 +635,13 @@ func (m tuiMarketplace) Sync(_ context.Context, out io.Writer) error {
 		return errors.New("sync failed — see the output above")
 	}
 	return err
+}
+
+// shellQuote is s as one shell word: unchanged when it holds only safe
+// characters, else in single quotes.
+func shellQuote(s string) string {
+	if s != "" && strings.Trim(s, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-./:=@%+,~") == "" {
+		return s
+	}
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
