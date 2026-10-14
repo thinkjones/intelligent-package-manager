@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="540" viewBox="0 0 1200 540" role="img" aria-labelledby="title desc">
   <title id="title">ipm — the intelligent package manager for Claude Code</title>
-  <desc id="desc">Four items picked from two GitHub repos — a skill, an agent and a command from wshobson/agents, and the stripe plugin from anthropics/claude-plugins-official — each pinned to a commit, built by ipm install into one Claude Code plugin, .ipm/plugins/csharp-sdlc, that passes claude plugin validate --strict.</desc>
+  <desc id="desc">Four items picked from two GitHub repos — a skill, an agent and a command from wshobson/agents, and the stripe plugin from anthropics/claude-plugins-official — each pinned to a commit, built by ipm pack build into one Claude Code plugin, .ipm/plugins/csharp-sdlc, that passes claude plugin validate --strict.</desc>
 
   <rect x="1" y="1" width="1198" height="538" rx="4" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
 
@@ -41,7 +41,7 @@
   </g>
 
   <g id="install-arrow" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
-    <text x="626" y="378" text-anchor="middle" font-size="18" fill="#e85d26">ipm install</text>
+    <text x="626" y="378" text-anchor="middle" font-size="18" fill="#e85d26">ipm pack build</text>
     <line x1="584" y1="394" x2="664" y2="394" stroke="#e85d26" stroke-width="2"/>
     <path d="M656 386 L668 394 L656 402" fill="none" stroke="#e85d26" stroke-width="2" stroke-linejoin="round"/>
   </g>

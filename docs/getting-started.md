@@ -17,10 +17,10 @@ Install `ipm`, pick the repos to follow, search them and build your first plugin
 | You need | For | Notes |
 | --- | --- | --- |
 | [Go](https://go.dev/dl/) 1.26 or later | Building `ipm` | |
-| [pnpm](https://pnpm.io/installation) 12 or later, **or** [Node.js](https://nodejs.org) | `ipm sync`, `ipm install` | With only Node, `ipm` runs `npx -y pnpm@12.10.1` for you. |
-| [Docker](https://www.docker.com) (or OrbStack) | `ipm serve`, `ipm search` | Runs the local Typesense search server. Everything else works without it. |
-| [GitHub CLI](https://cli.github.com) `gh`, logged in | `ipm stats` | Optional: stars, topics and descriptions. |
-| [Claude Code](https://code.claude.com) `claude` | Validating and using the plugins you build | Optional for `ipm install`, which skips validation without it. |
+| [pnpm](https://pnpm.io/installation) 12 or later, **or** [Node.js](https://nodejs.org) | `ipm catalog sync`, `ipm pack build` | With only Node, `ipm` runs `npx -y pnpm@12.10.1` for you. |
+| [Docker](https://www.docker.com) (or OrbStack) | `ipm catalog serve`, `ipm search` | Runs the local Typesense search server. Everything else works without it. |
+| [GitHub CLI](https://cli.github.com) `gh`, logged in | `ipm marketplace stats` | Optional: stars, topics and descriptions. |
+| [Claude Code](https://code.claude.com) `claude` | Validating and using the plugins you build | Needed for `ipm install claude`; optional for `ipm pack build`, which skips validation without it. |
 
 `ipm` is tested on macOS and Linux. Windows paths are defined but untested.
 
@@ -60,7 +60,7 @@ This puts the latest release of `ipm` in `$(go env GOPATH)/bin`; make sure that 
 ipm onboard
 ```
 
-`ipm onboard` takes you from nothing to a searchable library. It loads a curated list of repos, shows them grouped into lists, and lets you tick the ones to follow. Two lists, "AI · Agentic Engineering Methods" and "AI · Skills, Plugins & Registries", are ticked for you on a fresh start.
+`ipm onboard` takes you from nothing to a searchable library. It first prints the four concepts, one line each: marketplace (curated repos you can follow), catalog (the repos you follow, fetched, pinned and searchable), pack (the skills, agents and plugins you pick) and install (a pack, built and installed into Claude Code). Then it loads a curated list of repos, shows them grouped into lists, and lets you tick the ones to follow. Two lists, "AI · Agentic Engineering Methods" and "AI · Skills, Plugins & Registries", are ticked for you on a fresh start.
 
 | Key | Does |
 | --- | --- |
@@ -71,7 +71,7 @@ ipm onboard
 | `enter`, then `y` | Continue with the ticked repos |
 | `q` | Quit without adding any sources |
 
-Each repo shows its stars, language and how long ago it was last pushed (these two at 100 columns or wider), and its description; the line above the key hints shows the highlighted repo's topics and homepage. Then `ipm onboard` adds the repos as sources and runs `ipm sync`, `ipm stats` and `ipm serve` with `ipm load`, printing `✓` or `✗` for each step. While it works, one line at the bottom shows a progress bar, the step, what it is doing and the time so far, for example `[████████░░░░░░░░░░░░] 3/5 stats · 17/42 anthropics/skills · 0:48`. Stats are skipped when `gh` is missing or logged out, and search when Docker isn't running; it says so and what to run later. It ends with `✓ library ready — N sources, M artifacts` and a few searches to try.
+Each repo shows its stars, language and how long ago it was last pushed (these two at 100 columns or wider), and its description; the line above the key hints shows the highlighted repo's topics and homepage. Then `ipm onboard` adds the repos as sources and runs `ipm catalog sync`, `ipm marketplace stats` and `ipm catalog serve` with `ipm catalog rebuild`, printing `✓` or `✗` for each step. While it works, one line at the bottom shows a progress bar, the step, what it is doing and the time so far, for example `[████████░░░░░░░░░░░░] 3/5 stats · 17/42 anthropics/skills · 0:48`. Stats are skipped when `gh` is missing or logged out, and search when Docker isn't running; it says so and what to run later. It ends with `✓ library ready — N sources, M artifacts` and a few searches to try.
 
 If `ipm` already has data, `ipm onboard` says what it found and asks whether to use it or back it up and start fresh. Using it keeps your sources: they show `✓` in the checklist and nothing is ticked for you. Backing up renames the home and cache folders to `<folder>.backup-YYYYMMDD-HHMM` and prints how to restore them. If a step fails, it prints the command to rerun; running `ipm onboard` again picks up where you left off.
 
@@ -87,30 +87,33 @@ ipm doctor
 
 `ipm` keeps its data in your user folders, never in the directory you run it from. See [Files and paths](reference/files.md) to move them.
 
-## 1. Follow some repos
+## 1. Follow some repos from the marketplace
 
 `ipm onboard` does this step and the next for you. To do them by hand:
 
 ```bash
-ipm source add obra/superpowers anthropics/skills
-ipm sync
+ipm marketplace                    # the curated repos, with ✓ on the ones you follow
+ipm marketplace add obra/superpowers anthropics/skills
+ipm catalog sync
 ```
 
-`ipm source add` records the repos; `ipm sync` has pnpm fetch each one, pin it to a commit and build the catalog. The first sync downloads every repo; later ones only fetch what changed.
+`ipm marketplace` lists the curated repos and marks the ones you follow. `ipm marketplace add` records the repos; `ipm catalog sync` has pnpm fetch each one, pin it to a commit and build the catalog. The first sync downloads every repo; later ones only fetch what changed. `ipm catalog` alone prints a summary: sources followed, items by type, the last sync and the search server's state.
 
-## 2. Search them
+## 2. Search the catalog
 
 ```bash
-ipm serve           # start Typesense in Docker, once per boot
-ipm load            # index the catalog; rerun after each sync
+ipm catalog serve   # start Typesense in Docker, once per boot
+ipm catalog rebuild # rebuild the catalog and index it for search
 ipm search tdd
 ```
+
+`ipm catalog sync` and `ipm catalog rebuild` load the search index themselves when the server is up; with it off they print a hint to run `ipm catalog serve`.
 
 Each result shows a SCORE, the artifact's type, name, repo, stars, the plugins it belongs to and its description, with its **ID** on the line beneath, for example `skill:obra/superpowers:skills/test-driven-development`. IDs are how you refer to anything in `ipm`:
 
 ```bash
 ipm show 'skill:obra/superpowers:skills/test-driven-development'
-ipm tree 'repo:obra/superpowers'
+ipm show tree 'repo:obra/superpowers'
 ```
 
 ## 3. Build a plugin
@@ -120,18 +123,20 @@ In any project folder:
 ```bash
 ipm pack new my-pack --description "My picks"
 ipm pack add my-pack 'skill:obra/superpowers:skills/test-driven-development'
-ipm install
+ipm pack build
 ```
 
-`ipm install` writes `ipm.toml` and `.ipm/` in the project and ends with the commands to install the result.
+`ipm pack build` writes `.ipm/` in the project (`ipm pack new` already created `ipm.toml`) and ends with the command to install the result. It also writes `.ipm/build.stamp`, which lets `ipm install` skip a build that is already current.
 
 ## 4. Use it in Claude Code
 
 ```bash
-claude plugin marketplace add ./.ipm
+ipm install claude my-pack
 ```
 
-Then, in Claude Code, run `/plugin install my-pack@<project folder>-ipm`. Or do both in one step with `ipm deploy my-pack`. The skill is available as `my-pack:test-driven-development`.
+`ipm install claude` builds the pack when `.ipm/` is out of date, then runs `claude plugin marketplace add` and `claude plugin install` for this project (`--scope user` or `local` choose another scope; `--dry-run` prints the commands without running them). It records the install in `ipm.toml`, so a bare `ipm install` later reinstalls everything recorded. The skill is available as `my-pack:test-driven-development`.
+
+To wire it yourself instead: `claude plugin marketplace add ./.ipm`, then in Claude Code `/plugin install my-pack@<project folder>-ipm`.
 
 {: .note }
 Adding a marketplace changes your Claude Code configuration. To try it without that, point `CLAUDE_CONFIG_DIR` at an empty folder first: `CLAUDE_CONFIG_DIR=$(mktemp -d) claude plugin marketplace add ./.ipm`.

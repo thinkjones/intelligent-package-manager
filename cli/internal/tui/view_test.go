@@ -119,7 +119,7 @@ func TestGoldenViews(t *testing.T) {
 		},
 		"local-banner": func(t *testing.T) *Model {
 			m, f := newTestWith(t, setup)
-			f.s.mode, f.s.notice = "local", "server off: keyword search only — run `ipm serve` and `ipm load` for semantic search"
+			f.s.mode, f.s.notice = "local", "server off: keyword search only — run `ipm catalog serve` and `ipm catalog rebuild` for semantic search"
 			typeText(t, m, "tdd")
 			return m
 		},

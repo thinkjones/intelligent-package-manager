@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
   <title id="title">How ipm works</title>
-  <desc id="desc">Five steps: ipm source add records the repos you follow; ipm sync has pnpm fetch each repo, pin it to a commit and catalog it; ipm search finds artifacts with local hybrid search; ipm pack add picks items into a pack; ipm install builds each pack into a Claude Code plugin and marketplace, which you add to Claude Code yourself.</desc>
+  <desc id="desc">Five steps: ipm marketplace records the repos you follow; ipm catalog sync has pnpm fetch each repo, pin it to a commit and catalog it; ipm search finds artifacts with local hybrid search; ipm pack add picks items into a pack; ipm install builds each pack into a Claude Code plugin and marketplace, and installs it into Claude Code.</desc>
 
   <rect x="1" y="1" width="1198" height="318" rx="4" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
 
@@ -10,13 +10,13 @@
   <g font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
     <g transform="translate(64 0)">
       <circle cx="9" cy="132" r="9" fill="#ffffff" stroke="#0f172a" stroke-width="2"/>
-      <text x="0" y="112" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20" font-weight="700" fill="#0f172a">source add</text>
+      <text x="0" y="112" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20" font-weight="700" fill="#0f172a">marketplace</text>
       <text x="0" y="180" font-size="20" fill="#475569">List the repos</text>
       <text x="0" y="206" font-size="20" fill="#475569">you follow</text>
     </g>
     <g transform="translate(278 0)">
       <circle cx="9" cy="132" r="9" fill="#ffffff" stroke="#0f172a" stroke-width="2"/>
-      <text x="0" y="112" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20" font-weight="700" fill="#0f172a">sync</text>
+      <text x="0" y="112" font-family="'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="20" font-weight="700" fill="#0f172a">catalog sync</text>
       <text x="0" y="180" font-size="20" fill="#475569">pnpm fetches and</text>
       <text x="0" y="206" font-size="20" fill="#475569">pins each repo;</text>
       <text x="0" y="232" font-size="20" fill="#475569">ipm catalogs it</text>

@@ -2,7 +2,7 @@
 
 Router for agents working in [thinkjones/intelligent-package-manager](https://github.com/thinkjones/intelligent-package-manager): the source code of `ipm` ("intelligent package manager"), a local Go CLI that fetches repos of agent artifacts with pnpm, catalogs every skill, agent, command, hook, MCP server and plugin in them, searches the catalog, and builds packs of picked items into Claude Code plugins. Read the linked file for detail; this page is only where things are.
 
-`ipm` was called `aihs`. The design and its parts are in [the ipm design](docs/superpowers/specs/2026-10-09-ipm-design.md); parts 1 (rename), 2 (sources on pnpm), 3 (packs built into plugins with `ipm install`) and 4 (`ipm tui`, a Bubble Tea TUI over search and packs) are built.
+`ipm` was called `aihs`. The design and its parts are in [the ipm design](docs/superpowers/specs/2026-10-09-ipm-design.md); parts 1 (rename), 2 (sources on pnpm), 3 (packs built into plugins with `ipm pack build`) and 4 (`ipm tui`, a Bubble Tea TUI over search and packs) are built.
 
 ## Where things are
 
@@ -24,16 +24,18 @@ Router for agents working in [thinkjones/intelligent-package-manager](https://gi
 | `$IPM_HOME/sources/` | Your repos of interest as a pnpm project: `package.json` (one git dependency per repo, alias `owner--repo`), `pnpm-lock.yaml` (pinned commits), `node_modules/<alias>/` (the installed repos), `.pnpmfile.cjs` (generated). |
 | `$IPM_HOME/store/` | ipm's dedicated pnpm store. |
 | `$IPM_HOME/global/` | User scope (`-g`): `ipm.toml` and `.ipm/`, laid out as in a project. |
-| `$IPM_CACHE_DIR/catalog/*.jsonl` | The catalog, written by `ipm index` (`github.jsonl` by `ipm stats`). Rebuildable; never committed. See [the catalog spec](docs/superpowers/specs/2026-10-08-artifact-catalog-design.md). |
-| `$IPM_CACHE_DIR/typesense/` | The local search server's data and API key. Disposable; `ipm load` rebuilds the index. |
+| `$IPM_HOME/installs.json` | Where user-scope packs are installed (`ipm install -g`): a sorted JSON array. A project's installs are in its `ipm.toml`. |
+| `$IPM_CACHE_DIR/catalog/*.jsonl` | The catalog, written by `ipm catalog rebuild` (`github.jsonl` by `ipm marketplace stats`). Rebuildable; never committed. See [the catalog spec](docs/superpowers/specs/2026-10-08-artifact-catalog-design.md). |
+| `$IPM_CACHE_DIR/typesense/` | The local search server's data and API key. Disposable; `ipm catalog rebuild` rebuilds the index. |
 | `$IPM_CACHE_DIR/curated/` | The last copy of each curated list `ipm onboard` fetched, used when offline. |
 
 In a project (the nearest ancestor of the working directory holding `ipm.toml`):
 
 | Path | What it is |
 | --- | --- |
-| `ipm.toml` | Packs: `[packs.<name>]` with `description` and `items` (catalog IDs). Edited with `ipm pack`. Committed. |
+| `ipm.toml` | Packs: `[packs.<name>]` with `description`, `items` (catalog IDs) and `[[packs.<name>.installs]]` (where the pack is installed, written by `ipm install`). Edited with `ipm pack`. Committed. |
 | `.ipm/ipm.lock` | Every picked item resolved to repo, path and commit. Generated, committed. |
+| `.ipm/build.stamp` | A hash of the packs, the lock and the ipm version: `ipm install` skips a build while it matches. Generated, committed. |
 | `.ipm/package.json`, `.ipm/pnpm-lock.yaml`, `.ipm/.pnpmfile.cjs` | One pnpm dependency per source repo, pinned to a commit. Generated, committed. |
 | `.ipm/.claude-plugin/marketplace.json` | The marketplace listing each pack and its whole-plugin dependencies. Generated, committed. |
 | `.ipm/plugins/<pack>/`, `.ipm/node_modules/` | Built plugins (hard links into pnpm's files) and pnpm's output. Gitignored by the generated `.ipm/.gitignore`. |
@@ -42,9 +44,9 @@ Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.lo
 
 ## Conventions
 
-- **Generated files are regenerated, not edited.** Change sources with `ipm source`, then `ipm sync`; change packs with `ipm pack`, then `ipm install`.
+- **Generated files are regenerated, not edited.** Change sources with `ipm marketplace`, then `ipm catalog sync`; change packs with `ipm pack`, then `ipm pack build` (or `ipm install claude`, which builds when stale).
 - **No upstream code runs.** pnpm always runs with `--ignore-scripts`, and sources' own npm dependencies are never installed.
-- **`ipm` is self-contained.** It works from any directory, keeps its data only in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), installs into Claude Code only on `ipm deploy`, and shares no configuration with fsh or Gas City.
+- **`ipm` is self-contained.** It works from any directory, keeps its data only in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), installs into Claude Code only on `ipm install claude`, and shares no configuration with fsh or Gas City.
 - **All CLI commands are Go**, built with [Cobra](https://cobra.dev), in `cli/internal/cli`. There are no script commands. Flags are POSIX style: long flags take two dashes.
 - **Prose in Markdown is not hard-wrapped**: one line per paragraph or list item.
 - **User docs change with the code.** A change to a command, flag, message or file format updates `docs/reference/commands.md`, the guide that uses it and `docs/troubleshooting.md` in the same commit. Each site page has Just the Docs front matter (`title`, `nav_order`, `parent` under `guides/` and `reference/`); link between pages with relative `.md` links, which work on GitHub and on the site. Don't link to `docs/superpowers/` with a relative link from a site page (it isn't published); use its GitHub URL.
@@ -68,7 +70,7 @@ Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.lo
 
 ## Source packs
 
-`source-packs.toml` is the curated list `ipm onboard` offers by default and `ipm source list` groups by (`curated.DefaultURL` reads it from `main`, so a merge changes what every user is offered). It holds only repos with something `ipm` can catalog, grouped into named lists (the source packs). It and `source-packs.skipped.txt` are generated: never edit them by hand.
+`source-packs.toml` is the curated list `ipm onboard` offers by default and `ipm marketplace` groups by (`curated.DefaultURL` reads it from `main`, so a merge changes what every user is offered). It holds only repos with something `ipm` can catalog, grouped into named lists (the source packs). It and `source-packs.skipped.txt` are generated: never edit them by hand.
 
 - **`mise run packs:update`** reads [thinkjones/agentic-tools](https://github.com/thinkjones/agentic-tools)'s `starred_repos.toml`, downloads each repo it hasn't seen, and looks for the markers the catalog indexes (`cli/internal/catalog`'s `Walk`). A repo holding something other than MCP files joins its list in `source-packs.toml` with its stars, description, topics, homepage and counts; any other goes in `source-packs.skipped.txt` and isn't fetched again (`-- --recheck` does). A repo that can't be fetched (`--timeout`, 10 minutes each) is recorded nowhere and tried on the next run. It prints a Markdown report of the new repos by pack.
 - **The Source packs workflow** (`.github/workflows/source-packs.yml`) runs that task by hand: `gh workflow run source-packs.yml`. The report is the run's summary. If the files changed, it pushes them to the branch `source-packs/update` and opens a draft pull request with the report as its body.

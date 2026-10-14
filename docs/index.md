@@ -5,7 +5,7 @@ description: ipm finds agent skills, agents, commands and plugins across many re
 permalink: /
 ---
 
-![ipm, the intelligent package manager for Claude Code: four items picked from two GitHub repos, each pinned to a commit, built by ipm install into one validated Claude Code plugin.](assets/brand/hero.svg)
+![ipm, the intelligent package manager for Claude Code: four items picked from two GitHub repos, each pinned to a commit, built by ipm pack build into one validated Claude Code plugin.](assets/brand/hero.svg)
 
 The intelligent package manager for agent artifacts. Find skills, agents, commands, hooks, MCP servers and plugins across every repo you follow, then pick the ones you want into your own Claude Code plugin, pinned to the commits you picked from.
 {: .lede }
@@ -25,26 +25,25 @@ Good agent artifacts are scattered across hundreds of repos and marketplaces. In
 
 ## What ipm does
 
-![How ipm works: source add, sync, search, pack add, install.](assets/brand/workflow.svg)
+![How ipm works: marketplace, catalog sync, search, pack add, install.](assets/brand/workflow.svg)
 
-1. **Follow repos.** `ipm source add obra/superpowers` adds a repo of interest. `ipm sync` has [pnpm](https://pnpm.io) fetch every repo and pin it to a commit.
-2. **Catalog them.** `ipm sync` also builds a catalog of everything those repos hold: one record per repo, marketplace, plugin, skill, agent, command, hook and MCP server, linked to what owns it.
-3. **Search.** `ipm search "c# testing"` runs hybrid keyword and semantic search over the catalog, on a local Typesense server. `ipm tree` and `ipm graph` show where anything comes from.
+1. **Follow repos.** `ipm marketplace` lists curated repos and `ipm marketplace add obra/superpowers` follows one. `ipm catalog sync` has [pnpm](https://pnpm.io) fetch every repo and pin it to a commit.
+2. **Catalog them.** `ipm catalog sync` also builds a catalog of everything those repos hold: one record per repo, marketplace, plugin, skill, agent, command, hook and MCP server, linked to what owns it.
+3. **Search.** `ipm search "c# testing"` runs hybrid keyword and semantic search over the catalog, on a local Typesense server. `ipm show tree` and `ipm show graph` show where anything comes from.
 4. **Pick into packs.** `ipm pack add my-pack <id>…` collects skills, agents, commands and whole plugins from any of your repos into a named pack in your project's `ipm.toml`.
 5. **Or do it all in one screen.** `ipm tui` searches, shows relationships, collects into packs and builds, with keys instead of IDs.
-6. **Build plugins.** `ipm install` builds each pack into a Claude Code plugin and a local marketplace under `.ipm/`. Your picks load as `my-pack:<item>`; whole plugins come along as pinned dependencies.
+6. **Build and install plugins.** `ipm pack build` builds each pack into a Claude Code plugin and a local marketplace under `.ipm/`. Your picks load as `my-pack:<item>`; whole plugins come along as pinned dependencies. `ipm install claude` builds when needed and installs a pack into Claude Code.
 {: .steps }
 
 ```bash
-ipm source add obra/superpowers wshobson/agents
-ipm sync
-ipm serve && ipm load
+ipm marketplace add obra/superpowers wshobson/agents
+ipm catalog sync
+ipm catalog serve && ipm catalog rebuild
 ipm search tdd --type skill
 
 ipm pack new my-pack --description "My picks"
 ipm pack add my-pack 'skill:obra/superpowers:skills/test-driven-development'
-ipm install
-claude plugin marketplace add ./.ipm
+ipm install claude my-pack
 ```
 
 // Principles
@@ -52,11 +51,11 @@ claude plugin marketplace add ./.ipm
 
 ## Why it is different
 
-- **Pinned and reproducible.** Every item is pinned to a commit in `.ipm/ipm.lock`. Commit it, and a teammate who runs `ipm install` gets byte-identical plugins.
+- **Pinned and reproducible.** Every item is pinned to a commit in `.ipm/ipm.lock`. Commit it, and a teammate who runs `ipm pack build` gets byte-identical plugins.
 - **No upstream code runs.** pnpm always runs with `--ignore-scripts`, and repos' own npm dependencies are never installed. Sources are content, not code.
 - **Your namespace.** Picked items load under your pack's name, not a dozen upstream plugin names.
 - **Built on pnpm.** Fetching, pinning, a content-addressable store and cheap linking come from pnpm; `ipm` doesn't reinvent them.
-- **You stay in control.** Building never touches your Claude Code configuration; `ipm deploy` installs a pack, at the scope you choose, only when you ask.
+- **You stay in control.** Building never touches your Claude Code configuration; `ipm install claude` installs a pack, at the scope you choose, only when you ask.
 
 // Next
 {: .section-label }

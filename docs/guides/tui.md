@@ -22,7 +22,7 @@ ipm tui            # the project's packs (the nearest ipm.toml, or the current f
 ipm tui -g         # your user-scope packs
 ```
 
-`ipm tui` needs a terminal and a catalog: run `ipm sync` first. For the best ranking, run `ipm serve` and `ipm load` too; without them the TUI still works, with keyword search.
+`ipm tui` needs a terminal and a catalog: run `ipm catalog sync` first. For the best ranking, run `ipm catalog serve` and `ipm catalog rebuild` too; without them the TUI still works, with keyword search.
 
 ## The screen
 
@@ -70,8 +70,8 @@ Below 60×15 the TUI asks you to enlarge the terminal; in a short terminal the t
 | `t` | the pack tray (`←` `→` items, `d` removes, `esc` back) |
 | `f` | cycle the type filter: all, skill, agent, command, plugin |
 | `p` | switch pack, or `n` for a new one |
-| `b` (or `i`) | build every pack (`ipm install`) |
-| `D` | deploy the active pack to Claude Code |
+| `b` (or `i`) | build every pack (`ipm pack build`) |
+| `D` | deploy the active pack to Claude Code (`ipm install claude`) |
 | `e` | external references: the other repos that use this repo |
 | `ctrl+r` | check the search server again |
 | `?` | every key |
@@ -97,31 +97,31 @@ A marketplace can list a plugin that lives in another repo: `anthropics/claude-p
 - **`→` on it jumps** into `cloudflare/skills`' own tree, on the plugin it points at. A second root sits above the tree, `↩ anthropics/claude-plugins-official — back to cloudflare`: `↑` to it and `enter` takes you back. Jumps stack (up to 20); moving to another search result forgets them.
 - **In `cloudflare/skills`' own tree**, the root is `cloudflare/skills`. Who uses it is extra information, not ancestry: the current node says `↗ used by N` (other repos using its repo), and nodes that other repos point at directly say it too.
 - **`e`** lists every external reference to the current repo, grouped by the repo it comes from, with stars and marketplace. `enter` jumps there, with the back root to return.
-- An external entry whose repo isn't one of your sources says `↗ <repo> (not a source — ipm source add <id>)`; add it and `ipm sync` to follow it.
+- An external entry whose repo isn't one of your sources says `↗ <repo> (not a source — ipm marketplace add <id>)`; add it and `ipm catalog sync` to follow it.
 
 Being used by other repos is a strong sign a repo is useful, so search also prefers it when results are otherwise equal.
 
 ## Build and deploy
 
 1. **Collect.** Search, look at the tree, and `a` what you want. `p`, then `n`, creates a pack.
-2. **Build.** `b` runs `ipm install`; its output streams in and ends with `✓ installed`.
+2. **Build.** `b` runs `ipm pack build`; its output streams in and ends with `✓ installed`.
 3. **Deploy.** `D` installs the active pack into Claude Code:
    1. Pick where: **user** (every project, just you), **project** (a folder, shared through its `.claude/settings.json`) or **local** (a folder, just you). The default is project scope in the pack's own project.
    2. For project and local scope, confirm or type the folder (`~` works).
    3. Read the exact commands it will run, then `y` to deploy:
       ```text
       Deploy csharp-sdlc to Claude Code — project scope in /work
-        ipm install
+        ipm pack build
         claude plugin marketplace add /work/.ipm --scope project
         claude plugin install csharp-sdlc@work-ipm --scope project
       y deploy · esc cancel
       ```
    4. The output streams in and ends with `✓ deployed csharp-sdlc (project /work)`.
 
-Deploy always builds first, so Claude Code gets the current pack. Deploying again adds the marketplace again (Claude Code accepts that), refreshes it, and updates the plugin instead of installing it. If Claude Code already has a marketplace of the same name from another folder — two projects in folders with the same name — deploy stops rather than repoint it. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
+Deploy builds first when `.ipm/` is out of date, so Claude Code gets the current pack. Deploying again adds the marketplace again (Claude Code accepts that), refreshes it, and updates the plugin instead of installing it. If Claude Code already has a marketplace of the same name from another folder — two projects in folders with the same name — deploy stops rather than repoint it. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
 
-The same works from the command line with [`ipm deploy`](../reference/commands.md#ipm-deploy).
+The same works from the command line with [`ipm install claude`](../reference/commands.md#ipm-install). Like the command line, the TUI records each install, so a bare `ipm install` replays it.
 
 ## Without the search server
 
-When the server isn't running, or its index is empty, the TUI searches the catalog by keyword (names count most, then descriptions and tags) and shows a banner saying so. Start it with `ipm serve` and `ipm load` in another terminal, then press `ctrl+r`.
+When the server isn't running, or its index is empty, the TUI searches the catalog by keyword (names count most, then descriptions and tags) and shows a banner saying so. Start it with `ipm catalog serve` and `ipm catalog rebuild` in another terminal, then press `ctrl+r`.

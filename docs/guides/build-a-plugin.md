@@ -16,8 +16,8 @@ Pick items from several repos into a pack, build it into a Claude Code plugin, a
 This walkthrough builds `csharp-sdlc`, a C# pack with a skill, an agent and a command from `wshobson/agents`, plus the whole Stripe plugin from `anthropics/claude-plugins-official`. To follow it exactly, add those sources first:
 
 ```bash
-ipm source add wshobson/agents anthropics/claude-plugins-official
-ipm sync && ipm load
+ipm marketplace add wshobson/agents anthropics/claude-plugins-official
+ipm catalog sync
 ```
 
 ## 1. Find the items
@@ -71,7 +71,7 @@ items = [
 | A Copilot plugin | Its skills, placed in your pack's plugin |
 | A whole plugin (local, inline or external) | A dependency of your pack, keeping its own name, hooks and MCP servers |
 | A hook, an MCP server or an inline command | Refused: they come only with their plugin, and `ipm pack add` prints the command that adds it |
-| A repo or a marketplace | Refused: pick what it holds (`ipm tree <id>` lists it) |
+| A repo or a marketplace | Refused: pick what it holds (`ipm show tree <id>` lists it) |
 
 ### Pack names
 
@@ -80,38 +80,45 @@ Pack names start with a letter or digit and use letters, digits, `.`, `_` and `-
 ## 3. Build it
 
 ```bash
-ipm install
+ipm pack build
 ```
 
 ```text
 ✓ csharp-sdlc: 3 item(s), 1 plugin dependency(ies)
 validate: ok
 
-Install in Claude Code:
+Install in Claude Code: ipm install claude
+Or wire it yourself:
   claude plugin marketplace add /path/to/project/.ipm
-  /plugin install csharp-sdlc@project-ipm
 ```
 
-`ipm install`:
+`ipm pack build`:
 
 1. resolves every item to a repo, path and commit;
 2. has pnpm fetch those commits into `.ipm/node_modules` (with `--ignore-scripts`);
 3. places the picked files in `.ipm/plugins/csharp-sdlc/` (skills in `skills/`, agents in `agents/`, commands in `commands/`) with a `plugin.json` recording where each came from;
 4. writes the marketplace `.ipm/.claude-plugin/marketplace.json`, named `<project folder>-ipm`, listing `csharp-sdlc` and its dependency `csharp-sdlc-stripe`;
 5. records every pin in `.ipm/ipm.lock`;
-6. runs `claude plugin validate --strict` on the result.
+6. runs `claude plugin validate --strict` on the result;
+7. writes `.ipm/build.stamp` last: a hash of the packs, the lock and the ipm version, which lets `ipm install` skip a build that is already current.
 
 Validation is skipped, with a note, when `claude` isn't on your `PATH`, or with `--no-validate`. If anything fails, your previous build and lock are left as they were.
 
-If an external plugin's upstream entry isn't pinned to a commit, `ipm install` warns you: Claude Code will install whatever that entry points at on the day it installs.
+If an external plugin's upstream entry isn't pinned to a commit, `ipm pack build` warns you: Claude Code will install whatever that entry points at on the day it installs.
 
 ## 4. Install it in Claude Code
+
+```bash
+ipm install claude csharp-sdlc
+```
+
+`ipm install claude` builds the pack first when `.ipm/` is out of date (it prints `build is current` when it isn't), then installs it into Claude Code for this project; `--scope user` installs it for every project, `--scope local` for just you in this folder, and `--path DIR` picks another folder. `--dry-run` prints the `claude` commands without running them, and `--update` re-pins every item before building. The install is recorded in `ipm.toml` (`[[packs.csharp-sdlc.installs]]`), so a bare `ipm install` later reinstalls every recorded install. To wire it yourself instead:
 
 ```bash
 claude plugin marketplace add ./.ipm
 ```
 
-Or let `ipm` do it: `ipm deploy csharp-sdlc` builds and installs it for this project (`--scope user` for every project). Otherwise, in Claude Code:
+Then, in Claude Code:
 
 ```text
 /plugin install csharp-sdlc@<project folder>-ipm
@@ -127,35 +134,35 @@ Adding a marketplace changes your Claude Code configuration. To try a build firs
 ```bash
 ipm pack add csharp-sdlc '<another id>'
 ipm pack remove csharp-sdlc 'plugin:anthropics/claude-plugins-official#stripe'
-ipm install
+ipm pack build
 ```
 
-Rerun `ipm install` after every change. Items you remove leave no files behind, and building twice gives identical output. In Claude Code, run `/plugin marketplace update <project folder>-ipm` to pick up the new build.
+Rerun `ipm pack build` after every change. Items you remove leave no files behind, and building twice gives identical output. In Claude Code, run `/plugin marketplace update <project folder>-ipm` to pick up the new build.
 
 `ipm pack list` lists every pack in the scope with its item count and description.
 
 ## Keep it current
 
-`ipm install` keeps every item at the commit in `.ipm/ipm.lock`, so your plugin doesn't change when your sources do. To move forward:
+`ipm pack build` keeps every item at the commit in `.ipm/ipm.lock`, so your plugin doesn't change when your sources do. To move forward:
 
 ```bash
-ipm sync --upgrade        # move your sources to their latest commits
-ipm install --update      # re-pin every item to your current catalog
+ipm catalog sync --upgrade   # move your sources to their latest commits
+ipm pack build --update   # re-pin every item to your current catalog
 ```
 
 ## Don't edit the built files
 
-Files in `.ipm/plugins/` are hard links to pnpm's copies: editing one changes pnpm's copy too, and the next `ipm install` rebuilds the folder anyway. To change an item, change it upstream, or fork it into a repo of your own, add that as a source and pick from it.
+Files in `.ipm/plugins/` are hard links to pnpm's copies: editing one changes pnpm's copy too, and the next `ipm pack build` rebuilds the folder anyway. To change an item, change it upstream, or fork it into a repo of your own, add that as a source and pick from it.
 
 ## Packs for every project
 
-Add `-g` to any `ipm pack` command or to `ipm install` to use your user scope, `$IPM_HOME/global`, instead of a project:
+Add `-g` to any `ipm pack` command or to `ipm pack build` to use your user scope, `$IPM_HOME/global`, instead of a project:
 
 ```bash
 ipm pack new everyday -g
 ipm pack add everyday '<id>' -g
-ipm install -g
-claude plugin marketplace add ~/Library/ipm/global/.ipm      # macOS; ~/.local/share/ipm/global/.ipm on Linux
+ipm pack build -g
+ipm install claude everyday -g      # user scope; recorded in $IPM_HOME/installs.json
 ```
 
-Its marketplace is called `ipm-global`.
+Its marketplace is called `ipm-global`. To wire it yourself instead: `claude plugin marketplace add ~/Library/ipm/global/.ipm` (macOS; `~/.local/share/ipm/global/.ipm` on Linux).
