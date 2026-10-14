@@ -166,7 +166,7 @@ func TestBareInstallNothingRecorded(t *testing.T) {
 	f, _ := claudeFake(t)
 	err := f.run("install")
 	var usage *UsageError
-	want := "install: say claude — nothing is recorded for this scope yet. Try `ipm help install`."
+	want := "install: say claude or gascity — nothing is recorded for this scope yet. Try `ipm help install`."
 	if !errors.As(err, &usage) || err.Error() != want {
 		t.Errorf("got %v", err)
 	}
@@ -179,7 +179,7 @@ func TestBareInstallUnknownTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := f.run("install")
-	if err == nil || !strings.Contains(err.Error(), "kit → zed "+root+`: unknown target "zed" (use claude)`) ||
+	if err == nil || !strings.Contains(err.Error(), "kit → zed "+root+`: unknown target "zed" (use claude or gascity)`) ||
 		!strings.Contains(err.Error(), "ipm.toml ("+filepath.Join(root, project.File)+")") {
 		t.Errorf("got %v", err)
 	}
@@ -315,5 +315,42 @@ func TestInstallUnknownTargetNamesTargets(t *testing.T) {
 	err = f.run("install")
 	if err == nil || !strings.Contains(err.Error(), "install: say claude or gascity — nothing is recorded") {
 		t.Errorf("got %v", err)
+	}
+}
+
+func TestBuildCurrentStaleWhenLockChanges(t *testing.T) {
+	f, root := claudeFake(t)
+	scope, _ := currentScope(f.system(), false)
+	if !buildCurrent(f.system(), scope) {
+		t.Fatal("a fresh build is current")
+	}
+	lock := filepath.Join(root, ".ipm", project.LockFile)
+	data, _ := os.ReadFile(lock)
+	if err := os.WriteFile(lock, append(data, '\n'), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if buildCurrent(f.system(), scope) {
+		t.Error("a changed lock makes the build stale")
+	}
+}
+
+func TestBuildCurrentStaleWhenVersionChanges(t *testing.T) {
+	f, _ := claudeFake(t)
+	scope, _ := currentScope(f.system(), false)
+	sys := f.system()
+	sys.Version = "other"
+	if buildCurrent(sys, scope) {
+		t.Error("a new ipm version makes the build stale")
+	}
+}
+
+func TestBuildCurrentStaleWhenStampMissing(t *testing.T) {
+	f, root := claudeFake(t)
+	scope, _ := currentScope(f.system(), false)
+	if err := os.Remove(filepath.Join(root, ".ipm", project.StampFile)); err != nil {
+		t.Fatal(err)
+	}
+	if buildCurrent(f.system(), scope) {
+		t.Error("no stamp means no current build")
 	}
 }

@@ -159,15 +159,18 @@ func SavePacks(root string, packs []Pack) error {
 }
 
 // LockItem is one picked item, resolved. Source is set for whole plugins:
-// the marketplace source (JSON) their entry uses.
+// the marketplace source (JSON) their entry uses. Parts is a local whole
+// plugin's child item IDs, sorted: they share its repo and commit. Nil means
+// not recorded (an old lock); empty non-nil means recorded, none.
 type LockItem struct {
-	ID     string `toml:"id"`
-	Type   string `toml:"type"`
-	Name   string `toml:"name"`
-	Repo   string `toml:"repo"`
-	Path   string `toml:"path"`
-	SHA    string `toml:"sha"`
-	Source string `toml:"source"`
+	ID     string   `toml:"id"`
+	Type   string   `toml:"type"`
+	Name   string   `toml:"name"`
+	Repo   string   `toml:"repo"`
+	Path   string   `toml:"path"`
+	SHA    string   `toml:"sha"`
+	Source string   `toml:"source"`
+	Parts  []string `toml:"parts"`
 }
 
 // LoadLock reads dir/ipm.lock, keyed by item ID; no file is empty.
@@ -209,6 +212,13 @@ func SaveLock(dir string, items map[string]LockItem) error {
 		}
 		if it.Source != "" {
 			fmt.Fprintf(&b, "source = %q\n", it.Source)
+		}
+		if it.Parts != nil {
+			quoted := make([]string, len(it.Parts))
+			for i, p := range it.Parts {
+				quoted[i] = fmt.Sprintf("%q", p)
+			}
+			fmt.Fprintf(&b, "parts = [%s]\n", strings.Join(quoted, ", "))
 		}
 	}
 	return writeFile(filepath.Join(dir, LockFile), b.String())

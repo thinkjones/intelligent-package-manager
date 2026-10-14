@@ -167,3 +167,47 @@ func TestLoadPacksUnknownKeyStillFails(t *testing.T) {
 		t.Errorf("got %v", err)
 	}
 }
+
+func TestSaveLockParts(t *testing.T) {
+	dir := t.TempDir()
+	items := map[string]LockItem{
+		"plugin:o/r:p": {ID: "plugin:o/r:p", Type: "plugin", Name: "p", Repo: "o/r", Path: "p", SHA: "abc", Parts: []string{"agent:o/r:p/a.md", "skill:o/r:p/s"}},
+		"skill:o/r:s":  {ID: "skill:o/r:s", Type: "skill", Name: "s", Repo: "o/r", Path: "s", SHA: "abc"},
+	}
+	if err := SaveLock(dir, items); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadLock(dir)
+	if err != nil || !reflect.DeepEqual(got, items) {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, LockFile))
+	if n := strings.Count(string(raw), "parts ="); n != 1 || !strings.Contains(string(raw), `parts = ["agent:o/r:p/a.md", "skill:o/r:p/s"]`) {
+		t.Errorf("lock:\n%s", raw)
+	}
+}
+
+func TestLockPartsNilVersusEmpty(t *testing.T) {
+	dir := t.TempDir()
+	items := map[string]LockItem{
+		"plugin:o/r:none": {ID: "plugin:o/r:none", Type: "plugin", Name: "none", Repo: "o/r", Path: "none", SHA: "abc", Parts: []string{}},
+		"plugin:o/r:old":  {ID: "plugin:o/r:old", Type: "plugin", Name: "old", Repo: "o/r", Path: "old", SHA: "abc"},
+	}
+	if err := SaveLock(dir, items); err != nil {
+		t.Fatal(err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, LockFile))
+	if n := strings.Count(string(raw), "parts = []\n"); n != 1 {
+		t.Errorf("lock:\n%s", raw)
+	}
+	got, err := LoadLock(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p := got["plugin:o/r:none"].Parts; p == nil || len(p) != 0 {
+		t.Errorf("recorded none came back as %#v", p)
+	}
+	if p := got["plugin:o/r:old"].Parts; p != nil {
+		t.Errorf("not recorded came back as %#v", p)
+	}
+}

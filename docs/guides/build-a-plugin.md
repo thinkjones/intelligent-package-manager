@@ -129,6 +129,22 @@ Claude Code installs `csharp-sdlc-stripe` with it. Your picks load under the pac
 {: .note }
 Adding a marketplace changes your Claude Code configuration. To try a build first, use a throwaway config: `export CLAUDE_CONFIG_DIR=$(mktemp -d)` before running `claude`.
 
+## Install into Gas City
+
+The same pack can become a [Gas City](https://github.com/gastownhall/gascity) pack folder:
+
+```bash
+ipm install gascity csharp-sdlc -C ~/cities/dev
+```
+
+```text
+Import it into a city's pack.toml or city.toml:
+  [imports.csharp-sdlc]
+  source = "/Users/you/cities/dev/csharp-sdlc"
+```
+
+It builds first unless the build is current, then writes `~/cities/dev/csharp-sdlc/` with your skills, agents and MCP servers in Gas City's layout. Paste the `[imports]` table into the city's `pack.toml` or `city.toml`: ipm never edits a city. Gas City has no slash commands or hooks, so commands, hooks and plugins whose files live in another repo are skipped with a `skipped …` warning; agent and MCP settings Gas City has no equivalent for are dropped with a warning. `--dry-run` lists the files without writing. Rerun `ipm install gascity` (or a bare `ipm install`) after changing the pack: it replaces its own folder completely. See [the commands reference](../reference/commands.md#ipm-install-gascity) for every message.
+
 ## Change a pack
 
 ```bash

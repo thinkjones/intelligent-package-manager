@@ -174,3 +174,23 @@ func TestFrontmatterNonFiniteFloatsBecomeStrings(t *testing.T) {
 		t.Errorf("got %#v %v", meta, err)
 	}
 }
+
+func TestBody(t *testing.T) {
+	for in, want := range map[string]string{
+		"---\nname: x\n---\nHello\n":         "Hello\n",
+		"Hello\n":                            "Hello\n",
+		"---\r\nname: x\r\n---\r\nHello\r\n": "Hello\n",
+		"---\n---\nHello\n":                  "Hello\n",
+		"---\nname: x\n---":                  "",
+	} {
+		if got := string(Body([]byte(in))); got != want {
+			t.Errorf("Body(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestBodyNormalizesCRLFWithoutFrontmatter(t *testing.T) {
+	if got := string(Body([]byte("Hello\r\nthere\r\n"))); got != "Hello\nthere\n" {
+		t.Errorf("got %q", got)
+	}
+}

@@ -12,12 +12,12 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/marketplace"
-	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 )
@@ -55,6 +55,15 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 			if err := check(l); err != nil {
 				return fmt.Errorf("%s in ipm.lock: %v — fix it, or run `ipm pack build --update` to re-resolve from the catalog", id, err)
 			}
+			if l.Type == catalog.TypePlugin && l.Path != "" && l.Parts == nil {
+				// A lock from before parts were recorded: read them from
+				// the catalog, but only when it is at the locked commit —
+				// part IDs from a newer commit may not exist at the pin.
+				// Without a catalog the plugin stays whole-only.
+				if r, err := lookup(id); err == nil && r != nil && str(r, "commit") == l.SHA {
+					l.Parts = pluginParts(r)
+				}
+			}
 			out[id] = l
 			if l.Type == catalog.TypeCopilotPlugin {
 				skills, _ := copilotSkills(l)
@@ -76,6 +85,9 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 		it := project.LockItem{ID: id, Type: str(r, "type"), Name: str(r, "name"), Repo: str(r, "repo"), Path: str(r, "path"), SHA: str(r, "commit")}
 		switch it.Type {
 		case catalog.TypePlugin:
+			if it.Path != "" {
+				it.Parts = pluginParts(r)
+			}
 			if entry, ok := r["entry"].(map[string]any); ok && strings.Contains(id, "#") {
 				b, _ := json.Marshal(entry)
 				it.Source = string(b)
@@ -125,6 +137,12 @@ func check(it project.LockItem) error {
 	if (it.SHA != "" || !external) && !commitRE.MatchString(it.SHA) {
 		return fmt.Errorf("sha %q is not a full commit", it.SHA)
 	}
+	for _, p := range it.Parts {
+		// A part is an item of the plugin's own repo.
+		if _, rest, _ := strings.Cut(p, ":"); !strings.HasPrefix(rest, it.Repo+":") {
+			return fmt.Errorf("part %q is not in %s", p, it.Repo)
+		}
+	}
 	switch {
 	case it.Type == catalog.TypeCopilotPlugin:
 		if _, err := copilotSkills(it); err != nil {
@@ -136,6 +154,17 @@ func check(it project.LockItem) error {
 		}
 	}
 	return nil
+}
+
+// pluginParts is a plugin record's child item IDs (skills, agents, commands,
+// hooks, MCP servers), sorted and deduplicated.
+func pluginParts(r map[string]any) []string {
+	parts := []string{} // non-nil: "recorded, none" differs from "not recorded"
+	for _, k := range []string{"skills", "agents", "commands", "hooks", "mcp"} {
+		parts = append(parts, strs(r[k])...)
+	}
+	sort.Strings(parts)
+	return slices.Compact(parts)
 }
 
 // copilotSkills is a copilot plugin's skill IDs, from its Source.
@@ -257,15 +286,7 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 			if base == "" {
 				return fmt.Errorf("%s has no name usable as a file name", it.ID)
 			}
-			name := base
-			if used[dir+"/"+name] {
-				owner, _, _ := strings.Cut(pack.NormalizeRepo(it.Repo), "/")
-				name = base + "-" + slug(owner)
-				for n := 2; used[dir+"/"+name]; n++ {
-					name = fmt.Sprintf("%s-%d", base, n)
-				}
-			}
-			used[dir+"/"+name] = true
+			name := uniqueName(used, dir, base, it.Repo, slug)
 			pp.Files = append(pp.Files, Placed{Alias: sources.Alias(it.Repo), From: it.Path, To: dir + "/" + name + ext, Dir: it.Type == catalog.TypeSkill, Item: it})
 			return nil
 		}
@@ -297,6 +318,11 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 				dep, err := wholePlugin(p.Name, it)
 				if err != nil {
 					return Plan{}, fmt.Errorf("%s: %v", id, err)
+				}
+				if it.Path != "" {
+					if err := pin(it); err != nil {
+						return Plan{}, err
+					}
 				}
 				pp.Deps = append(pp.Deps, dep)
 				name := pp.DepNames()[len(pp.DepNames())-1]
@@ -347,22 +373,9 @@ func Place(p PackPlan, nodeModules, pluginDir string, link func(oldname, newname
 		return err
 	}
 	for _, f := range p.Files {
-		root, err := filepath.EvalSymlinks(filepath.Join(nodeModules, f.Alias))
+		src, err := source(nodeModules, f)
 		if err != nil {
-			return fmt.Errorf("%s is not installed in %s: %v", f.Item.Repo, nodeModules, err)
-		}
-		from := filepath.FromSlash(f.From)
-		if !filepath.IsLocal(from) {
-			return fmt.Errorf("%s: %s is outside its repo", f.Item.ID, f.From)
-		}
-		// Resolve symlinks so neither the item nor a link inside it can
-		// reach outside the repo.
-		src, err := filepath.EvalSymlinks(filepath.Join(root, from))
-		if err != nil {
-			return fmt.Errorf("%s: %v", f.Item.ID, err)
-		}
-		if rel, err := filepath.Rel(root, src); err != nil || !filepath.IsLocal(rel) {
-			return fmt.Errorf("%s: %s leads outside its repo", f.Item.ID, f.From)
+			return err
 		}
 		dst := filepath.Join(pluginDir, filepath.FromSlash(f.To))
 		if !f.Dir {
@@ -383,6 +396,29 @@ func Place(p PackPlan, nodeModules, pluginDir string, link func(oldname, newname
 		}
 	}
 	return nil
+}
+
+// source is the file or folder f names inside its installed repo, with
+// symlinks resolved; it refuses a path that leads outside the repo.
+func source(nodeModules string, f Placed) (string, error) {
+	root, err := filepath.EvalSymlinks(filepath.Join(nodeModules, f.Alias))
+	if err != nil {
+		return "", fmt.Errorf("%s is not installed in %s: %v", f.Item.Repo, nodeModules, err)
+	}
+	from := filepath.FromSlash(f.From)
+	if !filepath.IsLocal(from) {
+		return "", fmt.Errorf("%s: %s is outside its repo", f.Item.ID, f.From)
+	}
+	// Resolve symlinks so neither the item nor a link inside it can
+	// reach outside the repo.
+	src, err := filepath.EvalSymlinks(filepath.Join(root, from))
+	if err != nil {
+		return "", fmt.Errorf("%s: %v", f.Item.ID, err)
+	}
+	if rel, err := filepath.Rel(root, src); err != nil || !filepath.IsLocal(rel) {
+		return "", fmt.Errorf("%s: %s leads outside its repo", f.Item.ID, f.From)
+	}
+	return src, nil
 }
 
 func put(src, dst string, link func(string, string) error) error {

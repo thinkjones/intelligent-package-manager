@@ -14,7 +14,7 @@ import (
 )
 
 // installOpts are the flags every install target shares.
-type installOpts struct{ Global, Update, DryRun bool }
+type installOpts struct{ Global, Update, DryRun, Force bool }
 
 // installer installs pack from scope at in, writing what it does to out, and
 // returns what it installed where.
@@ -23,7 +23,8 @@ type installer func(sys System, scope project.Scope, pack string, in project.Ins
 // installers are the install targets, by the name ipm install takes and
 // records.
 var installers = map[string]installer{
-	"claude": installClaude,
+	"claude":  installClaude,
+	"gascity": installGascity,
 }
 
 // targetNames is the install targets for a message, sorted: "claude", or
@@ -52,7 +53,7 @@ func newInstallCmd(sys System) *cobra.Command {
 		RunE: func(*cobra.Command, []string) error { return replayInstalls(sys, global) },
 	}
 	cmd.Flags().BoolVarP(&global, "global", "g", false, "redo the installs of your user scope ($IPM_HOME/global)")
-	cmd.AddCommand(newInstallClaudeCmd(sys))
+	cmd.AddCommand(newInstallClaudeCmd(sys), newInstallGascityCmd(sys))
 	return cmd
 }
 
@@ -72,6 +73,9 @@ func newInstallClaudeCmd(sys System) *cobra.Command {
 			pack := ""
 			if len(args) == 1 {
 				pack = args[0]
+			}
+			if o.DryRun && o.Update {
+				return usagef("install claude: --dry-run and --update can't be used together")
 			}
 			scope, err := currentScope(sys, o.Global)
 			if err != nil {

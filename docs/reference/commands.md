@@ -222,7 +222,7 @@ ipm pack remove <pack> <id>… [-g]
 ipm pack list [-g]
 ipm pack show <pack> [-g]
 ipm pack build [-g] [--update] [--no-validate]
-ipm pack install claude [pack] …      (same as ipm install claude)
+ipm pack install claude|gascity [pack] …      (same as ipm install claude|gascity)
 ```
 
 | Subcommand | Does |
@@ -246,7 +246,7 @@ ipm pack install claude [pack] …      (same as ipm install claude)
 ipm pack build [-g] [--update] [--no-validate]
 ```
 
-Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, writes `.ipm/.claude-plugin/marketplace.json` and `.ipm/ipm.lock`, and validates the result with `claude plugin validate --strict`. Last, it writes `.ipm/build.stamp`, a hash of the packs, the lock and the ipm version, which lets `ipm install` skip a build that is already current. A failure leaves the previous build and lock in place. It only builds: it never touches your Claude Code configuration.
+Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, fetches the repos of any whole plugins you picked (so `ipm install gascity` can read their parts), writes `.ipm/.claude-plugin/marketplace.json` and `.ipm/ipm.lock` (which records each whole plugin's `parts`), and validates the result with `claude plugin validate --strict`. Last, it writes `.ipm/build.stamp`, a hash of the packs, the lock and the ipm version, which lets `ipm install` skip a build that is already current. A failure leaves the previous build and lock in place. It only builds: it never touches your Claude Code configuration.
 
 | Flag | Does |
 | --- | --- |
@@ -258,8 +258,11 @@ Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, 
 
 ```text
 ipm install claude [pack] [--scope user|project|local] [--path DIR] [-g] [--update] [--dry-run]
+ipm install gascity [pack] [-C DIR] [--name NAME] [-g] [--force] [--update] [--dry-run]
 ipm install [-g]
 ```
+
+#### `ipm install claude`
 
 `ipm install claude` installs `pack` into Claude Code. `pack` may be left out when the scope has only one. It builds first when `.ipm/` is out of date (the build stamp no longer matches), printing `build is current` when it is not needed, then prints each `claude` command before running it and needs no confirmation: typing the command is the decision. Afterwards it records the install: in the pack's `[[packs.<name>.installs]]` table in `ipm.toml` for a project pack (a path inside the project is stored relative to it), or in `$IPM_HOME/installs.json` for a user-scope pack. Installing the same pack to the same target, path and scope again replaces its record; project and local scope at one folder are two records. `ipm pack install claude` is the same command.
 
@@ -269,11 +272,52 @@ ipm install [-g]
 | `-p`, `--path DIR` | The folder for project or local scope. Default: the pack's project. `~` and relative paths work. |
 | `-g`, `--global` | Install a pack from your user scope. |
 | `--update` | Re-pin every item to your current catalog and rebuild first. |
-| `--dry-run` | Print the `claude` commands without building, running or recording anything. |
+| `--dry-run` | Print the `claude` commands without building, running or recording anything. Can't be combined with `--update` (usage error, exit 2: `install claude: --dry-run and --update can't be used together`). |
 
 The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (always — Claude Code accepts a repeat), `claude plugin marketplace update <name>` when Claude Code already knows the marketplace, then `claude plugin install <pack>@<name> --scope S`, or `claude plugin update …` when the pack is already installed there. Needs `claude` on your `PATH`.
 
-Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `claude` is a usage error. Before running anything it checks every record's target: a record of a target this ipm doesn't know is reported as `<pack> → <target> …: unknown target`, and nothing is installed. A record that fails (a stale one whose folder was deleted, say) doesn't stop the others: its error is printed as `✗ <pack> → <target> <scope or name> <path>: <error>`, and the replay ends with exit 1 and `✗ N of M recorded installs failed; if a record is stale, remove it from <file>`, where the file is `ipm.toml` for a project or `$IPM_HOME/installs.json` with `-g`, each with its path. There is no command to forget a record: delete it from that file.
+#### `ipm install gascity`
+
+`ipm install gascity` writes `pack` as a [Gas City](https://github.com/gastownhall/gascity) pack folder, `<DIR>/<NAME>`, that a city can import. `pack` may be left out when the scope has only one. Like `install claude` it builds first unless the build is current. It reads no Gas City config and edits no city: it writes the folder, records the install and prints how to import it. `ipm pack install gascity` is the same command.
+
+| Flag | Does |
+| --- | --- |
+| `-C`, `--dir DIR` | The folder to write the pack folder into; it must exist. Default: the working directory. `~` and relative paths work. |
+| `--name NAME` | The pack folder's name. Default: the pack's name. It must start with a letter or digit and use only letters, digits, `_` and `-`, else a usage error (exit 2). |
+| `-g`, `--global` | Install a pack from your user scope. |
+| `--force` | Replace a folder that ipm did not write. |
+| `--update` | Re-pin every item to your current catalog and rebuild first. |
+| `--dry-run` | List the files that would be written, without building, writing or recording anything. Needs a current build: `--dry-run needs a current build — run ipm pack build first`. If the folder would be refused, it prints `would refuse: <message>` and exits 1. Can't be combined with `--update` (usage error, exit 2: `install gascity: --dry-run and --update can't be used together`). |
+
+The folder holds `pack.toml`, `skills/<name>/` (each skill folder copied whole), `agents/<name>/prompt.md` with `agents/<name>/agent.toml`, and `mcp/<name>.toml`. Files are copied, not hard-linked, and two runs give byte-identical folders. Names are lowercased. For skills and agents `_` is kept and other characters become `-`; MCP server names also turn `_` into `-` (they use only `a-z 0-9 -`). Clashes within a kind get `-<owner>`, then `-2`, `-3`. An agent's prompt is its body without the frontmatter, as plain markdown (Gas City does not template it).
+
+Gas City has no equivalent for some items, so ipm skips them and prints each as a warning:
+
+| Message | Meaning |
+| --- | --- |
+| `skipped <id>: Gas City has no slash commands` | Commands, from a pack or from a whole plugin, are not written. |
+| `skipped <id>: Gas City packs have no hooks` | A plugin's hooks are not written. |
+| `skipped <id>: external plugin — its files live in another repo; add its skills and agents directly` | A plugin whose files are in another repo. Add its skills and agents to the pack instead. |
+| `skipped <id>: its parts aren't recorded — run ipm pack build --update` | A whole plugin that the lock has no parts for; `ipm pack build --update` records them. |
+| `skipped <id>: nothing Gas City can hold` | A whole plugin with no recorded parts (`parts = []` in `ipm.lock`). A plugin whose parts are all commands or hooks gets one skip line per part instead. |
+| `agents/<name>: frontmatter is not valid YAML — wrote the body only` | The agent's frontmatter doesn't parse. ipm still writes `prompt.md` with the body and an `agent.toml` holding only `provider = "claude"`. |
+| `agents/<name>: dropped tools, color — Gas City agents have no equivalent` | Agent frontmatter keys other than `name`, `description` and `model` are dropped, one warning per agent. |
+| `mcp/<name>: dropped <keys>` | MCP server keys Gas City doesn't know (Claude's `type` is dropped silently). |
+| `mcp/<name>: uses ${CLAUDE_PLUGIN_ROOT}, which Gas City does not set` | The server's command, arguments, environment or URL use Claude Code's plugin path, which won't resolve in a city. |
+
+ipm writes into `<DIR>/.<NAME>.ipm-tmp` and swaps the result in, replacing a folder it wrote earlier completely, so items removed from a pack leave no files. A folder that exists, isn't empty and wasn't written by ipm (its `pack.toml` lacks ipm's header line) is refused with exit 1: `<path> exists and was not written by ipm — use --force to replace it`. The check runs before any build. Even with `--force`, ipm refuses a folder that is, or holds, the project (or `$IPM_HOME/global` with `-g`) or `$IPM_HOME`: `refusing to replace <path>: it holds the project` or `… it holds ipm's home`.
+
+Afterwards it records the install (`target = "gascity"`, `path`, `name`), as for Claude Code, and prints:
+
+```text
+Import it into a city's pack.toml or city.toml:
+  [imports.<name>]
+  source = "<folder>"
+```
+
+#### Replay recorded installs
+
+Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `claude` or `gascity` is a usage error. Before running anything it checks every record's target: a record of a target this ipm doesn't know is reported as `<pack> → <target> …: unknown target`, and nothing is installed. A record that fails (a stale one whose folder was deleted, say) doesn't stop the others: its error is printed as `✗ <pack> → <target> <scope or name> <path>: <error>`, and the replay ends with exit 1 and `✗ N of M recorded installs failed; if a record is stale, remove it from <file>`, where the file is `ipm.toml` for a project or `$IPM_HOME/installs.json` with `-g`, each with its path. There is no command to forget a record: delete it from that file.
 
 ## Tools
 

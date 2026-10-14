@@ -1,0 +1,5 @@
+description = "Reviews code"
+provider = "claude"
+
+[option_defaults]
+model = "sonnet"
