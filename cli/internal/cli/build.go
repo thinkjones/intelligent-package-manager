@@ -95,7 +95,7 @@ func runBuild(sys System, global, update, noValidate bool) error {
 }
 
 // build is ipm pack build; hints adds the commands to install the result in
-// Claude Code, which deploy runs itself instead.
+// Claude Code, which install claude runs itself instead.
 func build(sys System, global, update, noValidate, hints bool) error {
 	scope, err := currentScope(sys, global)
 	if err != nil {

@@ -1792,9 +1792,9 @@ func TestTuiSearcherConcurrentFirstSearches(t *testing.T) {
 	}
 }
 
-// deployFake is installFake with claude on PATH and empty claude listings;
+// claudeFake is installFake with claude on PATH and empty claude listings;
 // it builds the project first so .ipm/ exists.
-func deployFake(t *testing.T) (*fake, string) {
+func claudeFake(t *testing.T) (*fake, string) {
 	t.Helper()
 	f, root := installFake(t)
 	f.onPath["claude"] = true
@@ -1829,9 +1829,9 @@ func cmdLines(cmds []claudeCmd) []string {
 }
 
 func TestPlanDeployFirstTime(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", claudeTarget{Scope: "project", Path: root})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope project",
 		root + " | claude plugin install kit@work-ipm --scope project",
@@ -1842,11 +1842,11 @@ func TestPlanDeployFirstTime(t *testing.T) {
 }
 
 func TestPlanDeployAgain(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
 	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", claudeTarget{Scope: "project", Path: root})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope project",
 		root + " | claude plugin marketplace update work-ipm",
@@ -1858,11 +1858,11 @@ func TestPlanDeployAgain(t *testing.T) {
 }
 
 func TestPlanDeployUserScope(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", root), nil}
 	f.full["claude plugin list --json"] = result{claudeFixture(t, "claude-plugin-list.json", root), nil}
 	ipm := filepath.Join(root, ".ipm")
-	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", deployTarget{Scope: "user"})
+	cmds, err := planDeploy(f.system(), ipm, "work-ipm", "kit", claudeTarget{Scope: "user"})
 	want := []string{
 		root + " | claude plugin marketplace add " + ipm + " --scope user",
 		root + " | claude plugin marketplace update work-ipm",
@@ -1874,38 +1874,39 @@ func TestPlanDeployUserScope(t *testing.T) {
 }
 
 func TestPlanDeployUnreadableClaudeJSON(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	f.full["claude plugin list --json"] = result{"not json", nil}
-	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", claudeTarget{Scope: "project", Path: root})
 	if err == nil || !strings.Contains(err.Error(), "claude plugin list --json") {
 		t.Errorf("got %v", err)
 	}
 }
 
-func TestDeployTargetPathExpanded(t *testing.T) {
+func TestClaudeTargetPathExpanded(t *testing.T) {
 	home := t.TempDir()
 	os.MkdirAll(filepath.Join(home, "work"), 0o755)
 	os.WriteFile(filepath.Join(home, "file"), []byte("x"), 0o644)
-	got, err := cleanTarget(deployTarget{Scope: "project", Path: "~/work/"}, "/elsewhere", home)
+	got, err := cleanTarget(claudeTarget{Scope: "project", Path: "~/work/"}, "/elsewhere", home)
 	if err != nil || got.Path != filepath.Join(home, "work") {
 		t.Errorf("~ expansion: %+v %v", got, err)
 	}
-	if got, err := cleanTarget(deployTarget{Scope: "local", Path: "work"}, home, home); err != nil || got.Path != filepath.Join(home, "work") {
+	if got, err := cleanTarget(claudeTarget{Scope: "local", Path: "work"}, home, home); err != nil || got.Path != filepath.Join(home, "work") {
 		t.Errorf("relative path: %+v %v", got, err)
 	}
-	for _, bad := range []deployTarget{{Scope: "project", Path: "~/file"}, {Scope: "project", Path: "~/missing"}, {Scope: "team"}, {Scope: "project"}} {
+	for _, bad := range []claudeTarget{{Scope: "project", Path: "~/file"}, {Scope: "project", Path: "~/missing"}, {Scope: "team"}, {Scope: "project"}} {
 		if _, err := cleanTarget(bad, home, home); err == nil {
 			t.Errorf("%+v accepted", bad)
 		}
 	}
-	if got, err := cleanTarget(deployTarget{Scope: "user", Path: "~/work"}, home, home); err != nil || got.Path != "" {
+	if got, err := cleanTarget(claudeTarget{Scope: "user", Path: "~/work"}, home, home); err != nil || got.Path != "" {
 		t.Errorf("user scope keeps no path: %+v %v", got, err)
 	}
 }
 
-func TestRunDeployBuildsThenRuns(t *testing.T) {
-	f, root := deployFake(t)
-	if err := f.run("deploy", "kit"); err != nil {
+func TestInstallClaudeBuildsWhenStale(t *testing.T) {
+	f, root := claudeFake(t)
+	os.Remove(filepath.Join(root, ".ipm", project.StampFile))
+	if err := f.run("install", "claude", "kit"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	var order []string
@@ -1919,33 +1920,33 @@ func TestRunDeployBuildsThenRuns(t *testing.T) {
 		t.Errorf("order %v", order)
 	}
 	out := f.out.String()
-	if !strings.Contains(out, "$ claude plugin install kit@work-ipm --scope project") || !strings.Contains(out, "✓ deployed kit (project "+root+")") {
+	if !strings.Contains(out, "$ claude plugin install kit@work-ipm --scope project") || !strings.Contains(out, "✓ installed kit (project "+root+")") {
 		t.Errorf("output:\n%s", out)
 	}
 }
 
-func TestRunDeployStopsOnFailure(t *testing.T) {
-	f, root := deployFake(t)
+func TestInstallClaudeStopsOnFailure(t *testing.T) {
+	f, root := claudeFake(t)
 	f.full["claude plugin install kit@work-ipm --scope project"] = result{"boom", errors.New("exit status 1")}
-	err := f.run("deploy", "kit", "--path", root)
-	if err == nil || !strings.Contains(err.Error(), "claude plugin install kit@work-ipm") || strings.Contains(f.out.String(), "✓ deployed") {
+	err := f.run("install", "claude", "kit", "--path", root)
+	if err == nil || !strings.Contains(err.Error(), "claude plugin install kit@work-ipm") || strings.Contains(f.out.String(), "✓ installed") {
 		t.Errorf("err %v\n%s", err, f.out.String())
 	}
 }
 
-func TestDeployNeedsClaude(t *testing.T) {
-	f, _ := deployFake(t)
+func TestInstallClaudeNeedsClaude(t *testing.T) {
+	f, _ := claudeFake(t)
 	f.onPath["claude"] = false
-	if err := f.run("deploy", "kit"); err == nil || !strings.Contains(err.Error(), "claude") {
+	if err := f.run("install", "claude", "kit"); err == nil || !strings.Contains(err.Error(), "claude") {
 		t.Errorf("got %v", err)
 	}
 }
 
-func TestDeployPackRequired(t *testing.T) {
-	f, _ := deployFake(t)
+func TestInstallClaudePackRequired(t *testing.T) {
+	f, _ := claudeFake(t)
 	f.run("pack", "new", "second")
 	var usage *UsageError
-	if err := f.run("deploy"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "name a pack") {
+	if err := f.run("install", "claude"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "name a pack") {
 		t.Errorf("got %v", err)
 	}
 }
@@ -1988,7 +1989,7 @@ func TestTuiDeployerPlan(t *testing.T) {
 	if cleaned.Path != root {
 		t.Errorf("Plan should return the cleaned target: %+v", cleaned)
 	}
-	want := []string{"ipm install", "claude plugin marketplace add " + filepath.Join(root, ".ipm") + " --scope project", "claude plugin install kit@work-ipm --scope project"}
+	want := []string{"ipm pack build", "claude plugin marketplace add " + filepath.Join(root, ".ipm") + " --scope project", "claude plugin install kit@work-ipm --scope project"}
 	if err != nil || !reflect.DeepEqual(plan, want) {
 		t.Errorf("plan %v %v\nwant %v", plan, err, want)
 	}
@@ -1998,31 +1999,31 @@ func TestTuiDeployerPlan(t *testing.T) {
 	}
 }
 
-func TestDeployOutputSaysEachThingOnce(t *testing.T) {
-	f, root := deployFake(t)
+func TestInstallClaudeOutputSaysEachThingOnce(t *testing.T) {
+	f, root := claudeFake(t)
 	var out bytes.Buffer
 	if err := (tuiDeployer{sys: f.system(), scope: project.Scope{Root: root}}).Deploy(context.Background(), "kit", tui.Target{Scope: "project", Path: root}, &out); err != nil {
 		t.Fatalf("%v\n%s", err, out.String())
 	}
-	if strings.Contains(out.String(), "✓ deployed") || strings.Contains(out.String(), "Install in Claude Code") {
-		t.Errorf("the TUI shows its own result, and deploy installs it itself:\n%s", out.String())
+	if strings.Contains(out.String(), "✓ installed") || strings.Contains(out.String(), "Install in Claude Code") {
+		t.Errorf("the TUI shows its own result, and install claude installs it itself:\n%s", out.String())
 	}
 	f.out.Reset()
-	if err := f.run("deploy", "kit"); err != nil {
+	if err := f.run("install", "claude", "kit"); err != nil {
 		t.Fatal(err)
 	}
-	if n := strings.Count(f.out.String(), "✓ deployed kit"); n != 1 || strings.Contains(f.out.String(), "Install in Claude Code") {
-		t.Errorf("ipm deploy prints its result once (%d) and no install hints:\n%s", n, f.out.String())
+	if n := strings.Count(f.out.String(), "✓ installed kit"); n != 1 || strings.Contains(f.out.String(), "Install in Claude Code") {
+		t.Errorf("ipm install claude prints its result once (%d) and no install hints:\n%s", n, f.out.String())
 	}
 }
 
 func TestPlanDeployRefusesOtherProjectsMarketplace(t *testing.T) {
-	f, root := deployFake(t)
+	f, root := claudeFake(t)
 	other := filepath.Join(t.TempDir(), "work")
 	f.full["claude plugin marketplace list --json"] = result{claudeFixture(t, "claude-marketplace-list.json", other), nil}
-	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", deployTarget{Scope: "project", Path: root})
+	_, err := planDeploy(f.system(), filepath.Join(root, ".ipm"), "work-ipm", "kit", claudeTarget{Scope: "project", Path: root})
 	if err == nil || !strings.Contains(err.Error(), "work-ipm") || !strings.Contains(err.Error(), other) {
-		t.Errorf("a same-named marketplace from another folder must stop the deploy: %v", err)
+		t.Errorf("a same-named marketplace from another folder must stop the install: %v", err)
 	}
 }
 
@@ -2037,7 +2038,7 @@ func TestTuiDeployerPlanGlobal(t *testing.T) {
 	os.MkdirAll(filepath.Join(home, "global"), 0o755)
 	d := tuiDeployer{sys: f.system(), scope: project.Scope{Root: filepath.Join(home, "global"), Global: true}, global: true}
 	_, plan, err := d.Plan("kit", tui.Target{Scope: "user"})
-	if err != nil || len(plan) == 0 || plan[0] != "ipm install -g" {
+	if err != nil || len(plan) == 0 || plan[0] != "ipm pack build -g" {
 		t.Errorf("plan %v %v", plan, err)
 	}
 }

@@ -128,7 +128,7 @@ Config
 		newShowCmd(sys),
 		newPackCmd(sys),
 		newTuiCmd(sys),
-		newDeployCmd(sys),
+		newInstallCmd(sys),
 		newOnboardCmd(sys),
 		newUninstallCmd(sys),
 		&cobra.Command{
