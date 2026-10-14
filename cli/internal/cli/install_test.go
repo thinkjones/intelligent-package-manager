@@ -178,8 +178,88 @@ func TestBareInstallUnknownTarget(t *testing.T) {
 	if err := recordInstall(f.system(), scope, "kit", project.Install{Target: "zed", Path: root}); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.run("install"); err == nil || !strings.Contains(err.Error(), "zed") {
+	err := f.run("install")
+	if err == nil || !strings.Contains(err.Error(), "kit → zed "+root+`: unknown target "zed" (use claude)`) ||
+		!strings.Contains(err.Error(), "ipm.toml ("+filepath.Join(root, project.File)+")") {
 		t.Errorf("got %v", err)
+	}
+}
+
+// An unknown target anywhere stops the replay before anything runs.
+func TestBareInstallUnknownTargetRunsNothing(t *testing.T) {
+	f, root := claudeFake(t)
+	if err := f.run("pack", "new", "zz"); err != nil {
+		t.Fatal(err)
+	}
+	scope, _ := currentScope(f.system(), false)
+	for _, r := range []installRecord{
+		{"kit", project.Install{Target: "claude", Path: root, Scope: "project"}},
+		{"kit", project.Install{Target: "zed", Path: root}},
+		{"zz", project.Install{Target: "claude", Path: root, Scope: "project"}},
+	} {
+		if err := recordInstall(f.system(), scope, r.Pack, r.Install); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.calls, f.dirs = nil, nil
+	err := f.run("install")
+	if err == nil || !strings.Contains(err.Error(), `kit → zed `+root+`: unknown target "zed"`) || !strings.Contains(err.Error(), "nothing was installed") {
+		t.Errorf("got %v", err)
+	}
+	if runs := claudeRuns(f); len(runs) != 0 || pnpmCalls(f) != 0 {
+		t.Errorf("an unknown target runs nothing: %v, %d pnpm calls", runs, pnpmCalls(f))
+	}
+}
+
+func TestBareInstallGlobalNamesInstallsFile(t *testing.T) {
+	f, _ := claudeFake(t)
+	scope, _ := currentScope(f.system(), true)
+	if err := recordInstall(f.system(), scope, "gk", project.Install{Target: "zed", Path: "/city"}); err != nil {
+		t.Fatal(err)
+	}
+	err := f.run("install", "-g")
+	want := "$IPM_HOME/installs.json (" + filepath.Join(f.env["IPM_HOME"], "installs.json") + ")"
+	if err == nil || !strings.Contains(err.Error(), want) || strings.Contains(err.Error(), project.File) {
+		t.Errorf("got %v\nwant it to name %s", err, want)
+	}
+}
+
+// A stale record (its folder deleted) fails on its own: the records after it
+// still run, and the replay ends with exit 1 and the file to fix.
+func TestBareInstallStaleRecordKeepsGoing(t *testing.T) {
+	f, root := claudeFake(t)
+	scope, _ := currentScope(f.system(), false)
+	gone, good := filepath.Join(root, "a"), filepath.Join(root, "b")
+	for _, p := range []string{gone, good} {
+		os.MkdirAll(p, 0o755)
+		if err := recordInstall(f.system(), scope, "kit", project.Install{Target: "claude", Path: p, Scope: "local"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	os.RemoveAll(gone)
+	err := f.run("install")
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != 1 {
+		t.Fatalf("got %v, want exit 1\n%s", err, f.out.String())
+	}
+	var installs []string
+	for i, c := range f.calls {
+		if strings.HasPrefix(c, "claude plugin install") {
+			installs = append(installs, f.dirs[i]+" | "+c)
+		}
+	}
+	if want := []string{good + " | claude plugin install kit@work-ipm --scope local"}; !reflect.DeepEqual(installs, want) {
+		t.Errorf("ran %v\nwant %v", installs, want)
+	}
+	out := f.out.String()
+	for _, want := range []string{
+		"✗ kit → claude local " + gone + ": " + gone + " is not a folder",
+		"✓ installed kit",
+		"✗ 1 of 2 recorded installs failed; if a record is stale, remove it from ipm.toml (" + filepath.Join(root, project.File) + ")",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
 	}
 }
 

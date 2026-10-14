@@ -48,6 +48,8 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | --- | --- |
 | `ipm sync was renamed: use ipm catalog sync` (exit 2) | The old names `source`, `stats`, `sync`, `index`, `load`, `serve`, `scan`, `tree`, `graph` and `deploy` are gone, and each says where it went: `ipm marketplace …`, `ipm marketplace stats`, `ipm catalog sync`, `ipm catalog rebuild` (for `index` and `load`), `ipm catalog serve`, `ipm catalog scan`, `ipm show tree`, `ipm show graph`, `ipm install claude`. The commands reference lists them all. |
 | `ipm install` no longer builds on its own | `ipm install` now installs: `ipm install claude [pack]` builds when `.ipm/` is out of date, then installs. `ipm pack build` only builds. |
+| `✗ N of M recorded installs failed; if a record is stale, remove it from …` (exit 1) | Bare `ipm install` ran every record; the `✗ <pack> → <target> …` lines above say which failed and why. When a record points at a folder that no longer exists, or an install you no longer want, delete its `[[packs.<name>.installs]]` table from `ipm.toml` (or its entry in `$IPM_HOME/installs.json` with `-g`); the message names the file. |
+| `<pack> → <target> …: unknown target "…"` and `nothing was installed` | A record names a target this ipm doesn't know, perhaps written by a newer ipm. Nothing ran. Upgrade ipm, or remove the record from the file the message names. |
 | `install: say claude — nothing is recorded for this scope yet` | Bare `ipm install` reinstalls what `ipm install claude` recorded earlier (in `ipm.toml`, or `$IPM_HOME/installs.json` with `-g`). Nothing is recorded yet, so name a target: `ipm install claude <pack>`. |
 
 ## Marketplace and catalog

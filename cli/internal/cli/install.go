@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"maps"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -94,7 +95,9 @@ func newInstallClaudeCmd(sys System) *cobra.Command {
 }
 
 // replayInstalls is bare ipm install: every recorded install in the scope,
-// in loadInstalls order, through its target's installer.
+// in loadInstalls order, through its target's installer. Every target is
+// checked before anything runs; a failing record doesn't stop the rest, and
+// the replay ends with exit 1 and the file that holds the records.
 func replayInstalls(sys System, global bool) error {
 	scope, err := currentScope(sys, global)
 	if err != nil {
@@ -107,16 +110,57 @@ func replayInstalls(sys System, global bool) error {
 	if len(recs) == 0 {
 		return usagef("install: say %s — nothing is recorded for this scope yet. Try `ipm help install`.", targetNames())
 	}
+	file, err := installsFileName(sys, scope)
+	if err != nil {
+		return err
+	}
+	var unknown []string
 	for _, rec := range recs {
-		inst, found := installers[rec.Target]
-		if !found {
-			return fmt.Errorf("%s records an install of %s to %q, a target this ipm doesn't know", project.File, rec.Pack, rec.Target)
+		if _, found := installers[rec.Target]; !found {
+			unknown = append(unknown, fmt.Sprintf("%s: unknown target %q (use %s)", describeRecord(rec), rec.Target, targetNames()))
 		}
-		done, err := inst(sys, scope, rec.Pack, rec.Install, installOpts{Global: global}, sys.Stdout)
+	}
+	if len(unknown) > 0 {
+		return fmt.Errorf("%s\nnothing was installed; remove the stale record from %s or upgrade ipm", strings.Join(unknown, "\n"), file)
+	}
+	failed := 0
+	for _, rec := range recs {
+		done, err := installers[rec.Target](sys, scope, rec.Pack, rec.Install, installOpts{Global: global}, sys.Stdout)
 		if err != nil {
-			return err
+			failed++
+			fmt.Fprintf(sys.Stdout, "%s %s: %v\n", bad, describeRecord(rec), err)
+			continue
 		}
 		fmt.Fprintf(sys.Stdout, "%s installed %s\n", ok, done)
 	}
+	if failed > 0 {
+		fmt.Fprintf(sys.Stdout, "%s %d of %d recorded installs failed; if a record is stale, remove it from %s\n", bad, failed, len(recs), file)
+		return &ExitError{Code: 1}
+	}
 	return nil
+}
+
+// describeRecord is rec as "<pack> → <target> <scope or name> <path>",
+// leaving out what is empty.
+func describeRecord(rec installRecord) string {
+	parts := []string{rec.Target}
+	for _, p := range []string{rec.Scope, rec.Name, rec.Path} {
+		if p != "" {
+			parts = append(parts, p)
+		}
+	}
+	return rec.Pack + " → " + strings.Join(parts, " ")
+}
+
+// installsFileName names the file that holds scope's install records, with
+// its path: the project's ipm.toml, or $IPM_HOME/installs.json for -g.
+func installsFileName(sys System, scope project.Scope) (string, error) {
+	if !scope.Global {
+		return project.File + " (" + filepath.Join(scope.Root, project.File) + ")", nil
+	}
+	path, err := globalInstallsPath(sys)
+	if err != nil {
+		return "", err
+	}
+	return "$IPM_HOME/" + installsFile + " (" + path + ")", nil
 }

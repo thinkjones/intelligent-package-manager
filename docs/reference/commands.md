@@ -273,7 +273,7 @@ ipm install [-g]
 
 The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (always — Claude Code accepts a repeat), `claude plugin marketplace update <name>` when Claude Code already knows the marketplace, then `claude plugin install <pack>@<name> --scope S`, or `claude plugin update …` when the pack is already installed there. Needs `claude` on your `PATH`.
 
-Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `claude` is a usage error.
+Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `claude` is a usage error. Before running anything it checks every record's target: a record of a target this ipm doesn't know is reported as `<pack> → <target> …: unknown target`, and nothing is installed. A record that fails (a stale one whose folder was deleted, say) doesn't stop the others: its error is printed as `✗ <pack> → <target> <scope or name> <path>: <error>`, and the replay ends with exit 1 and `✗ N of M recorded installs failed; if a record is stale, remove it from <file>`, where the file is `ipm.toml` for a project or `$IPM_HOME/installs.json` with `-g`, each with its path. There is no command to forget a record: delete it from that file.
 
 ## Tools
 
