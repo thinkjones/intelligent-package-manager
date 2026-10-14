@@ -128,6 +128,18 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `` `claude plugin …` failed `` | Claude Code's own output is shown above it. Fix what it says and install again; nothing is retried. |
 | A rebuilt pack doesn't change in Claude Code | Claude Code reads it from `.ipm/plugins/`; start a new session or run `/reload-plugins`. |
 
+## Install into Gas City
+
+| Message | Cause and fix |
+| --- | --- |
+| `<path> exists and was not written by ipm — use --force to replace it` | The folder exists, isn't empty, and its `pack.toml` doesn't start with ipm's header line. Pick another `--name` or `-C`, or add `--force` to replace it (everything in it is deleted). A folder ipm wrote itself is replaced without `--force`. |
+| `--dry-run needs a current build — run ipm pack build first` | `--dry-run` writes nothing, so it won't build. Run `ipm pack build`, then repeat. |
+| `skipped <id>: external plugin — its files live in another repo; add its skills and agents directly` | A plugin whose files are in another repo can't be written. `ipm pack add` its skills and agents, and remove the plugin. |
+| `skipped <id>: its parts aren't recorded — run ipm pack build --update` | The lock was written before ipm recorded each plugin's parts. Run `ipm pack build --update`, then install again. |
+| `mcp/<name>: uses ${CLAUDE_PLUGIN_ROOT}, which Gas City does not set` | The MCP server points at files inside its Claude Code plugin. The server is still written, but its path won't resolve in a city; edit it there or run the server from a fixed path. |
+| `… is not a folder` | The `-C` folder doesn't exist. Create it. |
+| `install gascity: --name … must start with a letter or digit …` | Use letters, digits, `_` and `-`. |
+
 ## Claude Code
 
 | Symptom | Cause and fix |

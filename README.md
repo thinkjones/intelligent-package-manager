@@ -104,6 +104,7 @@ The [build your own plugin](https://thinkjones.github.io/intelligent-package-man
 | `ipm pack new\|add\|remove\|list\|show` | Edit packs in `ipm.toml` (`-g` for your user scope) |
 | `ipm pack build [--update]` | Build every pack into a plugin and validate it |
 | `ipm install claude [pack] [--scope] [--path]` | Build when stale, then install a pack into Claude Code; bare `ipm install` replays recorded installs |
+| `ipm install gascity [pack] [-C DIR] [--name N]` | Build when stale, then write a pack as a Gas City pack folder and print how to import it |
 | `ipm tui [-g]` | Search, see the tree, collect, build and deploy, in one screen |
 | `ipm doctor` | Check everything `ipm` depends on |
 | `ipm uninstall [--purge]` | Remove `ipm` and its search container (`--purge` also deletes your data) |
@@ -112,7 +113,7 @@ Every flag is in the [commands reference](https://thinkjones.github.io/intellige
 
 ## Limits
 
-- **`ipm` installs into Claude Code only on `ipm install claude`.** Building never touches your Claude Code configuration.
+- **`ipm` installs into Claude Code only on `ipm install claude`.** Building never touches your Claude Code configuration. `ipm install gascity` writes a Gas City pack folder where you point it and edits no city.
 - **Hooks and MCP servers come only with their whole plugin.** They (and inline commands) can't be picked on their own.
 - **Non-GitHub sources may lose files**, because pnpm applies npm's packing rules to them.
 - **No prebuilt binaries**: installing needs Go. Windows is untested.
