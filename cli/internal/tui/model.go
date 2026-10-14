@@ -48,19 +48,19 @@ type Model struct {
 	height   int
 	debounce time.Duration
 
+	catCounts map[string]int    // items per type, read once at start
 	cursor    string            // the tree's centre node
 	chosen    map[string]string // the parent picked for a node in tree mode
 	tree      treeView
 	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
 	backStack []string // external entries jumped from, newest last
 
-	catCounts map[string]int // items per type, read once at start
-	packs     []Pack
-	active    string // the active pack's name
-	traySel   int
-	dirty     bool // a pack changed since the last install
-	picker    *picker
-	statusOK  bool // status is a note, not an error
+	packs    []Pack
+	active   string // the active pack's name
+	traySel  int
+	dirty    bool // a pack changed since the last install
+	picker   *picker
+	statusOK bool // status is a note, not an error
 
 	inst   *install     // the install or deploy output modal, while open
 	deploy *deployModal // the deploy modal before it runs
@@ -197,120 +197,12 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	return m.catalogKey(msg)
 }
 
-// treeKey handles keys in tree mode.
-func (m *Model) treeKey(k string) {
-	switch k {
-	case "down", "j":
-		m.treeMove(1)
-	case "up", "k":
-		m.treeMove(-1)
-	case "left", "h":
-		m.treeUp()
-	case "right", "l":
-		if m.treeSel == backRow {
-			m.back()
-			return
-		}
-		m.treeDown()
-	case "enter":
-		if m.treeSel == backRow {
-			m.back()
-			return
-		}
-		if i := m.treeSel - m.tree.Cursor - 1; i >= 0 && i < len(m.tree.AlsoIn) {
-			m.chosen[m.cursor] = m.tree.AlsoIn[i].ID
-			m.setCursor(m.cursor)
-		}
-	case "esc", "tab":
-		m.setFocus(focusResults)
-		m.followSelection()
-	}
-}
-
-// treeUp moves the tree's cursor to its parent.
-func (m *Model) treeUp() {
-	if n := len(m.tree.Path); n > 0 {
-		m.setCursor(m.tree.Path[n-1].ID)
-	}
-}
-
-// treeDown moves the tree's cursor to its first child, or, on an external
-// entry, into the repo it points at.
-func (m *Model) treeDown() {
-	switch {
-	case m.tree.Node.External != nil:
-		m.jump()
-		return
-	case m.tree.Node.Unresolved != "":
-		m.status = m.tree.Node.Unresolved + " isn't one of your sources — ipm marketplace add " + m.cursor
-		return
-	}
-	if len(m.tree.Children) > 0 {
-		child := m.tree.Children[0].ID
-		m.chosen[child] = m.cursor
-		m.setCursor(child)
-	}
-}
-
-// treeMove steps through the siblings and the 'also in' rows; a sibling
-// becomes the cursor, under the same parent. Above the first sibling is the
-// back root, when there is one.
-func (m *Model) treeMove(by int) {
-	switch {
-	case m.treeSel == backRow && by > 0:
-		m.treeSel = m.tree.Cursor
-		return
-	case m.treeSel == backRow:
-		return
-	case m.treeSel == 0 && by < 0 && m.tree.Back != nil:
-		m.treeSel = backRow
-		return
-	}
-	rows := m.tree.selectable()
-	sel := max(0, min(len(rows)-1, m.treeSel+by))
-	also := sel > m.tree.Cursor && sel <= m.tree.Cursor+len(m.tree.AlsoIn)
-	if also || sel == m.treeSel {
-		m.treeSel = sel
-		return
-	}
-	if n := len(m.tree.Path); n > 0 {
-		m.chosen[rows[sel].ID] = m.tree.Path[n-1].ID
-	}
-	m.setCursor(rows[sel].ID)
-}
-
-// trayKey handles keys while the tray has focus.
-func (m *Model) trayKey(k string) {
-	n := 0
-	if p := m.activePack(); p != nil {
-		n = len(p.Items)
-	}
-	switch k {
-	case "right", "l", "down", "j":
-		m.traySel = min(max(0, n-1), m.traySel+1)
-	case "left", "h", "up", "k":
-		m.traySel = max(0, m.traySel-1)
-	case "tab", "/":
-		m.setFocus(focusSearch)
-	case "esc":
-		m.setFocus(focusResults)
-	}
-}
-
 func (m *Model) setFocus(f focus) {
 	m.focus = f
 	if f == focusSearch {
 		m.input.Focus()
 	} else {
 		m.input.Blur()
-	}
-}
-
-func (m *Model) move(by int) {
-	sel := max(0, min(len(m.res.Hits)-1, m.sel+by))
-	if sel != m.sel {
-		m.sel = sel
-		m.followSelection()
 	}
 }
 
@@ -391,7 +283,7 @@ func (m *Model) render() string {
 	case m.status != "":
 		status = stError.Render(m.status)
 	}
-	lines := append(append(append(top, mid...), tray...), fit(status, w), fit(stMuted.Render(m.hints()), w))
+	lines := append(append(append(top, mid...), tray...), fit(status, w), fit(stMuted.Render(m.footer(w)), w))
 	return strings.Join(lines, "\n")
 }
 
@@ -401,72 +293,4 @@ func (m *Model) statusText() string {
 		return m.countLine()
 	}
 	return ""
-}
-
-// followSelection centres the tree on the selected result, forgetting jumps.
-func (m *Model) followSelection() {
-	m.backStack = nil
-	if m.sel < len(m.res.Hits) {
-		m.setCursor(m.res.Hits[m.sel].ID)
-		return
-	}
-	m.cursor, m.tree = "", treeView{}
-}
-
-// setCursor centres the tree on id.
-func (m *Model) setCursor(id string) {
-	tv, err := buildTree(m.d.Catalog, id, m.chosen)
-	if err != nil {
-		m.status = err.Error()
-	}
-	if n := len(m.backStack); n > 0 {
-		if e, err := m.d.Catalog.Node(m.backStack[n-1]); err == nil {
-			back := refOf(e)
-			tv.Back = &back
-		}
-	}
-	m.cursor, m.tree, m.treeSel = id, tv, tv.Cursor
-}
-
-// maxBack is how many jumps the back stack remembers.
-const maxBack = 20
-
-// jump moves from an external entry to what it references, in its own repo,
-// remembering the entry so back can return.
-func (m *Model) jump() {
-	target := m.tree.Node.External.ID
-	m.backStack = append(m.backStack, m.cursor)
-	if len(m.backStack) > maxBack {
-		m.backStack = m.backStack[len(m.backStack)-maxBack:]
-	}
-	m.setCursor(target)
-}
-
-// back returns to the external entry the last jump left.
-func (m *Model) back() {
-	n := len(m.backStack)
-	if n == 0 {
-		return
-	}
-	entry := m.backStack[n-1]
-	m.backStack = m.backStack[:n-1]
-	m.setCursor(entry)
-}
-
-// breadcrumb is the cursor's path, "repo › … › node", cut from the left to w.
-func (m *Model) breadcrumb(w int) string {
-	if m.cursor == "" {
-		return ""
-	}
-	refs := append(append([]Ref(nil), m.tree.Path...), refOf(m.tree.Node))
-	sep := stMuted.Render(" › ")
-	parts := make([]string, len(refs))
-	for i, r := range refs {
-		parts[i] = typeStyle(r.Type).Render(r.Name)
-	}
-	for len(parts) > 1 && lipglossWidth(strings.Join(parts, sep)) > w {
-		parts = parts[1:]
-		parts[0] = stMuted.Render("…")
-	}
-	return strings.Join(parts, sep)
 }

@@ -31,6 +31,7 @@ var (
 	stError    = lipgloss.NewStyle().Foreground(colRed)
 	stSelected = lipgloss.NewStyle().Foreground(colAmber).Bold(true)
 	stRule     = lipgloss.NewStyle().Foreground(colBorder)
+	stScope    = lipgloss.NewStyle().Foreground(colRepo)
 
 	// The selected row of the panel you're not in: a grey caret on a
 	// background, so it reads as "selected there", not "you are here".

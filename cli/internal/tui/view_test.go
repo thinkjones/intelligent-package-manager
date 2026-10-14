@@ -39,6 +39,10 @@ func TestGoldenViews(t *testing.T) {
 		withDetails(f)
 		f.c.counts = map[string]int{"skill": 1204, "agent": 312, "command": 98, "plugin": 410}
 		f.p.packs = []Pack{{Name: "csharp-sdlc", Description: "C# lifecycle", Items: []string{tddID, "agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md", "plugin:anthropics/claude-plugins-official#stripe"}}, {Name: "docs", Description: "Writing"}}
+		tdd := f.s.results["tdd"]
+		tdd.Hits[0].Stars, tdd.Hits[0].UsedBy = 31234, 3
+		tdd.Hits[0].Description = "Test-driven development: write the failing test first, then the code that makes it pass, then tidy up."
+		tdd.Hits[1].Stars = 842
 		f.s.results["long"] = Results{Hits: []Hit{{ID: "skill:o/r:skills/" + long, Type: "copilot-plugin", Name: long, Score: "99", Description: strings.Repeat("words ", 40)}}, Found: 1}
 	}
 	cases := map[string]func(t *testing.T) *Model{

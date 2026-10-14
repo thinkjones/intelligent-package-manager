@@ -3,9 +3,9 @@ CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)
 ━━━━━━━━━━━━━━━──────────────────────────────────────────                                           
 skill 1,204 · agent 312 · command 98 · plugin 410                                                   
 ╭─ search: tdd             ────────────────────────────────────────────────────────────────────────╮
-│   TYPE   ✓ NAME       REPO ↗ ★ SCORE DESCRIPTION                                                 │
-│ ▶ skill  ✓ tdd        o/r         50                                                             │
-│   skill    tdd-guard  o/r         50                                                             │
+│   TYPE   ✓ NAME       REPO  ↗      ★ SCORE DESCRIPTION                                           │
+│ ▶ skill  ✓ tdd        o/r  ↗3 ★31.2k    50 Test-driven development: write the failing test firs… │
+│   skill    tdd-guard  o/r       ★842    50                                                       │
 │                                                                                                  │
 │                                                                                                  │
 │                                                                                                  │

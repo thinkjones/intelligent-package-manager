@@ -66,9 +66,9 @@ func (m *Model) tabBar(w int) []string {
 func (m *Model) titleLine(w int) string {
 	mode := stTeal.Render("● hybrid")
 	if m.d.Searcher.Mode() != "hybrid" {
-		mode = stMuted.Render("○ local")
+		mode = stAmber.Render("○ local")
 	}
-	head := stTitle.Render("ipm") + "  " + stMuted.Render(m.d.Packs.Scope())
+	head := stTitle.Render("ipm") + "  " + stScope.Render(m.d.Packs.Scope())
 	return fit(head, w-lipgloss.Width(mode)-1) + " " + mode
 }
 
@@ -100,7 +100,33 @@ func (m *Model) hints() string {
 	if m.tab == tabCatalog {
 		return m.catalogHints()
 	}
-	return "1-4 tabs  [ ] switch  ? help  q quit"
+	return strings.Join(append(m.otherHints(), helpQuit), "  ")
+}
+
+// helpQuit ends every footer that can be cut: it is the last thing to go.
+const helpQuit = "? help  q quit"
+
+// otherHints are the footer hints of a tab with no keys of its own yet.
+func (m *Model) otherHints() []string { return []string{"1-4 tabs", "[ ] switch"} }
+
+// footer is the hints cut to w: the middle hints drop from the end first, so
+// "? help  q quit" stays visible.
+func (m *Model) footer(w int) string {
+	var parts []string
+	switch {
+	case m.inst != nil, m.deploy != nil, m.ext != nil, m.help, m.picker != nil:
+		return m.hints()
+	case m.tab != tabCatalog:
+		parts = m.otherHints()
+	case m.focus == focusResults:
+		parts = m.catalogResultHints()
+	default:
+		return m.hints()
+	}
+	for len(parts) > 0 && lipgloss.Width(strings.Join(append(parts[:len(parts):len(parts)], helpQuit), "  ")) > w {
+		parts = parts[:len(parts)-1]
+	}
+	return strings.Join(append(parts, helpQuit), "  ")
 }
 
 // tabKey switches tabs on 1–4 and [ ]; it reports whether k was one of them.
