@@ -17,7 +17,8 @@ type (
 
 // install is the state of the install modal.
 type install struct {
-	title   string // "build" or "install"
+	kind    runKind
+	title   string // the modal's title: "build" or "install"
 	command string // the ipm command the modal echoes under its title
 	success string // the line shown when it finishes without error
 	lines   []string
@@ -27,6 +28,14 @@ type install struct {
 	pipe    *io.PipeReader
 	result  chan error
 }
+
+// runKind is what the output modal runs.
+type runKind int
+
+const (
+	runBuild runKind = iota
+	runInstall
+)
 
 // busyMsg is the status when a run is asked for while another still streams.
 const busyMsg = "busy — wait for the current run to finish"
@@ -54,16 +63,16 @@ func (m *Model) startBuild() tea.Cmd {
 	if m.d.Packs.Scope() == "global" {
 		cmd += " -g"
 	}
-	return m.stream("build", cmd, "✓ built", func(w io.Writer) error {
+	return m.stream(runBuild, "build", cmd, "✓ built", func(w io.Writer) error {
 		return m.d.Builder.Build(context.Background(), w)
 	})
 }
 
 // stream runs work in the background with its output piped into the modal
 // line by line; command is the ipm command it echoes under the title.
-func (m *Model) stream(title, command, success string, work func(io.Writer) error) tea.Cmd {
+func (m *Model) stream(kind runKind, title, command, success string, work func(io.Writer) error) tea.Cmd {
 	pr, pw := io.Pipe()
-	in := &install{title: title, command: command, success: success, scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
+	in := &install{kind: kind, title: title, command: command, success: success, scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
 	in.scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	m.inst = in
 	go func() {

@@ -180,6 +180,13 @@ func (m *Model) planForm(t Target) {
 	cleaned, plan, err := m.d.Installer.Plan(f.pack, t)
 	if err != nil {
 		f.err = err.Error()
+		if t.Kind == "gascity" {
+			// The error may be about either input; the folder is the one
+			// people mistype, and enter carries the name along.
+			f.step = formFolder
+			f.name.Blur()
+			f.folder.Focus()
+		}
 		return
 	}
 	f.target, f.plan, f.step = cleaned, plan, formConfirm
@@ -190,7 +197,7 @@ func (m *Model) runInstall(pack string, t Target) tea.Cmd {
 	if m.refuseBusy() {
 		return nil
 	}
-	return m.stream("install", installCommand(pack, t), "✓ installed "+pack+" ("+describe(t)+")", func(w io.Writer) error {
+	return m.stream(runInstall, "install", installCommand(pack, t), "✓ installed "+pack+" ("+describe(t)+")", func(w io.Writer) error {
 		return m.d.Installer.Install(context.Background(), pack, t, w)
 	})
 }

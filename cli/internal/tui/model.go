@@ -143,7 +143,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.dirty = false
 			}
 			m.reloadPacks()
-			if m.inst.title == "install" {
+			if m.inst.kind == runInstall {
 				m.loadInstallsTab()
 			}
 		}

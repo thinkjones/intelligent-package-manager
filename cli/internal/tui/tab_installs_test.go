@@ -121,11 +121,14 @@ func TestInstallsGlobalToggle(t *testing.T) {
 	if m.counts[tabInstalls] != 3 || !strings.Contains(v, "mine") || !strings.Contains(v, "global") {
 		t.Errorf("global records:\n%s", v)
 	}
-	press(t, m, "down", "down", "enter")
-	if len(m.d.Installer.(*fakeInstaller).targets) != 1 || !m.d.Installer.(*fakeInstaller).targets[0].Global {
-		t.Errorf("a global record reinstalls as global")
+	press(t, m, "down", "down")
+	for _, k := range []string{"enter", "i", "a"} {
+		press(t, m, k)
+		if m.status != readOnlyGlobal || m.form != nil || m.inst != nil || len(m.d.Installer.(*fakeInstaller).targets) != 0 {
+			t.Errorf("%s on a global record from a project: status %q", k, m.status)
+		}
 	}
-	press(t, m, "esc", "g")
+	press(t, m, "g")
 	if m.counts[tabInstalls] != 2 {
 		t.Errorf("g again drops them: %d", m.counts[tabInstalls])
 	}
@@ -191,5 +194,21 @@ func TestInstallsHelp(t *testing.T) {
 		if !strings.Contains(v, want) {
 			t.Errorf("help lacks %q:\n%s", want, v)
 		}
+	}
+}
+
+func TestInstallsGlobalRecordsWorkInGlobalScope(t *testing.T) {
+	m, f := newTestWith(t, func(f fakes) {
+		withInstalls(f)
+		f.in.installs = f.in.globalInstalls
+		f.p.scope = "global"
+	})
+	press(t, m, "down", "3", "enter")
+	if len(f.in.targets) != 1 || !f.in.targets[0].Global {
+		t.Errorf("reinstall in global scope: %+v status %q", f.in.targets, m.status)
+	}
+	press(t, m, "esc", "a")
+	if m.form == nil || m.form.pack != "mine" {
+		t.Errorf("a opens the form: %v status %q", m.form, m.status)
 	}
 }

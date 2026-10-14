@@ -133,6 +133,9 @@ func (m *Model) installsKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 	case "enter", "i":
 		if in := m.selectedInstall(); in != nil {
+			if m.readOnlyInstall(in) {
+				return nil
+			}
 			return m.reinstall(*in)
 		}
 		m.status = "no install selected"
@@ -142,11 +145,23 @@ func (m *Model) installsKey(msg tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
+// readOnlyInstall reports whether in is a global record shown from a project,
+// saying so in the status: those change from ipm tui -g.
+func (m *Model) readOnlyInstall(in *Install) bool {
+	if in.Global && m.d.Packs.Scope() != "global" {
+		m.status = readOnlyGlobal
+		return true
+	}
+	return false
+}
+
 // newInstall opens the install form for the pack under the selection, or the
 // only pack; with several and none selected it asks which first.
 func (m *Model) newInstall() {
 	if in := m.selectedInstall(); in != nil {
-		m.openInstallForm(in.Pack, in.Global)
+		if !m.readOnlyInstall(in) {
+			m.openInstallForm(in.Pack, in.Global)
+		}
 		return
 	}
 	switch len(m.packs) {

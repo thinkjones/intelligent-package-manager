@@ -46,7 +46,7 @@ func TestInstallFormClaudeFlow(t *testing.T) {
 			t.Errorf("modal lacks %q:\n%s", want, v)
 		}
 	}
-	if m.inst.title != "install" || strings.Join(f.in.installed, ";") != "kit project /work" {
+	if m.inst.kind != runInstall || m.inst.title != "install" || strings.Join(f.in.installed, ";") != "kit project /work" {
 		t.Errorf("title %q installed %v", m.inst.title, f.in.installed)
 	}
 	if m.counts[tabInstalls] != 1 {
@@ -107,11 +107,11 @@ func TestInstallFormPlanErrorStaysOnStep(t *testing.T) {
 		t.Errorf("claude: step %v:\n%s", m.form, view(m))
 	}
 	press(t, m, "esc", "i", "down", "enter", "enter", "enter")
-	if m.form == nil || m.form.step != formName || !strings.Contains(view(m), "/nope is not a folder") {
-		t.Errorf("gascity: step %v:\n%s", m.form, view(m))
+	if m.form == nil || m.form.step != formFolder || !strings.Contains(view(m), "/nope is not a folder") {
+		t.Errorf("gascity returns to the folder: step %v:\n%s", m.form, view(m))
 	}
 	f.in.planErr = nil
-	press(t, m, "enter")
+	press(t, m, "enter", "enter")
 	if m.form.step != formConfirm {
 		t.Errorf("a fixed folder goes on: step %v", m.form.step)
 	}
