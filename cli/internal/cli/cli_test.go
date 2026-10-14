@@ -2333,10 +2333,15 @@ func TestRootHelpGroups(t *testing.T) {
 		{titles[5], "", []string{"tui", "doctor", "uninstall", "version", "completion", "help"}},
 	} {
 		sec := section(c.from, c.to)
+		last := -1
 		for _, n := range c.names {
-			if !strings.Contains(sec, "\n  "+n+" ") {
+			i := strings.Index(sec, "\n  "+n+" ")
+			if i < 0 {
 				t.Errorf("%q lacks %s:\n%s", c.from, n, sec)
+			} else if i < last {
+				t.Errorf("%q lists %s out of order:\n%s", c.from, n, sec)
 			}
+			last = i
 		}
 	}
 	for _, gone := range []string{"source", "stats", "sync", "index", "load", "serve", "scan", "tree", "graph", "deploy"} {

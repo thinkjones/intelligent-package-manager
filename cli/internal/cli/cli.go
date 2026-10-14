@@ -81,6 +81,9 @@ func Run(args []string, sys System) error {
 // newRootCmd is ipm's command tree. Every command writes to sys and returns
 // a UsageError for a malformed command line, so ipm exits 2 for those.
 func newRootCmd(sys System) *cobra.Command {
+	// Help lists commands in registration order, which is the workflow's.
+	// The setting is process-global; every ipm command tree wants it.
+	cobra.EnableCommandSorting = false
 	root := &cobra.Command{
 		Use:   "ipm",
 		Short: "ipm — intelligent package manager for agent skills, agents, commands and plugins",
@@ -135,15 +138,15 @@ Config
 		},
 	})
 	root.AddCommand(
+		newOnboardCmd(sys),
 		newMarketplaceCmd(sys),
-		newDoctorCmd(sys),
 		newCatalogCmd(sys),
 		newSearchCmd(sys),
 		newShowCmd(sys),
 		newPackCmd(sys),
-		newTuiCmd(sys),
 		newInstallCmd(sys),
-		newOnboardCmd(sys),
+		newTuiCmd(sys),
+		newDoctorCmd(sys),
 		newUninstallCmd(sys),
 		renamed("source", "marketplace"),
 		renamed("stats", "marketplace stats"),
@@ -177,6 +180,9 @@ Config
 			c.GroupID = g
 		}
 	}
+	// Cobra adds its help command first and completion after it; adding
+	// completion now puts help last, as the Tools list reads.
+	root.InitDefaultCompletionCmd()
 	return root
 }
 

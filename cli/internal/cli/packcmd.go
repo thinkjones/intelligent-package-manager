@@ -59,14 +59,14 @@ func newPackCmd(sys System) *cobra.Command {
 			Args:  noArgs,
 			RunE:  inScope(func(s project.Scope, _ []string) error { return packList(sys, s) }),
 		},
-		newPackBuildCmd(sys, &global),
-		newInstallCmd(sys),
 		&cobra.Command{
 			Use:   "show <pack>",
 			Short: "a pack's items: type, name, repo, stars and ID",
 			Args:  exactArgs(1, "one pack name"),
 			RunE:  inScope(func(s project.Scope, args []string) error { return packShow(sys, s, args[0]) }),
 		},
+		newPackBuildCmd(sys, &global),
+		newInstallCmd(sys),
 	)
 	return cmd
 }
