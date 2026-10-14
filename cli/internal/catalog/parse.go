@@ -90,6 +90,27 @@ func splitFrontmatter(data []byte) (string, bool) {
 	return rest[:end], true
 }
 
+// Body is data without its leading frontmatter block, CRLF normalized to LF;
+// the whole file when there is none.
+func Body(data []byte) []byte {
+	text := strings.ReplaceAll(string(data), "\r\n", "\n")
+	raw, found := splitFrontmatter(data)
+	if !found {
+		return data
+	}
+	rest := text[len("---\n"):]
+	if rest == "---" {
+		return nil
+	}
+	if strings.HasPrefix(rest, "---\n") {
+		return []byte(rest[len("---\n"):])
+	}
+	body := rest[len(raw):]
+	body = strings.TrimPrefix(body, "\n---")
+	body = strings.TrimPrefix(body, "\n")
+	return []byte(body)
+}
+
 // Frontmatter parses a Markdown file's YAML frontmatter into plain JSON
 // types: maps with string keys, timestamps as RFC 3339 strings.
 func Frontmatter(data []byte) (map[string]any, bool, error) {

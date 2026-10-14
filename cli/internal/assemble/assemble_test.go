@@ -28,7 +28,7 @@ func fixtureCatalog(t *testing.T) string {
 {"id":"skill:o/r:skills/go","type":"skill","name":"Go Expert","repo":"o/r","path":"skills/go","commit":"` + shaA + `"}`,
 		catalog.TypeAgent:   `{"id":"agent:o/r:agents/rev.md","type":"agent","name":"reviewer","repo":"o/r","path":"agents/rev.md","commit":"` + shaA + `"}`,
 		catalog.TypeCommand: `{"id":"command:o/r:commands/ship.md","type":"command","name":"ship","repo":"o/r","path":"commands/ship.md","commit":"` + shaA + `"}`,
-		catalog.TypePlugin: `{"id":"plugin:o/r:plugins/tools","type":"plugin","name":"tools","repo":"o/r","path":"plugins/tools","commit":"` + shaA + `"}
+		catalog.TypePlugin: `{"id":"plugin:o/r:plugins/tools","type":"plugin","name":"tools","repo":"o/r","path":"plugins/tools","commit":"` + shaA + `","skills":["skill:o/r:plugins/tools/skills/a"],"agents":["agent:o/r:plugins/tools/agents/b.md"],"mcp":["mcp:o/r:plugins/tools/.mcp.json#notes"],"hooks":["hook:o/r:plugins/tools/hooks/hooks.json#PreToolUse"]}
 {"id":"plugin:o/r:plugins/lsp#lsp","type":"plugin","name":"lsp","repo":"o/r","path":"plugins/lsp","commit":"` + shaA + `","entry":{"name":"lsp","source":"./plugins/lsp","strict":false,"lspServers":{"x":{"command":"x"}}}}
 {"id":"plugin:o/r#stripe","type":"plugin","name":"stripe","repo":"o/r","source_repo":"stripe/ai","entry":{"name":"stripe","description":"Stripe","source":{"source":"git-subdir","url":"https://github.com/stripe/ai.git","path":"p","sha":"` + shaB + `"}}}`,
 		catalog.TypeCopilotPlugin: `{"id":"copilot-plugin:o/r:plugins/go","type":"copilot-plugin","name":"go","repo":"o/r","path":"plugins/go","commit":"` + shaA + `","skills":["skill:o/r:skills/go"]}`,
@@ -51,7 +51,7 @@ func TestResolveFromLockThenCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if items["agent:o/r:agents/rev.md"] != locked {
+	if !reflect.DeepEqual(items["agent:o/r:agents/rev.md"], locked) {
 		t.Errorf("the lock should win: %+v", items["agent:o/r:agents/rev.md"])
 	}
 	if s := items["skill:o/r:skills/code-review"]; s.SHA != shaA || s.Path != "skills/code-review" || s.Name != "code-review" {
@@ -109,7 +109,7 @@ func TestBuildWholePlugins(t *testing.T) {
 		t.Fatal(err)
 	}
 	deps := plan.Packs[0].Deps
-	if len(deps) != 3 || len(plan.Repos) != 0 {
+	if len(deps) != 3 || len(plan.Repos) != 1 {
 		t.Fatalf("deps %v repos %v", deps, plan.Repos)
 	}
 	tools := deps[0].(marketplace.Entry)
@@ -273,5 +273,58 @@ func TestPlaceCopyKeepsMode(t *testing.T) {
 	Place(plan.Packs[0], nm, dir, func(string, string) error { return errors.New("EXDEV") })
 	if info, err := os.Stat(filepath.Join(dir, "skills", "code-review", "run.sh")); err != nil || info.Mode().Perm() != 0o755 {
 		t.Errorf("mode %v %v", info, err)
+	}
+}
+
+var toolsParts = []string{
+	"agent:o/r:plugins/tools/agents/b.md",
+	"hook:o/r:plugins/tools/hooks/hooks.json#PreToolUse",
+	"mcp:o/r:plugins/tools/.mcp.json#notes",
+	"skill:o/r:plugins/tools/skills/a",
+}
+
+func TestResolveRecordsPluginParts(t *testing.T) {
+	_, items := resolved(t, "plugin:o/r:plugins/tools", "plugin:o/r#stripe")
+	if got := items["plugin:o/r:plugins/tools"].Parts; !reflect.DeepEqual(got, toolsParts) {
+		t.Errorf("parts %v", got)
+	}
+	if got := items["plugin:o/r#stripe"].Parts; got != nil {
+		t.Errorf("external plugin parts %v", got)
+	}
+}
+
+func TestResolveFillsPartsForOldLock(t *testing.T) {
+	locked := project.LockItem{ID: "plugin:o/r:plugins/tools", Type: "plugin", Name: "tools", Repo: "o/r", Path: "plugins/tools", SHA: shaB}
+	items, err := Resolve([]project.Pack{{Name: "p", Items: []string{locked.ID}}}, map[string]project.LockItem{locked.ID: locked}, fixtureCatalog(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := items[locked.ID]
+	if got.SHA != shaB || !reflect.DeepEqual(got.Parts, toolsParts) {
+		t.Errorf("got %+v", got)
+	}
+}
+
+func TestResolveRefusesForeignParts(t *testing.T) {
+	locked := project.LockItem{ID: "plugin:o/r:plugins/tools", Type: "plugin", Name: "tools", Repo: "o/r", Path: "plugins/tools", SHA: shaA, Parts: []string{"skill:x/y:skills/a"}}
+	_, err := Resolve([]project.Pack{{Name: "p", Items: []string{locked.ID}}}, map[string]project.LockItem{locked.ID: locked}, fixtureCatalog(t))
+	if err == nil || !strings.Contains(err.Error(), "skill:x/y:skills/a") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestBuildFetchesWholePluginRepo(t *testing.T) {
+	packs, items := resolved(t, "plugin:o/r:plugins/tools")
+	plan, err := Build(packs, items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Repos["o--r"] != "github:o/r#"+shaA || len(plan.Repos) != 1 {
+		t.Errorf("repos %v", plan.Repos)
+	}
+	packs, items = resolved(t, "plugin:o/r#stripe")
+	plan, _ = Build(packs, items)
+	if len(plan.Repos) != 0 {
+		t.Errorf("external plugin repos %v", plan.Repos)
 	}
 }

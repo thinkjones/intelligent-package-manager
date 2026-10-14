@@ -167,3 +167,22 @@ func TestLoadPacksUnknownKeyStillFails(t *testing.T) {
 		t.Errorf("got %v", err)
 	}
 }
+
+func TestSaveLockParts(t *testing.T) {
+	dir := t.TempDir()
+	items := map[string]LockItem{
+		"plugin:o/r:p": {ID: "plugin:o/r:p", Type: "plugin", Name: "p", Repo: "o/r", Path: "p", SHA: "abc", Parts: []string{"agent:o/r:p/a.md", "skill:o/r:p/s"}},
+		"skill:o/r:s":  {ID: "skill:o/r:s", Type: "skill", Name: "s", Repo: "o/r", Path: "s", SHA: "abc"},
+	}
+	if err := SaveLock(dir, items); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadLock(dir)
+	if err != nil || !reflect.DeepEqual(got, items) {
+		t.Fatalf("got %+v, %v", got, err)
+	}
+	raw, _ := os.ReadFile(filepath.Join(dir, LockFile))
+	if n := strings.Count(string(raw), "parts ="); n != 1 || !strings.Contains(string(raw), `parts = ["agent:o/r:p/a.md", "skill:o/r:p/s"]`) {
+		t.Errorf("lock:\n%s", raw)
+	}
+}

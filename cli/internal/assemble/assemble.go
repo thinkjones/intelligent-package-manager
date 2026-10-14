@@ -12,6 +12,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -55,6 +56,14 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 			if err := check(l); err != nil {
 				return fmt.Errorf("%s in ipm.lock: %v — fix it, or run `ipm pack build --update` to re-resolve from the catalog", id, err)
 			}
+			if l.Type == catalog.TypePlugin && l.Path != "" && l.Parts == nil {
+				// A lock from before parts were recorded: read them from
+				// the catalog, keeping the pinned commit. Without a
+				// catalog the plugin stays whole-only.
+				if r, err := lookup(id); err == nil && r != nil {
+					l.Parts = pluginParts(r)
+				}
+			}
 			out[id] = l
 			if l.Type == catalog.TypeCopilotPlugin {
 				skills, _ := copilotSkills(l)
@@ -76,6 +85,9 @@ func Resolve(packs []project.Pack, lock map[string]project.LockItem, catalogDir 
 		it := project.LockItem{ID: id, Type: str(r, "type"), Name: str(r, "name"), Repo: str(r, "repo"), Path: str(r, "path"), SHA: str(r, "commit")}
 		switch it.Type {
 		case catalog.TypePlugin:
+			if it.Path != "" {
+				it.Parts = pluginParts(r)
+			}
 			if entry, ok := r["entry"].(map[string]any); ok && strings.Contains(id, "#") {
 				b, _ := json.Marshal(entry)
 				it.Source = string(b)
@@ -125,6 +137,12 @@ func check(it project.LockItem) error {
 	if (it.SHA != "" || !external) && !commitRE.MatchString(it.SHA) {
 		return fmt.Errorf("sha %q is not a full commit", it.SHA)
 	}
+	for _, p := range it.Parts {
+		// A part is an item of the plugin's own repo.
+		if _, rest, _ := strings.Cut(p, ":"); !strings.HasPrefix(rest, it.Repo+":") {
+			return fmt.Errorf("part %q is not in %s", p, it.Repo)
+		}
+	}
 	switch {
 	case it.Type == catalog.TypeCopilotPlugin:
 		if _, err := copilotSkills(it); err != nil {
@@ -136,6 +154,17 @@ func check(it project.LockItem) error {
 		}
 	}
 	return nil
+}
+
+// pluginParts is a plugin record's child item IDs (skills, agents, commands,
+// hooks, MCP servers), sorted and deduplicated.
+func pluginParts(r map[string]any) []string {
+	var parts []string
+	for _, k := range []string{"skills", "agents", "commands", "hooks", "mcp"} {
+		parts = append(parts, strs(r[k])...)
+	}
+	sort.Strings(parts)
+	return slices.Compact(parts)
 }
 
 // copilotSkills is a copilot plugin's skill IDs, from its Source.
@@ -297,6 +326,11 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 				dep, err := wholePlugin(p.Name, it)
 				if err != nil {
 					return Plan{}, fmt.Errorf("%s: %v", id, err)
+				}
+				if it.Path != "" {
+					if err := pin(it); err != nil {
+						return Plan{}, err
+					}
 				}
 				pp.Deps = append(pp.Deps, dep)
 				name := pp.DepNames()[len(pp.DepNames())-1]
