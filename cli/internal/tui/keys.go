@@ -54,3 +54,15 @@ var packsKeys = [][2]string{
 	{"?", "this help"},
 	{"q  ctrl+c", "quit"},
 }
+
+// installsKeys is the Installs tab's ? overlay.
+var installsKeys = [][2]string{
+	{"↑ ↓  j k", "move through the installs"},
+	{"enter  i", "reinstall the selected install"},
+	{"a", "new install: claude or gascity (the install form)"},
+	{"g", "include the global installs"},
+	{"/", "filter the installs; esc clears the filter"},
+	{"1-4  [ ]", "switch tab"},
+	{"?", "this help"},
+	{"q  ctrl+c", "quit"},
+}

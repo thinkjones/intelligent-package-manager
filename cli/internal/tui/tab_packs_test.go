@@ -115,7 +115,7 @@ func TestPacksGlobalToggleAndReadOnly(t *testing.T) {
 		if m.status != readOnlyGlobal {
 			t.Errorf("%s: status %q", k, m.status)
 		}
-		if m.inst != nil || m.deploy != nil {
+		if m.inst != nil || m.form != nil {
 			t.Errorf("%s opened a modal", k)
 		}
 	}
@@ -162,10 +162,10 @@ func TestPacksBuild(t *testing.T) {
 func TestPacksInstallKey(t *testing.T) {
 	m, f := packsModel(t)
 	press(t, m, "down", "i")
-	if m.deploy == nil || m.deploy.pack != "docs" {
-		t.Fatalf("i opens the install for the selected pack: %+v", m.deploy)
+	if m.form == nil || m.form.pack != "docs" || m.form.step != formTarget {
+		t.Fatalf("i opens the install form for the selected pack: %+v", m.form)
 	}
-	press(t, m, "enter", "enter", "y")
+	press(t, m, "enter", "enter", "enter", "y")
 	if len(f.in.installed) != 1 || !strings.HasPrefix(f.in.installed[0], "docs ") {
 		t.Errorf("installed %v", f.in.installed)
 	}
@@ -186,7 +186,7 @@ func TestPacksFilter(t *testing.T) {
 	// Keys with a meaning elsewhere type into the filter.
 	press(t, m, "/")
 	typeText(t, m, "x1]qbigdw")
-	if m.pk.filter.value() != "x1]qbigdw" || m.tab != tabPacks || m.inst != nil || m.deploy != nil || len(f.p.calls) != 0 || m.help {
+	if m.pk.filter.value() != "x1]qbigdw" || m.tab != tabPacks || m.inst != nil || m.form != nil || len(f.p.calls) != 0 || m.help {
 		t.Errorf("filter %q tab %d", m.pk.filter.value(), m.tab)
 	}
 	if !strings.Contains(view(m), "no pack matches") {

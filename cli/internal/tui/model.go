@@ -55,7 +55,8 @@ type Model struct {
 	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
 	backStack []string // external entries jumped from, newest last
 
-	pk       packsTab // the Packs tab
+	pk       packsTab    // the Packs tab
+	ins      installsTab // the Installs tab
 	packs    []Pack
 	active   string // the active pack's name
 	traySel  int
@@ -63,11 +64,11 @@ type Model struct {
 	picker   *picker
 	statusOK bool // status is a note, not an error
 
-	inst   *install     // the install or deploy output modal, while open
-	deploy *deployModal // the deploy modal before it runs
-	ext    *extModal    // the e modal: external references
-	help   bool         // the ? overlay
-	plain  bool         // NO_COLOR: draw without colour
+	inst  *install     // the build or install output modal, while open
+	form  *installForm // the install form before it runs
+	ext   *extModal    // the e modal: external references
+	help  bool         // the ? overlay
+	plain bool         // NO_COLOR: draw without colour
 }
 
 type keyMsg = tea.KeyPressMsg
@@ -92,6 +93,7 @@ func New(d Deps) *Model {
 	in.Focus()
 	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
 	m.pk.filter = newFilterBox()
+	m.ins.filter = newFilterBox()
 	m.catCounts = d.Catalog.Counts()
 	for i := range m.counts {
 		m.counts[i] = notLoaded
@@ -141,6 +143,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.dirty = false
 			}
 			m.reloadPacks()
+			if m.inst.title == "install" {
+				m.loadInstallsTab()
+			}
 		}
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
@@ -177,8 +182,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if m.deploy != nil {
-		return m.deployKey(msg)
+	if m.form != nil {
+		return m.formKey(msg)
 	}
 	if m.ext != nil {
 		m.extKey(k)
@@ -197,6 +202,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.catalogKey(msg)
 	case tabPacks:
 		return m.packsKey(msg)
+	case tabInstalls:
+		return m.installsKey(msg)
 	}
 	return m.otherTabKey(k)
 }
@@ -264,8 +271,8 @@ func (m *Model) render() string {
 	switch {
 	case m.inst != nil:
 		mid = panel(stTitle.Render(m.inst.title), m.installLines(w-4, body-2), w, true)
-	case m.deploy != nil:
-		mid = panel(stTitle.Render("deploy"), m.deployLines(w-4, body-2), w, true)
+	case m.form != nil:
+		mid = panel(stTitle.Render("install"), m.formLines(w-4, body-2), w, true)
 	case m.ext != nil:
 		mid = panel(stTitle.Render("external references"), m.extLines(w-4, body-2), w, true)
 	case m.help:
@@ -276,6 +283,8 @@ func (m *Model) render() string {
 		mid = m.catalogBody(w, body)
 	case m.tab == tabPacks:
 		mid = m.packsBody(w, body)
+	case m.tab == tabInstalls:
+		mid = m.installsBody(w, body)
 	default:
 		for range body {
 			mid = append(mid, spaces(w))

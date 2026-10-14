@@ -3,7 +3,7 @@ CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)
 ━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
 skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
 ╭─ build ──────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ipm build                                                                                                            │
+│ ipm pack build                                                                                                       │
 │                                                                                                                      │
 │ ✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)                                                                   │
 │ validate: ok                                                                                                         │

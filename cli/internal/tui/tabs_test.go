@@ -39,7 +39,7 @@ func TestOtherTabQuitsAndKeepsCatalogState(t *testing.T) {
 	m, _ := newTest(t)
 	typeText(t, m, "tdd")
 	press(t, m, "down", "3")
-	if !strings.Contains(view(m), "INSTALLS (…)") {
+	if !strings.Contains(view(m), "INSTALLS (0)") {
 		t.Errorf("tab bar:\n%s", view(m))
 	}
 	press(t, m, "1")

@@ -105,12 +105,34 @@ func TestGoldenViews(t *testing.T) {
 			press(t, m, "down")
 			return m
 		},
-		"deploy-confirm": func(t *testing.T) *Model {
+		"install-form-target": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
-			typeText(t, m, "tdd")
-			press(t, m, "down")
-			m.openDeploy()
-			press(t, m, "enter", "enter")
+			press(t, m, "down", "2", "i")
+			return m
+		},
+		"install-form-gascity": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			press(t, m, "down", "2", "i", "down", "enter", "enter")
+			return m
+		},
+		"install-form-confirm": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			press(t, m, "down", "2", "i", "enter", "enter", "enter")
+			return m
+		},
+		"installs": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withInstalls)
+			press(t, m, "down", "3")
+			return m
+		},
+		"installs-global": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withInstalls)
+			press(t, m, "down", "3", "g")
+			return m
+		},
+		"installs-empty": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			press(t, m, "down", "3")
 			return m
 		},
 		"external-modal": func(t *testing.T) *Model {
@@ -130,7 +152,7 @@ func TestGoldenViews(t *testing.T) {
 			f.b.lines = []string{"✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)", "validate: ok"}
 			typeText(t, m, "tdd")
 			press(t, m, "down")
-			drain(t, m, m.startInstall())
+			drain(t, m, m.startBuild())
 			return m
 		},
 		"local-banner": func(t *testing.T) *Model {

@@ -1,15 +1,17 @@
 ipm  project /work                                                                                              ● hybrid
-CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
-━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
-skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
-╭─ deploy ─────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Deploy csharp-sdlc to Claude Code — project scope in /work                                                           │
+CATALOG (2,024)  PACKS (2)  INSTALLS (0)  MARKETPLACE (…)                                                               
+────────────────────────────━━━━━━━━━━━━─────────────────                                                               
+0 installs                                                                                                              
+╭─ installs ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ no installs yet — press a to install a pack                                                                          │
 │                                                                                                                      │
-│   ipm install                                                                                                        │
-│   claude plugin marketplace add /work/.ipm --scope project                                                           │
-│   claude plugin install kit@work-ipm --scope project                                                                 │
 │                                                                                                                      │
-│ y deploy · esc cancel                                                                                                │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -24,7 +26,5 @@ skill 1,204 · agent 312 · command 98 · plugin 410
 │                                                                                                                      │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
-skill tdd · agent csharp-pro · plugin stripe                                                                            
-2 of 100  o/r › p › tdd                                                                                                 
-y deploy  esc cancel                                                                                                    
+                                                                                                                        
+↑↓ move  enter reinstall  a new  g global  / filter  1-4 tabs  ? help  q quit                                           

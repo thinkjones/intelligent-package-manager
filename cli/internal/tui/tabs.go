@@ -79,6 +79,8 @@ func (m *Model) statsStrip(w int) string {
 		return fit(m.catalogStats(), w)
 	case tabPacks:
 		return fit(m.packsStats(), w)
+	case tabInstalls:
+		return fit(m.installsStats(), w)
 	}
 	return spaces(w)
 }
@@ -88,9 +90,9 @@ func (m *Model) hints() string {
 	switch {
 	case m.inst != nil:
 		return "esc close (when finished)"
-	case m.deploy != nil && m.deploy.step == stepConfirm:
-		return "y deploy  esc cancel"
-	case m.deploy != nil:
+	case m.form != nil && m.form.step == formConfirm:
+		return "y install  esc cancel"
+	case m.form != nil:
 		return "enter next  esc cancel"
 	case m.ext != nil:
 		return "↑↓ move  enter jump  esc close"
@@ -105,6 +107,9 @@ func (m *Model) hints() string {
 	if m.tab == tabPacks && m.pk.filter.typing {
 		return strings.Join(m.packsHints(), "  ")
 	}
+	if m.tab == tabInstalls && m.ins.filter.typing {
+		return strings.Join(m.installsHints(), "  ")
+	}
 	return strings.Join(append(m.otherHints(), helpQuit), "  ")
 }
 
@@ -113,8 +118,11 @@ const helpQuit = "? help  q quit"
 
 // otherHints are the footer hints of a tab with no keys of its own yet.
 func (m *Model) otherHints() []string {
-	if m.tab == tabPacks {
+	switch m.tab {
+	case tabPacks:
 		return m.packsHints()
+	case tabInstalls:
+		return m.installsHints()
 	}
 	return []string{"1-4 tabs", "[ ] switch"}
 }
@@ -124,9 +132,9 @@ func (m *Model) otherHints() []string {
 func (m *Model) footer(w int) string {
 	var parts []string
 	switch {
-	case m.inst != nil, m.deploy != nil, m.ext != nil, m.help, m.picker != nil:
+	case m.inst != nil, m.form != nil, m.ext != nil, m.help, m.picker != nil:
 		return m.hints()
-	case m.tab == tabPacks && m.pk.filter.typing:
+	case m.tab == tabPacks && m.pk.filter.typing, m.tab == tabInstalls && m.ins.filter.typing:
 		return m.hints()
 	case m.tab != tabCatalog:
 		parts = m.otherHints()

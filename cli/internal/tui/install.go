@@ -17,7 +17,8 @@ type (
 
 // install is the state of the install modal.
 type install struct {
-	title   string // "install" or "deploy"
+	title   string // "build" or "install"
+	command string // the ipm command the modal echoes under its title
 	success string // the line shown when it finishes without error
 	lines   []string
 	done    bool
@@ -27,19 +28,42 @@ type install struct {
 	result  chan error
 }
 
-// startInstall runs the installer in the background, its output piped into
-// the modal line by line.
-func (m *Model) startInstall() tea.Cmd {
-	return m.stream("build", "✓ built", func(w io.Writer) error {
+// busyMsg is the status when a run is asked for while another still streams.
+const busyMsg = "busy — wait for the current run to finish"
+
+// busy reports whether the output modal is streaming a run.
+func (m *Model) busy() bool { return m.inst != nil && !m.inst.done }
+
+// refuseBusy says so in the status and reports true when a run is streaming;
+// every command that starts a run asks first.
+func (m *Model) refuseBusy() bool {
+	if !m.busy() {
+		return false
+	}
+	m.status, m.statusOK = busyMsg, false
+	return true
+}
+
+// startBuild builds every pack in the background, its output piped into the
+// modal line by line.
+func (m *Model) startBuild() tea.Cmd {
+	if m.refuseBusy() {
+		return nil
+	}
+	cmd := "ipm pack build"
+	if m.d.Packs.Scope() == "global" {
+		cmd += " -g"
+	}
+	return m.stream("build", cmd, "✓ built", func(w io.Writer) error {
 		return m.d.Builder.Build(context.Background(), w)
 	})
 }
 
 // stream runs work in the background with its output piped into the modal
-// line by line.
-func (m *Model) stream(title, success string, work func(io.Writer) error) tea.Cmd {
+// line by line; command is the ipm command it echoes under the title.
+func (m *Model) stream(title, command, success string, work func(io.Writer) error) tea.Cmd {
 	pr, pw := io.Pipe()
-	in := &install{title: title, success: success, scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
+	in := &install{title: title, command: command, success: success, scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
 	in.scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	m.inst = in
 	go func() {
@@ -69,7 +93,7 @@ func (in *install) next() tea.Msg {
 // installKey handles keys while the modal is open.
 func (m *Model) installKey(k string) tea.Cmd {
 	if !m.inst.done {
-		m.status = m.inst.title + " is running — wait for it to finish"
+		m.refuseBusy()
 		return nil
 	}
 	switch k {
@@ -92,7 +116,7 @@ func (m *Model) installLines(w, rows int) []string {
 	case in.done:
 		result = stTeal.Render(in.success) + stMuted.Render("  · esc close")
 	}
-	head := []string{stTitle.Render("ipm " + in.title), ""}
+	head := []string{stTitle.Render(in.command), ""}
 	room := max(0, rows-len(head)-2)
 	shown := in.lines
 	if len(shown) > room {
@@ -130,8 +154,11 @@ func (m *Model) helpLines(w, rows int) []string {
 	var lines []string
 	if m.tab != tabCatalog {
 		keys := tabKeys
-		if m.tab == tabPacks {
+		switch m.tab {
+		case tabPacks:
 			keys = packsKeys
+		case tabInstalls:
+			keys = installsKeys
 		}
 		lines = keyTable("Keys", keys, w)
 	} else if w >= 100 {

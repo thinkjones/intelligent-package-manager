@@ -1,0 +1,30 @@
+ipm  project /work                                                                                              ● hybrid
+CATALOG (0)  PACKS (3)  INSTALLS (3)  MARKETPLACE (…)                                                                   
+────────────────────────━━━━━━━━━━━━─────────────────                                                                   
+3 installs · claude 2 · gascity 1                                                                                       
+╭─ installs ─────────────────────────────────────────────────────────────╮╭─ csharp-sdlc ──────────────────────────────╮
+│   PACK        TARGET  AS      PATH     FROM                            ││ target  claude                             │
+│ ▶ csharp-sdlc claude  project /x       project                         ││ scope   project                            │
+│   docs        gascity kit     /x       project                         ││ path    /x                                 │
+│   mine        claude  user             global                          ││ from    project                            │
+│                                                                        ││                                            │
+│                                                                        ││ reinstall with                             │
+│                                                                        ││ ipm install claude csharp-sdlc --scope     │
+│                                                                        ││ project --path /x                          │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+│                                                                        ││                                            │
+╰────────────────────────────────────────────────────────────────────────╯╰────────────────────────────────────────────╯
+                                                                                                                        
+↑↓ move  enter reinstall  a new  g global  / filter  1-4 tabs  ? help  q quit                                           
