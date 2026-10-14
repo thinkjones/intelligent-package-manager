@@ -110,7 +110,7 @@ func (tv treeView) cursorText(desc string) string {
 	case tv.Node.External != nil:
 		return "↗ " + tv.Node.External.Repo + " — " + desc
 	case tv.Node.Unresolved != "":
-		return "↗ " + tv.Node.Unresolved + " (not a source — ipm source add " + tv.Node.ID + ") — " + desc
+		return "↗ " + tv.Node.Unresolved + " (not a source — ipm marketplace add " + tv.Node.ID + ") — " + desc
 	}
 	return desc
 }

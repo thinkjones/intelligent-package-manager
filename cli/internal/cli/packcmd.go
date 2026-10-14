@@ -130,7 +130,7 @@ func pickable(g *catgraph.Graph, packName, id string) error {
 			return nil
 		}
 	case catalog.TypeRepo, catalog.TypeMarketplace:
-		return fmt.Errorf("%s is a %s — pick the plugins, skills, agents or commands it holds (see `ipm tree %s`)", id, typ, id)
+		return fmt.Errorf("%s is a %s — pick the plugins, skills, agents or commands it holds (see `ipm show tree %s`)", id, typ, id)
 	}
 	var owners []string
 	if l, ok := n["plugins"].([]any); ok {

@@ -126,8 +126,6 @@ Config
 		newCatalogCmd(sys),
 		newSearchCmd(sys),
 		newShowCmd(sys),
-		newTreeCmd(sys),
-		newGraphCmd(sys),
 		newPackCmd(sys),
 		newInstallCmd(sys),
 		newTuiCmd(sys),

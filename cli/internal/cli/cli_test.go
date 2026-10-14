@@ -692,7 +692,7 @@ func TestShowExternalPlugin(t *testing.T) {
 	f := graphFake(t)
 	f.run("show", "plugin:o/r#e")
 	lines := strings.Split(strings.TrimSpace(f.out.String()), "\n")
-	if lines[len(lines)-1] != "add its source: ipm source add plugin:o/r#e" {
+	if lines[len(lines)-1] != "add its source: ipm marketplace add plugin:o/r#e" {
 		t.Errorf("output:\n%s", f.out.String())
 	}
 }
@@ -708,30 +708,49 @@ func TestShowJSON(t *testing.T) {
 
 func TestTreeAndGraphCommands(t *testing.T) {
 	f := graphFake(t)
-	if err := f.run("tree", "--up", "skill:o/r:p/skills/s1"); err != nil || !strings.HasPrefix(f.out.String(), "skill       s1\n└─ plugin      p") {
+	if err := f.run("show", "tree", "--up", "skill:o/r:p/skills/s1"); err != nil || !strings.HasPrefix(f.out.String(), "skill       s1\n└─ plugin      p") {
 		t.Errorf("tree --up: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("graph", "--format", "dot", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "digraph") {
+	if err := f.run("show", "graph", "--format", "dot", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "digraph") {
 		t.Errorf("graph dot: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("graph", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "flowchart LR") {
+	if err := f.run("show", "graph", "plugin:o/r:p"); err != nil || !strings.HasPrefix(f.out.String(), "flowchart LR") {
 		t.Errorf("graph default: %v\n%s", err, f.out.String())
 	}
 	var usage *UsageError
-	if err := f.run("graph", "--format", "svg", "plugin:o/r:p"); !errors.As(err, &usage) {
+	if err := f.run("show", "graph", "--format", "svg", "plugin:o/r:p"); !errors.As(err, &usage) {
 		t.Errorf("svg: %v", err)
 	}
-	if err := f.run("tree"); !errors.As(err, &usage) {
+	if err := f.run("show", "tree"); !errors.As(err, &usage) {
 		t.Errorf("no id: %v", err)
+	}
+}
+
+func TestShowTreeNeedsID(t *testing.T) {
+	f := graphFake(t)
+	err := f.run("show", "tree")
+	var usage *UsageError
+	if !errors.As(err, &usage) || !strings.Contains(err.Error(), "give one artifact ID") {
+		t.Errorf("show tree: %v", err)
+	}
+	if err := f.run("show", "tree", "--up"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "give one artifact ID") {
+		t.Errorf("show tree --up: %v", err)
+	}
+}
+
+func TestShowStillShows(t *testing.T) {
+	f := graphFake(t)
+	if err := f.run("show", "skill:o/r:p/skills/s1"); err != nil || !strings.Contains(f.out.String(), "description") {
+		t.Errorf("%v\n%s", err, f.out.String())
 	}
 }
 
 func TestShowWithoutCatalog(t *testing.T) {
 	f := newFake(checkout(t))
-	for _, cmd := range []string{"show", "tree", "graph"} {
-		if err := f.run(cmd, "skill:o/r:x"); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
+	for _, cmd := range [][]string{{"show"}, {"show", "tree"}, {"show", "graph"}} {
+		if err := f.run(append(cmd, "skill:o/r:x")...); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 			t.Errorf("%s: %v", cmd, err)
 		}
 	}
@@ -739,13 +758,13 @@ func TestShowWithoutCatalog(t *testing.T) {
 
 func TestTreeDefaultDepth(t *testing.T) {
 	f := graphFake(t)
-	f.run("tree", "repo:o/r")
+	f.run("show", "tree", "repo:o/r")
 	// repo (0) → marketplace (1) → plugin p (2) → skill/hook (3): depth 3 shows s1
 	if !strings.Contains(f.out.String(), "skill       s1") {
 		t.Errorf("repo tree:\n%s", f.out.String())
 	}
 	f.out.Reset()
-	f.run("tree", "--depth", "1", "repo:o/r")
+	f.run("show", "tree", "--depth", "1", "repo:o/r")
 	if strings.Contains(f.out.String(), "plugin      p") {
 		t.Errorf("--depth 1 shows grandchildren:\n%s", f.out.String())
 	}
@@ -1199,7 +1218,7 @@ func TestPackAddRefusesUnpickable(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "plugin:o/r:p") || !strings.Contains(err.Error(), "ipm pack add kit") {
 		t.Errorf("hook: %v", err)
 	}
-	if err := f.run("pack", "add", "kit", "repo:o/r"); err == nil || !strings.Contains(err.Error(), "ipm tree") {
+	if err := f.run("pack", "add", "kit", "repo:o/r"); err == nil || !strings.Contains(err.Error(), "ipm show tree") {
 		t.Errorf("repo: %v", err)
 	}
 }
@@ -2119,12 +2138,12 @@ func TestShowSourceHintOnlyWhenUnresolved(t *testing.T) {
 	}
 	f := newFake(root)
 	f.run("show", "plugin:a/m#cf")
-	if strings.Contains(f.out.String(), "ipm source add") {
+	if strings.Contains(f.out.String(), "ipm marketplace add") {
 		t.Errorf("b/s is already a source:\n%s", f.out.String())
 	}
 	f.out.Reset()
 	f.run("show", "plugin:a/m#other")
-	if !strings.Contains(f.out.String(), "ipm source add plugin:a/m#other") {
+	if !strings.Contains(f.out.String(), "ipm marketplace add plugin:a/m#other") {
 		t.Errorf("c/x isn't a source:\n%s", f.out.String())
 	}
 }

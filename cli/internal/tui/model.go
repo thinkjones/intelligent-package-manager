@@ -303,7 +303,7 @@ func (m *Model) treeDown() {
 		m.jump()
 		return
 	case m.tree.Node.Unresolved != "":
-		m.status = m.tree.Node.Unresolved + " isn't one of your sources — ipm source add " + m.cursor
+		m.status = m.tree.Node.Unresolved + " isn't one of your sources — ipm marketplace add " + m.cursor
 		return
 	}
 	if len(m.tree.Children) > 0 {
