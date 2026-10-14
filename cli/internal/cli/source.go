@@ -27,73 +27,60 @@ func ipmPaths(sys System) (paths.Paths, error) {
 	return paths.Resolve(sys.Getenv, runtime.GOOS)
 }
 
-func newSourceCmd(sys System) *cobra.Command {
-	cmd := verbs(&cobra.Command{
-		Use:   "source",
-		Short: "add, remove, list or import your repos of interest",
-	}, "add, remove, list or import")
-	cmd.AddCommand(
-		&cobra.Command{
-			Use:   "add <repo>...",
-			Short: "add sources: owner/repo[@ref], a git URL[#ref], or an external plugin ID",
-			Args:  minArgs(1, "at least one repo"),
-			RunE: func(_ *cobra.Command, args []string) error {
-				p, err := ipmPaths(sys)
-				if err != nil {
-					return err
-				}
-				return sourceAdd(sys, p, args)
-			},
+func newMarketplaceAddCmd(sys System) *cobra.Command {
+	return &cobra.Command{
+		Use:   "add <repo>...",
+		Short: "follow repos: owner/repo[@ref], a git URL[#ref], or an external plugin ID",
+		Args:  minArgs(1, "at least one repo"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			p, err := ipmPaths(sys)
+			if err != nil {
+				return err
+			}
+			return sourceAdd(sys, p, args)
 		},
-		&cobra.Command{
-			Use:   "remove <repo>...",
-			Short: "remove sources",
-			Args:  minArgs(1, "at least one repo"),
-			RunE: func(_ *cobra.Command, args []string) error {
-				p, err := ipmPaths(sys)
-				if err != nil {
-					return err
-				}
-				if err := sources.Remove(p.Sources(), args); err != nil {
-					return err
-				}
-				fmt.Fprintf(sys.Stdout, "%s removed %s — run `ipm sync` to reindex\n", ok, strings.Join(args, ", "))
-				return nil
-			},
+	}
+}
+
+func newMarketplaceRemoveCmd(sys System) *cobra.Command {
+	return &cobra.Command{
+		Use:   "remove <repo>...",
+		Short: "stop following repos",
+		Args:  minArgs(1, "at least one repo"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			p, err := ipmPaths(sys)
+			if err != nil {
+				return err
+			}
+			if err := sources.Remove(p.Sources(), args); err != nil {
+				return err
+			}
+			fmt.Fprintf(sys.Stdout, "%s removed %s — run `ipm catalog sync` to reindex\n", ok, strings.Join(args, ", "))
+			return nil
 		},
-		&cobra.Command{
-			Use:   "list",
-			Short: "alias, repo, ref and pinned commit of every source",
-			Args:  noArgs,
-			RunE: func(*cobra.Command, []string) error {
-				p, err := ipmPaths(sys)
-				if err != nil {
-					return err
-				}
-				return sourceList(sys, p)
-			},
+	}
+}
+
+func newMarketplaceImportCmd(sys System) *cobra.Command {
+	return &cobra.Command{
+		Use:   "import <path/to/manifest.toml>",
+		Short: "one-time: add the [[repo]] entries of an aihs-era manifest.toml",
+		Args:  exactArgs(1, "the path of one manifest.toml"),
+		RunE: func(_ *cobra.Command, args []string) error {
+			p, err := ipmPaths(sys)
+			if err != nil {
+				return err
+			}
+			return sourceImport(sys, p, args[0])
 		},
-		&cobra.Command{
-			Use:   "import <path/to/manifest.toml>",
-			Short: "one-time: add the [[repo]] entries of an aihs-era manifest.toml",
-			Args:  exactArgs(1, "the path of one manifest.toml"),
-			RunE: func(_ *cobra.Command, args []string) error {
-				p, err := ipmPaths(sys)
-				if err != nil {
-					return err
-				}
-				return sourceImport(sys, p, args[0])
-			},
-		},
-	)
-	return cmd
+	}
 }
 
 // sourceAdd adds repos; an external plugin's catalog ID adds the repo it
 // lives in.
 func sourceAdd(sys System, p paths.Paths, args []string) error {
 	if len(args) == 0 {
-		return usagef("source add: name at least one repo (owner/repo[@ref], a git URL, or an external plugin ID)")
+		return usagef("marketplace add: name at least one repo (owner/repo[@ref], a git URL, or an external plugin ID)")
 	}
 	var plugins []map[string]any
 	repos := make([]string, 0, len(args))
@@ -121,7 +108,7 @@ func sourceAdd(sys System, p paths.Paths, args []string) error {
 	for _, s := range added {
 		fmt.Fprintf(sys.Stdout, "%s %s (%s)\n", ok, s.Repo, s.Alias)
 	}
-	fmt.Fprintln(sys.Stdout, "\nNext: ipm sync")
+	fmt.Fprintln(sys.Stdout, "\nNext: ipm catalog sync")
 	return nil
 }
 
@@ -139,11 +126,11 @@ func sourceRepo(plugins []map[string]any, id string) (string, error) {
 	return "", fmt.Errorf("no plugin %s in the catalog — run `ipm index`", id)
 }
 
-// packsMaxAge is how old the saved source packs may be before ipm source
-// list fetches them again.
+// packsMaxAge is how old the saved source packs may be before ipm marketplace
+// --followed fetches them again.
 const packsMaxAge = 7 * 24 * time.Hour
 
-// sourcePacks is the default curated list, which groups ipm source list:
+// sourcePacks is the default curated list, which groups ipm marketplace --followed:
 // the saved copy, fetched again when it is missing or old. ok is false when
 // there is no copy and none could be fetched.
 func sourcePacks(sys System, p paths.Paths) (lists []curated.List, ok bool) {
@@ -166,23 +153,23 @@ func sourcePacks(sys System, p paths.Paths) (lists []curated.List, ok bool) {
 	return lists, err == nil
 }
 
-// sourceRow is one source as ipm source list shows it.
+// sourceRow is one source as ipm marketplace --followed shows it.
 type sourceRow struct {
 	alias, repo, stars, ref, commit string
 	description, homepage           string
 	topics                          []string
 }
 
-// sourceList prints the sources under the source pack each belongs to (the
+// sourceList (ipm marketplace --followed) prints the sources under the source pack each belongs to (the
 // first, for a repo in several), then the rest under Other. Stars,
-// description and topics come from the pack, else from ipm stats.
+// description and topics come from the pack, else from ipm marketplace stats.
 func sourceList(sys System, p paths.Paths) error {
 	srcs, err := sources.Load(p.Sources())
 	if err != nil {
 		return err
 	}
 	if len(srcs) == 0 {
-		fmt.Fprintln(sys.Stdout, "no sources — add one with `ipm source add owner/repo`")
+		fmt.Fprintln(sys.Stdout, "no sources — add one with `ipm marketplace add owner/repo`")
 		return nil
 	}
 	commits := map[string]string{}
@@ -294,7 +281,7 @@ func sourceList(sys System, p paths.Paths) error {
 // copies its sibling catalog/github.jsonl so stats needn't be refetched.
 func sourceImport(sys System, p paths.Paths, file string) error {
 	if filepath.Base(file) != pack.ManifestFile {
-		return usagef("source import: expected a file named %s, got %s", pack.ManifestFile, file)
+		return usagef("marketplace import: expected a file named %s, got %s", pack.ManifestFile, file)
 	}
 	ups, err := pack.LoadInterest(filepath.Dir(file))
 	if err != nil {
@@ -326,7 +313,7 @@ func sourceImport(sys System, p paths.Paths, file string) error {
 			fmt.Fprintf(sys.Stdout, "%s copied GitHub stats to %s\n", ok, dest)
 		}
 	}
-	fmt.Fprintln(sys.Stdout, "\nNext: ipm sync")
+	fmt.Fprintln(sys.Stdout, "\nNext: ipm catalog sync")
 	return nil
 }
 

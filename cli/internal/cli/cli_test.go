@@ -155,7 +155,7 @@ func checkout(t *testing.T) string {
 
 func TestHelpAndVersion(t *testing.T) {
 	f := newFake("")
-	if err := f.run(); err != nil || !strings.Contains(f.out.String(), "source") {
+	if err := f.run(); err != nil || !strings.Contains(f.out.String(), "marketplace") {
 		t.Fatalf("help: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
@@ -185,9 +185,9 @@ func TestUsageErrors(t *testing.T) {
 		{"help", "nope"},
 		{"help", "a", "b"},
 		{"sync", "-upgrade"}, // POSIX flags: long flags take two dashes
-		{"source"},
-		{"source", "bogus"},
-		{"source", "add"},
+		{"marketplace", "stats", "x"},
+		{"marketplace", "bogus"},
+		{"marketplace", "add"},
 		{"pack", "add", "kit"},
 		{"pack", "new"},
 		{"show"},
@@ -244,7 +244,7 @@ func TestStatsCommand(t *testing.T) {
 	f.onPath["gh"] = true
 	f.results["gh auth"] = result{"Logged in", nil}
 	f.results["gh api"] = result{ghRepoJSON, nil}
-	if err := f.run("stats"); err != nil {
+	if err := f.run("marketplace", "stats"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	data, _ := os.ReadFile(filepath.Join(cacheOf(root), "catalog", "github.jsonl"))
@@ -266,7 +266,7 @@ func TestStatsKeepsPreviousRecordOnFailure(t *testing.T) {
 	f.onPath["gh"] = true
 	f.results["gh api"] = result{"HTTP 502", errors.New("exit 1")}
 	var exit *ExitError
-	if err := f.run("stats"); !errors.As(err, &exit) || exit.Code != 1 {
+	if err := f.run("marketplace", "stats"); !errors.As(err, &exit) || exit.Code != 1 {
 		t.Errorf("want exit 1, got %v", err)
 	}
 	if data, _ := os.ReadFile(filepath.Join(cacheOf(root), "catalog", "github.jsonl")); string(data) != prev {
@@ -277,7 +277,7 @@ func TestStatsKeepsPreviousRecordOnFailure(t *testing.T) {
 func TestStatsNeedsGh(t *testing.T) {
 	root := checkout(t)
 	withRepos(t, root, "o/r")
-	err := newFake(root).run("stats")
+	err := newFake(root).run("marketplace", "stats")
 	if err == nil || !strings.Contains(err.Error(), "gh") {
 		t.Errorf("got %v", err)
 	}
@@ -916,38 +916,35 @@ func withSources(t *testing.T, f *fake, repos map[string]map[string]string) {
 
 func TestSourceAddListRemove(t *testing.T) {
 	f := newFake(checkout(t))
-	if err := f.run("source", "add", "obra/superpowers", "anthropics/skills@v1"); err != nil {
+	if err := f.run("marketplace", "add", "obra/superpowers", "anthropics/skills@v1"); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(f.out.String(), "ipm sync") {
+	if !strings.Contains(f.out.String(), "ipm catalog sync") {
 		t.Errorf("add output:\n%s", f.out.String())
 	}
 	f.out.Reset()
-	f.run("source", "list")
+	f.run("marketplace", "--followed")
 	if !regexpMatch(`anthropics--skills\s+anthropics/skills\s+★ —\s+v1\s+not synced`, f.out.String()) || !strings.Contains(f.out.String(), "obra/superpowers") {
 		t.Errorf("list:\n%s", f.out.String())
 	}
-	if err := f.run("source", "remove", "obra/superpowers"); err != nil {
+	if err := f.run("marketplace", "remove", "obra/superpowers"); err != nil {
 		t.Fatal(err)
 	}
 	f.out.Reset()
-	f.run("source", "list")
+	f.run("marketplace", "--followed")
 	if strings.Contains(f.out.String(), "obra") {
 		t.Errorf("after remove:\n%s", f.out.String())
 	}
 	var usage *UsageError
-	if err := f.run("source", "frob"); !errors.As(err, &usage) {
+	if err := f.run("marketplace", "frob"); !errors.As(err, &usage) {
 		t.Errorf("unknown verb: %v", err)
-	}
-	if err := f.run("source"); !errors.As(err, &usage) {
-		t.Errorf("no verb: %v", err)
 	}
 }
 
 func TestSourceListShowsCommits(t *testing.T) {
 	f := newFake(checkout(t))
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/a/SKILL.md": "---\nname: a\n---\n"}})
-	f.run("source", "list")
+	f.run("marketplace", "--followed")
 	if !strings.Contains(f.out.String(), strings.Repeat("a", 7)) {
 		t.Errorf("list:\n%s", f.out.String())
 	}
@@ -957,14 +954,14 @@ func TestSourceAddPluginID(t *testing.T) {
 	f := newFake(checkout(t))
 	write(t, filepath.Join(f.env["IPM_CACHE_DIR"], "catalog", "plugins.jsonl"),
 		`{"id":"plugin:o/r#c","type":"plugin","name":"c","repo":"o/r","source_repo":"x/c"}`+"\n")
-	if err := f.run("source", "add", "plugin:o/r#c"); err != nil {
+	if err := f.run("marketplace", "add", "plugin:o/r#c"); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := sources.Load(filepath.Join(f.env["IPM_HOME"], "sources"))
 	if len(got) != 1 || got[0].Repo != "x/c" {
 		t.Errorf("got %+v", got)
 	}
-	if err := f.run("source", "add", "plugin:o/r#nope"); err == nil || !strings.Contains(err.Error(), "plugin:o/r#nope") {
+	if err := f.run("marketplace", "add", "plugin:o/r#nope"); err == nil || !strings.Contains(err.Error(), "plugin:o/r#nope") {
 		t.Errorf("unknown plugin: %v", err)
 	}
 }
@@ -974,7 +971,7 @@ func TestSourceImport(t *testing.T) {
 	write(t, filepath.Join(root, "old", "manifest.toml"), "[[repo]]\nrepo = \"o/r\"\n\n[[repo]]\nrepo = \"x/y\"\nversion = \"v2\"\n")
 	write(t, filepath.Join(root, "old", "catalog", "github.jsonl"), `{"repo":"o/r","stars":5}`+"\n")
 	f := newFake(root)
-	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
+	if err := f.run("marketplace", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := sources.Load(filepath.Join(f.env["IPM_HOME"], "sources"))
@@ -1141,10 +1138,10 @@ func TestSourceImportIsRepeatable(t *testing.T) {
 	root := checkout(t)
 	write(t, filepath.Join(root, "old", "manifest.toml"), "[[repo]]\nrepo = \"o/r\"\n")
 	f := newFake(root)
-	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
+	if err := f.run("marketplace", "import", filepath.Join(root, "old", "manifest.toml")); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.run("source", "import", filepath.Join(root, "old", "manifest.toml")); err != nil || !strings.Contains(f.out.String(), "already") {
+	if err := f.run("marketplace", "import", filepath.Join(root, "old", "manifest.toml")); err != nil || !strings.Contains(f.out.String(), "already") {
 		t.Errorf("second import: %v\n%s", err, f.out.String())
 	}
 }

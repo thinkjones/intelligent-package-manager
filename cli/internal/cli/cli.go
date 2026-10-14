@@ -121,7 +121,7 @@ Config
 		},
 	})
 	root.AddCommand(
-		newSourceCmd(sys),
+		newMarketplaceCmd(sys),
 		newSyncCmd(sys),
 		newDoctorCmd(sys),
 		newIndexCmd(sys),
@@ -133,7 +133,6 @@ Config
 		newGraphCmd(sys),
 		newPackCmd(sys),
 		newInstallCmd(sys),
-		newStatsCmd(sys),
 		newScanCmd(sys),
 		newTuiCmd(sys),
 		newDeployCmd(sys),
