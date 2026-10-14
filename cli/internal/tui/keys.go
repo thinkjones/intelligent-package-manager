@@ -66,3 +66,14 @@ var installsKeys = [][2]string{
 	{"?", "this help"},
 	{"q  ctrl+c", "quit"},
 }
+
+// marketplaceKeys is the Marketplace tab's ? overlay.
+var marketplaceKeys = [][2]string{
+	{"↑ ↓  j k", "move through the repos; the lists' rows are skipped"},
+	{"space", "follow or unfollow the selected repo"},
+	{"s", "run catalog sync: fetch and index the followed repos"},
+	{"/", "filter the repos; esc clears the filter"},
+	{"1-4  [ ]", "switch tab"},
+	{"?", "this help"},
+	{"q  ctrl+c", "quit"},
+}

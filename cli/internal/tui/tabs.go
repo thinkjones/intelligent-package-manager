@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 
-	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
@@ -81,6 +80,8 @@ func (m *Model) statsStrip(w int) string {
 		return fit(m.packsStats(), w)
 	case tabInstalls:
 		return fit(m.installsStats(), w)
+	case tabMarketplace:
+		return fit(m.marketplaceStats(), w)
 	}
 	return spaces(w)
 }
@@ -110,6 +111,9 @@ func (m *Model) hints() string {
 	if m.tab == tabInstalls && m.ins.filter.typing {
 		return strings.Join(m.installsHints(), "  ")
 	}
+	if m.tab == tabMarketplace && m.mk.filter.typing {
+		return strings.Join(m.marketHints(), "  ")
+	}
 	return strings.Join(append(m.otherHints(), helpQuit), "  ")
 }
 
@@ -124,7 +128,7 @@ func (m *Model) otherHints() []string {
 	case tabInstalls:
 		return m.installsHints()
 	}
-	return []string{"1-4 tabs", "[ ] switch"}
+	return m.marketHints()
 }
 
 // footer is the hints cut to w: the middle hints drop from the end first, so
@@ -134,7 +138,7 @@ func (m *Model) footer(w int) string {
 	switch {
 	case m.inst != nil, m.form != nil, m.ext != nil, m.help, m.picker != nil:
 		return m.hints()
-	case m.tab == tabPacks && m.pk.filter.typing, m.tab == tabInstalls && m.ins.filter.typing:
+	case m.tab == tabPacks && m.pk.filter.typing, m.tab == tabInstalls && m.ins.filter.typing, m.tab == tabMarketplace && m.mk.filter.typing:
 		return m.hints()
 	case m.tab != tabCatalog:
 		parts = m.otherHints()
@@ -162,17 +166,6 @@ func (m *Model) tabKey(k string) bool {
 		return false
 	}
 	return true
-}
-
-// otherTabKey handles keys on a tab that has no keys of its own yet.
-func (m *Model) otherTabKey(k string) tea.Cmd {
-	switch k {
-	case "q":
-		return tea.Quit
-	case "?":
-		m.help = true
-	}
-	return nil
 }
 
 // typeOrder is how the catalog's types are listed in the stats strip; types

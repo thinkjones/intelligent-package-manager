@@ -57,6 +57,7 @@ type Model struct {
 
 	pk       packsTab    // the Packs tab
 	ins      installsTab // the Installs tab
+	mk       marketTab   // the Marketplace tab
 	packs    []Pack
 	active   string // the active pack's name
 	traySel  int
@@ -94,6 +95,7 @@ func New(d Deps) *Model {
 	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
 	m.pk.filter = newFilterBox()
 	m.ins.filter = newFilterBox()
+	m.mk.filter = newFilterBox()
 	m.catCounts = d.Catalog.Counts()
 	for i := range m.counts {
 		m.counts[i] = notLoaded
@@ -146,7 +148,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.inst.kind == runInstall {
 				m.loadInstallsTab()
 			}
+			if m.inst.kind == runSync && msg.err == nil {
+				m.note(syncedMsg)
+				return m, m.loadMarket()
+			}
 		}
+	case marketLoaded:
+		m.marketReady(msg)
+		return m, nil
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
 	}
@@ -194,8 +203,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 	if !m.textFocused() && m.tabKey(k) {
-		m.enterTab()
-		return nil
+		return m.enterTab()
 	}
 	switch m.tab {
 	case tabCatalog:
@@ -205,7 +213,7 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	case tabInstalls:
 		return m.installsKey(msg)
 	}
-	return m.otherTabKey(k)
+	return m.marketKey(msg)
 }
 
 func (m *Model) setFocus(f focus) {
@@ -285,6 +293,8 @@ func (m *Model) render() string {
 		mid = m.packsBody(w, body)
 	case m.tab == tabInstalls:
 		mid = m.installsBody(w, body)
+	case m.tab == tabMarketplace:
+		mid = m.marketBody(w, body)
 	default:
 		for range body {
 			mid = append(mid, spaces(w))

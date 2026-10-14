@@ -128,13 +128,16 @@ func (m *Model) clampPacks() {
 
 // enterTab loads what the tab shows when it is switched to: its first visit,
 // and a retry after a failed load.
-func (m *Model) enterTab() {
+func (m *Model) enterTab() tea.Cmd {
 	switch {
 	case m.tab == tabPacks && (!m.pk.loaded || m.pk.err != nil):
 		m.loadPacksTab()
 	case m.tab == tabInstalls && (!m.ins.loaded || m.ins.err != nil):
 		m.loadInstallsTab()
+	case m.tab == tabMarketplace:
+		return m.marketVisit()
 	}
+	return nil
 }
 
 // textFocused reports whether a text input has focus, so that every
@@ -147,6 +150,8 @@ func (m *Model) textFocused() bool {
 		return m.pk.filter.typing
 	case tabInstalls:
 		return m.ins.filter.typing
+	case tabMarketplace:
+		return m.mk.filter.typing
 	}
 	return false
 }

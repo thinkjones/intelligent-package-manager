@@ -262,7 +262,59 @@ func (f *fakeInstaller) Install(_ context.Context, pack string, t Target, out io
 	return f.err
 }
 
+type fakeMarketplace struct {
+	repos     []Repo // List's repos; Follow and Unfollow change Followed here
+	listErr   error
+	listCalls int
+	followErr error
+	followed  []string // Follow's and Unfollow's calls, "+repo" and "-repo"
+	lines     []string
+	syncErr   error
+	syncs     int
+	// gate, when set, holds Sync until it is closed.
+	gate chan struct{}
+}
+
+func (f *fakeMarketplace) List() ([]Repo, error) {
+	f.listCalls++
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	return append([]Repo(nil), f.repos...), nil
+}
+
+func (f *fakeMarketplace) set(repo string, on bool) error {
+	sign := "-"
+	if on {
+		sign = "+"
+	}
+	f.followed = append(f.followed, sign+repo)
+	if f.followErr != nil {
+		return f.followErr
+	}
+	for i := range f.repos {
+		if f.repos[i].Repo == repo {
+			f.repos[i].Followed = on
+		}
+	}
+	return nil
+}
+
+func (f *fakeMarketplace) Follow(repo string) error   { return f.set(repo, true) }
+func (f *fakeMarketplace) Unfollow(repo string) error { return f.set(repo, false) }
+func (f *fakeMarketplace) Sync(_ context.Context, out io.Writer) error {
+	f.syncs++
+	for _, l := range f.lines {
+		fmt.Fprintln(out, l)
+	}
+	if f.gate != nil {
+		<-f.gate
+	}
+	return f.syncErr
+}
+
 type fakes struct {
+	mk *fakeMarketplace
 	s  *fakeSearcher
 	c  *fakeCatalog
 	p  *fakePacks
@@ -283,16 +335,17 @@ func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
 		s: &fakeSearcher{mode: "hybrid", results: map[string]Results{
 			"tdd": {Hits: hits("tdd", "tdd-guard"), Found: 100},
 		}, errs: map[string]error{}},
-		c: &fakeCatalog{details: map[string]Node{}},
-		p: &fakePacks{scope: "project /work"},
-		b: &fakeBuilder{},
+		c:  &fakeCatalog{details: map[string]Node{}},
+		p:  &fakePacks{scope: "project /work"},
+		b:  &fakeBuilder{},
+		mk: &fakeMarketplace{},
 		in: &fakeInstaller{def: Target{Scope: "project", Path: "/work"},
 			plan: []string{"ipm install", "claude plugin marketplace add /work/.ipm --scope project", "claude plugin install kit@work-ipm --scope project"}},
 	}
 	if setup != nil {
 		setup(f)
 	}
-	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Builder: f.b, Installer: f.in})
+	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Builder: f.b, Installer: f.in, Marketplace: f.mk})
 	m.debounce = 0
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m, f

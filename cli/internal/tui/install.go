@@ -35,6 +35,7 @@ type runKind int
 const (
 	runBuild runKind = iota
 	runInstall
+	runSync
 )
 
 // busyMsg is the status when a run is asked for while another still streams.
@@ -168,6 +169,8 @@ func (m *Model) helpLines(w, rows int) []string {
 			keys = packsKeys
 		case tabInstalls:
 			keys = installsKeys
+		case tabMarketplace:
+			keys = marketplaceKeys
 		}
 		lines = keyTable("Keys", keys, w)
 	} else if w >= 100 {

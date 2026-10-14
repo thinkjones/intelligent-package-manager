@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -133,6 +134,37 @@ func TestGoldenViews(t *testing.T) {
 		"installs-empty": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
 			press(t, m, "down", "3")
+			return m
+		},
+		"marketplace": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withMarket)
+			press(t, m, "down", "4", "down")
+			return m
+		},
+		"marketplace-filtered": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withMarket)
+			press(t, m, "down", "4", "/")
+			typeText(t, m, "review")
+			press(t, m, "enter")
+			return m
+		},
+		"marketplace-loading": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withMarket)
+			press(t, m, "down")
+			m.Update(key("4"))
+			return m
+		},
+		"marketplace-error": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, func(f fakes) {
+				f.mk.listErr = errors.New("fetch https://example.test/lists.toml: 503 Service Unavailable")
+			})
+			press(t, m, "down", "4")
+			return m
+		},
+		"marketplace-narrow": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withMarket)
+			m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+			press(t, m, "down", "4")
 			return m
 		},
 		"external-modal": func(t *testing.T) *Model {
