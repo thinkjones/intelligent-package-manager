@@ -135,7 +135,7 @@ func installClaude(sys System, scope project.Scope, pack string, in project.Inst
 	if err := needClaude(sys); err != nil {
 		return "", err
 	}
-	pack, err := pickPack(scope, pack)
+	pack, err := pickPack(scope, "claude", pack)
 	if err != nil {
 		return "", err
 	}
@@ -153,14 +153,8 @@ func installClaude(sys System, scope project.Scope, pack string, in project.Inst
 		}
 		return pack + " (" + describeTarget(t) + ")", nil
 	}
-	if o.Update || !buildCurrent(sys, scope) {
-		buildSys := sys
-		buildSys.Stdout = out
-		if err := build(buildSys, o.Global, o.Update, false, false); err != nil {
-			return "", err
-		}
-	} else {
-		fmt.Fprintln(out, "build is current")
+	if err := ensureBuilt(sys, scope, o, out); err != nil {
+		return "", err
 	}
 	cmds, err := planDeploy(sys, scope.IPMDir(), marketName(scope), pack, t)
 	if err != nil {
@@ -182,8 +176,21 @@ func installClaude(sys System, scope project.Scope, pack string, in project.Inst
 	return pack + " (" + describeTarget(t) + ")", nil
 }
 
+// ensureBuilt builds scope's packs unless the build is current (or always with
+// o.Update), writing the build's output to out; a current build prints "build
+// is current".
+func ensureBuilt(sys System, scope project.Scope, o installOpts, out io.Writer) error {
+	if !o.Update && buildCurrent(sys, scope) {
+		fmt.Fprintln(out, "build is current")
+		return nil
+	}
+	buildSys := sys
+	buildSys.Stdout = out
+	return build(buildSys, o.Global, o.Update, false, false)
+}
+
 // pickPack is the pack to install: the one named, or the scope's only pack.
-func pickPack(scope project.Scope, pack string) (string, error) {
+func pickPack(scope project.Scope, target, pack string) (string, error) {
 	packs, err := project.LoadPacks(scope.Root)
 	if err != nil {
 		return "", err
@@ -195,7 +202,7 @@ func pickPack(scope project.Scope, pack string) (string, error) {
 		case 1:
 			return packs[0].Name, nil
 		}
-		return "", usagef("install claude: name a pack — this scope has %d. Try `ipm pack list`.", len(packs))
+		return "", usagef("install %s: name a pack — this scope has %d. Try `ipm pack list`.", target, len(packs))
 	}
 	if findPack(packs, pack) < 0 {
 		return "", fmt.Errorf("no pack %s — `ipm pack list` shows the packs here", pack)
