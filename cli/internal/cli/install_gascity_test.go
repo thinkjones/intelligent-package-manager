@@ -49,7 +49,7 @@ func TestInstallGascityWritesPack(t *testing.T) {
 	for _, want := range []string{
 		"✓ installed kit (gascity " + dir + ")",
 		"skipped plugin:o/r#e: external plugin",
-		"Import it into a city:\n  gc import add " + dir + "\nor add to the city's pack.toml:\n  [imports.kit]\n  source = \"" + dir + "\"\n",
+		"Import it into a city's pack.toml or city.toml:\n  [imports.kit]\n  source = \"" + dir + "\"\n",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
@@ -163,7 +163,7 @@ func TestInstallGascityRefusesForeign(t *testing.T) {
 	write(t, filepath.Join(target, "pack.toml"), "[pack]\nname = \"mine\"\n")
 	err := f.run("install", "gascity", "kit", "-C", tmp)
 	var exit *ExitError
-	if err == nil || errors.As(err, &exit) || !strings.Contains(err.Error(), "exists and was not written by ipm — use --force to replace it") {
+	if want := target + " exists and was not written by ipm — use --force to replace it"; err == nil || errors.As(err, &exit) || err.Error() != want {
 		t.Fatalf("got %v", err)
 	}
 	if data, _ := os.ReadFile(filepath.Join(target, "pack.toml")); string(data) != "[pack]\nname = \"mine\"\n" {
@@ -221,5 +221,137 @@ func TestInstallGascityPackRequired(t *testing.T) {
 	var usage *UsageError
 	if err := f.run("install", "gascity"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "install gascity: name a pack") {
 		t.Errorf("got %v", err)
+	}
+}
+
+func TestInstallGascityDryRunRefusesForeignBeforeBuilding(t *testing.T) {
+	f, root, tmp := gascityFake(t)
+	target := filepath.Join(tmp, "kit")
+	write(t, filepath.Join(target, "pack.toml"), "[pack]\nname = \"mine\"\n")
+	err := f.run("install", "gascity", "kit", "-C", tmp, "--dry-run")
+	want := target + " exists and was not written by ipm — use --force to replace it"
+	if err == nil || err.Error() != want || !strings.Contains(f.out.String(), "would refuse: "+want+"\n") {
+		t.Fatalf("got %v\n%s", err, f.out.String())
+	}
+	// A stale build is not rebuilt before the refusal.
+	os.Remove(filepath.Join(root, ".ipm", project.StampFile))
+	f.calls = nil
+	if err := f.run("install", "gascity", "kit", "-C", tmp); err == nil || err.Error() != want || pnpmCalls(f) != 0 {
+		t.Errorf("got %v, %d pnpm calls", err, pnpmCalls(f))
+	}
+}
+
+func TestInstallGascityRefusesProject(t *testing.T) {
+	f, root, _ := gascityFake(t)
+	err := f.run("install", "gascity", "kit", "-C", filepath.Dir(root), "--name", filepath.Base(root), "--force")
+	if want := "refusing to replace " + root + ": it holds the project"; err == nil || err.Error() != want {
+		t.Errorf("got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, project.File)); err != nil {
+		t.Errorf("project was touched: %v", err)
+	}
+}
+
+func TestGascityRefusalHome(t *testing.T) {
+	f, root, _ := gascityFake(t)
+	home := f.env["IPM_HOME"]
+	// A project scope elsewhere, and the user scope: both refuse ipm's home
+	// and anything holding it.
+	for _, scope := range []project.Scope{{Root: t.TempDir()}, {Root: filepath.Join(home, "global"), Global: true}} {
+		for _, folder := range []string{home, filepath.Dir(home)} {
+			want := "refusing to replace " + folder + ": it holds ipm's home"
+			if err := gascityRefusal(f.system(), scope, folder); err == nil || err.Error() != want {
+				t.Errorf("%s: got %v", folder, err)
+			}
+		}
+		if err := gascityRefusal(f.system(), scope, filepath.Join(t.TempDir(), "kit")); err != nil {
+			t.Errorf("unrelated folder: %v", err)
+		}
+	}
+	_ = root
+}
+
+func TestInstallDryRunWithUpdateIsUsage(t *testing.T) {
+	f, _, tmp := gascityFake(t)
+	for _, target := range []string{"claude", "gascity"} {
+		err := f.run("install", target, "kit", "-C", tmp, "--dry-run", "--update")
+		var usage *UsageError
+		if target == "claude" {
+			err = f.run("install", target, "kit", "--dry-run", "--update")
+		}
+		if !errors.As(err, &usage) || err.Error() != "install "+target+": --dry-run and --update can't be used together" {
+			t.Errorf("%s: got %v", target, err)
+		}
+	}
+}
+
+func TestGascityDir(t *testing.T) {
+	cwd := t.TempDir()
+	home := t.TempDir()
+	os.MkdirAll(filepath.Join(cwd, "rel"), 0o755)
+	os.MkdirAll(filepath.Join(home, "x"), 0o755)
+	os.WriteFile(filepath.Join(cwd, "file"), []byte("x"), 0o644)
+	for _, tc := range []struct{ in, want, err string }{
+		{"", cwd, ""},
+		{"rel", filepath.Join(cwd, "rel"), ""},
+		{"~", home, ""},
+		{"~/x", filepath.Join(home, "x"), ""},
+		{cwd, cwd, ""},
+		{"missing", "", "is not a folder"},
+		{"file", "", "is not a folder"},
+	} {
+		got, err := gascityDir(tc.in, cwd, home)
+		if tc.err != "" {
+			if err == nil || !strings.Contains(err.Error(), tc.err) {
+				t.Errorf("%q: got %q, %v", tc.in, got, err)
+			}
+			continue
+		}
+		if err != nil || got != tc.want {
+			t.Errorf("%q: got %q, %v, want %q", tc.in, got, err, tc.want)
+		}
+	}
+}
+
+func TestInstallGascityWholeLocalPlugin(t *testing.T) {
+	f, root := installFake(t)
+	const sha = "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+	write(t, filepath.Join(cacheOf(root), "catalog", "plugins.jsonl"), `{"id":"plugin:o/r:q","type":"plugin","name":"q","repo":"o/r","commit":"`+sha+`","path":"q","skills":["skill:o/r:q/skills/qs"],"agents":["agent:o/r:q/agents/qa.md"],"commands":["command:o/r:q/commands/go.md"],"hooks":["hook:o/r:q/hooks/hooks.json#PreToolUse"],"mcp":["mcp:o/r:q/.mcp.json#srv"]}`+"\n")
+	nm := filepath.Join(root, ".ipm", "node_modules", "o--r", "q")
+	write(t, filepath.Join(nm, "skills", "qs", "SKILL.md"), "---\nname: qs\n---\n")
+	write(t, filepath.Join(nm, "agents", "qa.md"), "---\nname: qa\n---\nhi\n")
+	write(t, filepath.Join(nm, "commands", "go.md"), "go\n")
+	write(t, filepath.Join(nm, "hooks", "hooks.json"), "{}")
+	write(t, filepath.Join(nm, ".mcp.json"), `{"mcpServers": {"srv": {"command": "run", "args": ["a"]}}}`)
+	if err := f.run("pack", "remove", "kit", "plugin:o/r#e"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("pack", "new", "whole"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("pack", "add", "whole", "plugin:o/r:q"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	tmp := t.TempDir()
+	if r, err := filepath.EvalSymlinks(tmp); err == nil {
+		tmp = r
+	}
+	f.out.Reset()
+	if err := f.run("install", "gascity", "whole", "-C", tmp); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	for _, rel := range []string{"mcp/srv.toml", "skills/qs/SKILL.md", "agents/qa/prompt.md"} {
+		if _, err := os.Stat(filepath.Join(tmp, "whole", rel)); err != nil {
+			t.Errorf("missing %s", rel)
+		}
+	}
+	out := f.out.String()
+	for _, want := range []string{
+		"skipped command:o/r:q/commands/go.md: Gas City has no slash commands",
+		"skipped hook:o/r:q/hooks/hooks.json#PreToolUse: Gas City packs have no hooks",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
 	}
 }

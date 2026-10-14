@@ -33,6 +33,9 @@ func newInstallGascityCmd(sys System) *cobra.Command {
 			if len(args) == 1 {
 				pack = args[0]
 			}
+			if o.DryRun && o.Update {
+				return usagef("install gascity: --dry-run and --update can't be used together")
+			}
 			scope, err := currentScope(sys, o.Global)
 			if err != nil {
 				return err
@@ -76,6 +79,15 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 		return "", err
 	}
 	folder := filepath.Join(dir, name)
+	if err := gascityRefusal(sys, scope, folder); err != nil {
+		return "", err
+	}
+	if err := assemble.CheckGascityTarget(dir, name, o.Force); err != nil {
+		if o.DryRun {
+			fmt.Fprintf(out, "would refuse: %s\n", err)
+		}
+		return "", err
+	}
 	if o.DryRun {
 		if !buildCurrent(sys, scope) {
 			return "", errors.New("--dry-run needs a current build — run ipm pack build first")
@@ -116,7 +128,7 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 	if err := recordInstall(sys, scope, pack, project.Install{Target: "gascity", Path: dir, Name: name}); err != nil {
 		return "", err
 	}
-	fmt.Fprintf(out, "Import it into a city:\n  gc import add %s\nor add to the city's pack.toml:\n  [imports.%s]\n  source = %q\n", folder, name, folder)
+	fmt.Fprintf(out, "Import it into a city's pack.toml or city.toml:\n  [imports.%s]\n  source = %q\n", name, folder)
 	return desc, nil
 }
 
@@ -138,4 +150,20 @@ func gascityDir(p, cwd, home string) (string, error) {
 		return "", fmt.Errorf("%s is not a folder", p)
 	}
 	return p, nil
+}
+
+// gascityRefusal refuses, even with --force, a pack folder that is or holds
+// the scope's root or ipm's home: replacing it would delete them.
+func gascityRefusal(sys System, scope project.Scope, folder string) error {
+	paths, err := ipmPaths(sys)
+	if err != nil {
+		return err
+	}
+	if !scope.Global && inside(filepath.Clean(scope.Root), folder) {
+		return fmt.Errorf("refusing to replace %s: it holds the project", folder)
+	}
+	if inside(filepath.Clean(paths.Home), folder) {
+		return fmt.Errorf("refusing to replace %s: it holds ipm's home", folder)
+	}
+	return nil
 }

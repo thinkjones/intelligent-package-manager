@@ -74,6 +74,9 @@ func newInstallClaudeCmd(sys System) *cobra.Command {
 			if len(args) == 1 {
 				pack = args[0]
 			}
+			if o.DryRun && o.Update {
+				return usagef("install claude: --dry-run and --update can't be used together")
+			}
 			scope, err := currentScope(sys, o.Global)
 			if err != nil {
 				return err
