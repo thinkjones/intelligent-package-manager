@@ -286,7 +286,7 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 			if base == "" {
 				return fmt.Errorf("%s has no name usable as a file name", it.ID)
 			}
-			name := uniqueName(used, dir, base, it.Repo)
+			name := uniqueName(used, dir, base, it.Repo, slug)
 			pp.Files = append(pp.Files, Placed{Alias: sources.Alias(it.Repo), From: it.Path, To: dir + "/" + name + ext, Dir: it.Type == catalog.TypeSkill, Item: it})
 			return nil
 		}

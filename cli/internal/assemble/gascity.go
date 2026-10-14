@@ -65,21 +65,18 @@ func gasMCPSlug(s string) string {
 }
 
 // uniqueName claims base within key (a type or folder) in used: base if
-// free, else base-<repo owner>, else base-2, base-3. A repo that already
-// holds base skips its own owner suffix, which would only repeat it.
-func uniqueName(used map[string]bool, key, base, repo string) string {
-	owner, _, _ := strings.Cut(pack.NormalizeRepo(repo), "/")
+// free, else base-<repo owner>, else base-2, base-3. clean sanitises the
+// owner the way base was.
+func uniqueName(used map[string]bool, key, base, repo string, clean func(string) string) string {
 	name := base
 	if used[key+"/"+name] {
-		if !used[key+"/"+base+"@"+owner] {
-			name = base + "-" + slug(owner)
-		}
+		owner, _, _ := strings.Cut(pack.NormalizeRepo(repo), "/")
+		name = base + "-" + clean(owner)
 		for n := 2; used[key+"/"+name]; n++ {
 			name = fmt.Sprintf("%s-%d", base, n)
 		}
 	}
 	used[key+"/"+name] = true
-	used[key+"/"+name+"@"+owner] = true
 	return name
 }
 
@@ -98,6 +95,10 @@ func PlanGascity(p project.Pack, name string, items map[string]project.LockItem)
 	used := map[string]bool{}
 	placed := map[string]bool{}
 	add := func(kind GasKind, base, server string, it project.LockItem) error {
+		clean := gasSlug
+		if kind == GasMCP {
+			clean = gasMCPSlug
+		}
 		if placed[it.ID] {
 			return nil
 		}
@@ -105,7 +106,7 @@ func PlanGascity(p project.Pack, name string, items map[string]project.LockItem)
 		if base == "" {
 			return fmt.Errorf("%s has no name usable as a folder name", it.ID)
 		}
-		plan.Entries = append(plan.Entries, GasEntry{Kind: kind, Name: uniqueName(used, string(kind), base, it.Repo), Alias: sources.Alias(it.Repo), From: it.Path, Server: server, Item: it})
+		plan.Entries = append(plan.Entries, GasEntry{Kind: kind, Name: uniqueName(used, string(kind), base, it.Repo, clean), Alias: sources.Alias(it.Repo), From: it.Path, Server: server, Item: it})
 		return nil
 	}
 	named := func(it project.LockItem) string {
@@ -134,7 +135,7 @@ func PlanGascity(p project.Pack, name string, items map[string]project.LockItem)
 		case catalog.TypeCopilotPlugin:
 			skills, err := copilotSkills(it)
 			if err != nil {
-				return GascityPlan{}, fmt.Errorf("%s: %v", id, err)
+				return GascityPlan{}, fmt.Errorf("%s: %w", id, err)
 			}
 			for _, s := range skills {
 				sk, ok := items[s]

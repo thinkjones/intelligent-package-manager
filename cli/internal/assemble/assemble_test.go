@@ -336,3 +336,22 @@ func TestBuildFetchesWholePluginRepo(t *testing.T) {
 		t.Errorf("external plugin repos %v", plan.Repos)
 	}
 }
+
+func TestBuildClashRule(t *testing.T) {
+	sk := func(repo string) project.LockItem {
+		id := "skill:" + repo + ":skills/x"
+		return project.LockItem{ID: id, Type: "skill", Name: "x", Repo: repo, Path: "skills/x", SHA: shaA}
+	}
+	a, b, c := sk("o/a"), sk("o/b"), sk("o/c")
+	plan, err := Build([]project.Pack{{Name: "kit", Items: []string{a.ID, b.ID, c.ID}}}, map[string]project.LockItem{a.ID: a, b.ID: b, c.ID: c})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, f := range plan.Packs[0].Files {
+		got = append(got, f.To)
+	}
+	if want := []string{"skills/x", "skills/x-o", "skills/x-2"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v want %v", got, want)
+	}
+}

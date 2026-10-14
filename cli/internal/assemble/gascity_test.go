@@ -112,11 +112,12 @@ func TestPlanGascityNameClash(t *testing.T) {
 		"agent:o/r:agents/a.md": {ID: "agent:o/r:agents/a.md", Type: "agent", Name: "Code.Review", Repo: "o/r", Path: "agents/a.md", SHA: shaA},
 		"agent:o/r:agents/b.md": {ID: "agent:o/r:agents/b.md", Type: "agent", Name: "code-review", Repo: "o/r", Path: "agents/b.md", SHA: shaA},
 	}
-	plan, err := PlanGascity(project.Pack{Name: "kit", Items: []string{"agent:o/r:agents/a.md", "agent:o/r:agents/b.md"}}, "kit", items)
+	items["agent:o/r:agents/c.md"] = project.LockItem{ID: "agent:o/r:agents/c.md", Type: "agent", Name: "code-review", Repo: "o/r", Path: "agents/c.md", SHA: shaA}
+	plan, err := PlanGascity(project.Pack{Name: "kit", Items: []string{"agent:o/r:agents/a.md", "agent:o/r:agents/b.md", "agent:o/r:agents/c.md"}}, "kit", items)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := []string{"agent code-review", "agent code-review-2"}; !reflect.DeepEqual(gasNames(plan), want) {
+	if want := []string{"agent code-review", "agent code-review-2", "agent code-review-o"}; !reflect.DeepEqual(gasNames(plan), want) {
 		t.Errorf("got %v", gasNames(plan))
 	}
 }
@@ -138,5 +139,39 @@ func TestValidGasName(t *testing.T) {
 		if ValidGasName(n) {
 			t.Errorf("%q should be invalid", n)
 		}
+	}
+}
+
+func TestPlanGascityOwnerSuffixSanitised(t *testing.T) {
+	mk := func(typ, repo, path, name string) project.LockItem {
+		return project.LockItem{ID: typ + ":" + repo + ":" + path, Type: typ, Name: name, Repo: repo, Path: path, SHA: shaA}
+	}
+	a, b := mk("skill", "a/r", "skills/x", "x"), mk("skill", "My.Org/r", "skills/x", "x")
+	plan, err := PlanGascity(project.Pack{Name: "kit", Items: []string{a.ID, b.ID}}, "kit", map[string]project.LockItem{a.ID: a, b.ID: b})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"skill x", "skill x-my-org"}; !reflect.DeepEqual(gasNames(plan), want) {
+		t.Errorf("skills %v", gasNames(plan))
+	}
+	// An MCP clash: two plugins in repos owned by "a" and "My_Org".
+	pl := func(repo string) project.LockItem {
+		id := "plugin:" + repo + ":p"
+		return project.LockItem{ID: id, Type: "plugin", Name: "p", Repo: repo, Path: "p", SHA: shaA, Parts: []string{"mcp:" + repo + ":p/.mcp.json#srv"}}
+	}
+	p1, p2 := pl("a/r"), pl("My_Org/r")
+	plan, err = PlanGascity(project.Pack{Name: "kit", Items: []string{p1.ID, p2.ID}}, "kit", map[string]project.LockItem{p1.ID: p1, p2.ID: p2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"mcp srv", "mcp srv-my-org"}; !reflect.DeepEqual(gasNames(plan), want) {
+		t.Errorf("mcp %v", gasNames(plan))
+	}
+}
+
+func TestPlanGascityMCPPartWithoutName(t *testing.T) {
+	pl := project.LockItem{ID: "plugin:o/r:p", Type: "plugin", Name: "p", Repo: "o/r", Path: "p", SHA: shaA, Parts: []string{"mcp:o/r:p/.mcp.json"}}
+	if _, err := PlanGascity(project.Pack{Name: "kit", Items: []string{pl.ID}}, "kit", map[string]project.LockItem{pl.ID: pl}); err == nil {
+		t.Error("want an error for an MCP part without a server name")
 	}
 }
