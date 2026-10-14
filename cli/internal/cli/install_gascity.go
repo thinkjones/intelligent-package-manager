@@ -159,11 +159,50 @@ func gascityRefusal(sys System, scope project.Scope, folder string) error {
 	if err != nil {
 		return err
 	}
-	if !scope.Global && inside(filepath.Clean(scope.Root), folder) {
+	if !scope.Global && holds(folder, scope.Root) {
 		return fmt.Errorf("refusing to replace %s: it holds the project", folder)
 	}
-	if inside(filepath.Clean(paths.Home), folder) {
+	if holds(folder, paths.Home) {
 		return fmt.Errorf("refusing to replace %s: it holds ipm's home", folder)
 	}
 	return nil
+}
+
+// holds reports whether folder is path or one of its ancestors, by real path:
+// symlinks are resolved (through the nearest existing ancestor, since either
+// may not exist yet), and where folder exists os.SameFile on each ancestor of
+// path catches what spelling cannot, such as letter case on a case-insensitive
+// filesystem.
+func holds(folder, path string) bool {
+	if inside(realPath(path), realPath(folder)) {
+		return true
+	}
+	want, err := os.Stat(folder)
+	if err != nil {
+		return false
+	}
+	for dir := filepath.Clean(path); ; dir = filepath.Dir(dir) {
+		if info, err := os.Stat(dir); err == nil && os.SameFile(want, info) {
+			return true
+		}
+		if filepath.Dir(dir) == dir {
+			return false
+		}
+	}
+}
+
+// realPath resolves symlinks in the nearest existing ancestor of p and joins
+// the components that do not exist back on.
+func realPath(p string) string {
+	p = filepath.Clean(p)
+	rest := ""
+	for dir := p; ; dir = filepath.Dir(dir) {
+		if real, err := filepath.EvalSymlinks(dir); err == nil {
+			return filepath.Join(real, rest)
+		}
+		if filepath.Dir(dir) == dir {
+			return p
+		}
+		rest = filepath.Join(filepath.Base(dir), rest)
+	}
 }

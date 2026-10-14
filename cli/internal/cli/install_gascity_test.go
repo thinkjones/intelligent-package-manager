@@ -252,6 +252,63 @@ func TestInstallGascityRefusesProject(t *testing.T) {
 	}
 }
 
+func TestGascityRefusalFollowsSymlinks(t *testing.T) {
+	f, root, tmp := gascityFake(t)
+	link := filepath.Join(tmp, "link")
+	if err := os.Symlink(filepath.Dir(root), link); err != nil {
+		t.Fatal(err)
+	}
+	err := f.run("install", "gascity", "kit", "-C", link, "--name", filepath.Base(root), "--force")
+	if err == nil || !strings.HasSuffix(err.Error(), ": it holds the project") {
+		t.Errorf("project through a symlink: got %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, project.File)); err != nil {
+		t.Errorf("project was touched: %v", err)
+	}
+	home := f.env["IPM_HOME"]
+	homeLink := filepath.Join(tmp, "homelink")
+	if err := os.Symlink(filepath.Dir(home), homeLink); err != nil {
+		t.Fatal(err)
+	}
+	folder := filepath.Join(homeLink, filepath.Base(home))
+	err = gascityRefusal(f.system(), project.Scope{Root: t.TempDir()}, folder)
+	if err == nil || !strings.HasSuffix(err.Error(), ": it holds ipm's home") {
+		t.Errorf("home through a symlink: got %v", err)
+	}
+}
+
+func TestGascityRefusalIgnoresCase(t *testing.T) {
+	f, root, _ := gascityFake(t)
+	upper := filepath.Join(filepath.Dir(root), strings.ToUpper(filepath.Base(root)))
+	if upper == root {
+		t.Skip("project folder name has no letters to change")
+	}
+	if _, err := os.Stat(upper); err != nil {
+		t.Skip("case-sensitive filesystem")
+	}
+	err := gascityRefusal(f.system(), project.Scope{Root: root}, upper)
+	if err == nil || !strings.HasSuffix(err.Error(), ": it holds the project") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestGascityRefusalAllowsSiblings(t *testing.T) {
+	f, root, _ := gascityFake(t)
+	for _, name := range []string{"sibling", filepath.Base(root) + "-out"} {
+		folder := filepath.Join(filepath.Dir(root), name)
+		for _, existing := range []bool{false, true} {
+			if existing {
+				if err := os.MkdirAll(folder, 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := gascityRefusal(f.system(), project.Scope{Root: root}, folder); err != nil {
+				t.Errorf("%s (exists %v): %v", name, existing, err)
+			}
+		}
+	}
+}
+
 func TestGascityRefusalHome(t *testing.T) {
 	f, root, _ := gascityFake(t)
 	home := f.env["IPM_HOME"]
