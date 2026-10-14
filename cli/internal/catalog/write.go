@@ -60,7 +60,7 @@ func Load(dir, typ string) ([]map[string]any, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("%s does not exist — run `ipm index`", path)
+			return nil, fmt.Errorf("%s does not exist — run `ipm catalog rebuild`", path)
 		}
 		return nil, err
 	}

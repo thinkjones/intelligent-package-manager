@@ -42,7 +42,7 @@ func runScan(sys System, args []string, paths bool) error {
 		return err
 	}
 	if len(cos) == 0 {
-		return fmt.Errorf("no sources to scan — add some with `ipm source add owner/repo`, then `ipm sync`")
+		return fmt.Errorf("no sources to scan — add some with `ipm marketplace add owner/repo`, then `ipm catalog sync`")
 	}
 	if len(args) > 0 {
 		byAlias := map[string]sources.Checkout{}
@@ -54,7 +54,7 @@ func runScan(sys System, args []string, paths bool) error {
 			repo, _, _ := strings.Cut(a, "@")
 			c, ok := byAlias[sources.Alias(repo)]
 			if !ok {
-				return fmt.Errorf("%s is not a source — add it with `ipm source add %s`, then `ipm sync`", a, a)
+				return fmt.Errorf("%s is not a source — add it with `ipm marketplace add %s`, then `ipm catalog sync`", a, a)
 			}
 			picked = append(picked, c)
 		}

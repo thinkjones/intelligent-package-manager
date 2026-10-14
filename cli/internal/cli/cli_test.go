@@ -159,7 +159,7 @@ func TestHelpAndVersion(t *testing.T) {
 		t.Fatalf("help: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("help", "sync"); err != nil || !strings.Contains(f.out.String(), "-upgrade") {
+	if err := f.run("help", "catalog", "sync"); err != nil || !strings.Contains(f.out.String(), "-upgrade") {
 		t.Fatalf("help sync: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
@@ -180,11 +180,11 @@ func TestUsageErrors(t *testing.T) {
 	for _, args := range [][]string{
 		{"nope"},
 		{"--nope"},
-		{"sync", "--bogus"},
-		{"sync", "stray"},
+		{"catalog", "sync", "--bogus"},
+		{"catalog", "sync", "stray"},
 		{"help", "nope"},
 		{"help", "a", "b"},
-		{"sync", "-upgrade"}, // POSIX flags: long flags take two dashes
+		{"catalog", "sync", "-upgrade"}, // POSIX flags: long flags take two dashes
 		{"marketplace", "stats", "x"},
 		{"marketplace", "bogus"},
 		{"marketplace", "add"},
@@ -205,7 +205,7 @@ func TestDoctorRows(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	f.run("sync")
+	f.run("catalog", "sync")
 	f.out.Reset()
 	if err := f.run("doctor"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
@@ -338,7 +338,7 @@ func callWith(f *fake, prefix string) string {
 
 func TestServeCreatesContainer(t *testing.T) {
 	f, root := dockerFake(t, result{"Error: No such object", errors.New("exit 1")})
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	keyFile := filepath.Join(cacheOf(root), "typesense", "api-key")
@@ -354,7 +354,7 @@ func TestServeCreatesContainer(t *testing.T) {
 	}
 	f2, _ := dockerFake(t, result{"Error", errors.New("exit 1")})
 	f2.env = f.env
-	f2.run("serve")
+	f2.run("catalog", "serve")
 	if again, _ := os.ReadFile(keyFile); string(again) != string(key) {
 		t.Error("the key must be reused")
 	}
@@ -362,7 +362,7 @@ func TestServeCreatesContainer(t *testing.T) {
 
 func TestServeLeavesRunningContainer(t *testing.T) {
 	f, _ := dockerFake(t, result{"true\n", nil})
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatal(err)
 	}
 	if callWith(f, "docker run") != "" || callWith(f, "docker start") != "" {
@@ -372,7 +372,7 @@ func TestServeLeavesRunningContainer(t *testing.T) {
 
 func TestServeStartsStoppedContainer(t *testing.T) {
 	f, _ := dockerFake(t, result{"false\n", nil})
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatal(err)
 	}
 	if callWith(f, "docker start ipm-typesense") == "" {
@@ -382,7 +382,7 @@ func TestServeStartsStoppedContainer(t *testing.T) {
 
 func TestServeStop(t *testing.T) {
 	f, _ := dockerFake(t, result{"true", nil})
-	if err := f.run("serve", "--stop"); err != nil {
+	if err := f.run("catalog", "serve", "--stop"); err != nil {
 		t.Fatal(err)
 	}
 	if callWith(f, "docker stop ipm-typesense") == "" {
@@ -392,12 +392,12 @@ func TestServeStop(t *testing.T) {
 
 func TestServeWithoutDocker(t *testing.T) {
 	f := newFake(checkout(t))
-	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "Docker") {
+	if err := f.run("catalog", "serve"); err == nil || !strings.Contains(err.Error(), "Docker") {
 		t.Errorf("no docker: %v", err)
 	}
 	f.onPath["docker"] = true
 	f.results["docker info"] = result{"Cannot connect", errors.New("exit 1")}
-	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "not running") {
+	if err := f.run("catalog", "serve"); err == nil || !strings.Contains(err.Error(), "not running") {
 		t.Errorf("docker down: %v", err)
 	}
 }
@@ -409,7 +409,7 @@ func TestServeHealthTimeout(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(503) }))
 	defer srv.Close()
 	typesenseAt(f, srv)
-	if err := f.run("serve"); err == nil || !strings.Contains(err.Error(), "docker logs ipm-typesense") {
+	if err := f.run("catalog", "serve"); err == nil || !strings.Contains(err.Error(), "docker logs ipm-typesense") {
 		t.Errorf("got %v", err)
 	}
 }
@@ -493,7 +493,7 @@ func loadFake(t *testing.T, n int) (*fake, *tsRecorder) {
 
 func TestLoadRebuildsCollection(t *testing.T) {
 	f, rec := loadFake(t, 1200)
-	if err := f.run("load"); err != nil {
+	if err := runLoad(f.system()); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if len(rec.requests) < 3 || rec.requests[0] != "DELETE /collections/artifacts" || rec.requests[1] != "POST /collections" {
@@ -511,7 +511,7 @@ func TestLoadReportsFailures(t *testing.T) {
 	f, rec := loadFake(t, 3)
 	rec.fail = map[string]bool{"skill:o/r:s0001": true}
 	var exit *ExitError
-	if err := f.run("load"); !errors.As(err, &exit) || exit.Code != 1 {
+	if err := runLoad(f.system()); !errors.As(err, &exit) || exit.Code != 1 {
 		t.Errorf("want exit 1, got %v", err)
 	}
 	if !strings.Contains(f.out.String(), "skill:o/r:s0001") || !strings.Contains(f.out.String(), "bad") {
@@ -523,14 +523,14 @@ func TestLoadNeedsServer(t *testing.T) {
 	root := checkout(t)
 	withCatalog(t, root, 1)
 	os.Remove(filepath.Join(cacheOf(root), "typesense", "api-key"))
-	if err := newFake(root).run("load"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
+	if err := runLoad(newFake(root).system()); err == nil || !strings.Contains(err.Error(), "ipm catalog serve") {
 		t.Errorf("no key: %v", err)
 	}
 	f, _ := loadFake(t, 1)
 	srv := httptest.NewServer(http.NotFoundHandler())
 	typesenseAt(f, srv)
 	srv.Close()
-	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
+	if err := runLoad(f.system()); err == nil || !strings.Contains(err.Error(), "ipm catalog serve") {
 		t.Errorf("server down: %v", err)
 	}
 }
@@ -538,7 +538,7 @@ func TestLoadNeedsServer(t *testing.T) {
 func TestLoadWrongKey(t *testing.T) {
 	f, rec := loadFake(t, 1)
 	rec.status = 401
-	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "port 8108") {
+	if err := runLoad(f.system()); err == nil || !strings.Contains(err.Error(), "port 8108") {
 		t.Errorf("got %v", err)
 	}
 }
@@ -546,7 +546,7 @@ func TestLoadWrongKey(t *testing.T) {
 func TestLoadWithoutCatalog(t *testing.T) {
 	f, rec := loadFake(t, 1)
 	os.RemoveAll(filepath.Join(f.env["IPM_CACHE_DIR"], "catalog"))
-	if err := f.run("load"); err == nil || !strings.Contains(err.Error(), "ipm index") {
+	if err := runLoad(f.system()); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 		t.Errorf("got %v", err)
 	}
 	if len(rec.requests) != 0 {
@@ -622,13 +622,13 @@ func TestSearchNeedsQuery(t *testing.T) {
 
 func TestSearchNoIndex(t *testing.T) {
 	f, _ := searchFake(t, 404)
-	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm load") {
+	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 		t.Errorf("404: %v", err)
 	}
 	srv := httptest.NewServer(http.NotFoundHandler())
 	typesenseAt(f, srv)
 	srv.Close()
-	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm serve") {
+	if err := f.run("search", "x"); err == nil || !strings.Contains(err.Error(), "ipm catalog serve") {
 		t.Errorf("down: %v", err)
 	}
 }
@@ -731,7 +731,7 @@ func TestTreeAndGraphCommands(t *testing.T) {
 func TestShowWithoutCatalog(t *testing.T) {
 	f := newFake(checkout(t))
 	for _, cmd := range []string{"show", "tree", "graph"} {
-		if err := f.run(cmd, "skill:o/r:x"); err == nil || !strings.Contains(err.Error(), "ipm index") {
+		if err := f.run(cmd, "skill:o/r:x"); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 			t.Errorf("%s: %v", cmd, err)
 		}
 	}
@@ -769,13 +769,13 @@ func TestServeRecreatesContainerWithStaleKey(t *testing.T) {
 	}))
 	defer srv.Close()
 	typesenseAt(f, srv)
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if callWith(f, "docker rm -f ipm-typesense") == "" || callWith(f, "docker run") == "" {
 		t.Errorf("calls %v", f.calls)
 	}
-	if strings.Contains(f.out.String(), "ipm load") {
+	if strings.Contains(f.out.String(), "ipm catalog rebuild") {
 		t.Errorf("a populated index needs no load hint:\n%s", f.out.String())
 	}
 }
@@ -815,7 +815,7 @@ func TestDoctorWarnsOnEmptyIndex(t *testing.T) {
 	write(t, filepath.Join(cacheOf(root), "typesense", "api-key"), "k")
 	typesenseAt(f, healthy(t, 0))
 	f.run("doctor")
-	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "ipm load") {
+	if !strings.Contains(f.out.String(), "! typesense") || !strings.Contains(f.out.String(), "ipm catalog rebuild") {
 		t.Errorf("doctor:\n%s", f.out.String())
 	}
 }
@@ -988,7 +988,7 @@ func TestSyncRunsPnpmThenIndexes(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {".claude-plugin/plugin.json": `{"name":"p"}`, "skills/one/SKILL.md": "---\nname: one\n---\n"}})
-	if err := f.run("sync"); err != nil {
+	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	home := f.env["IPM_HOME"]
@@ -1008,7 +1008,7 @@ func TestSyncUpgrade(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	f.run("sync", "--upgrade")
+	f.run("catalog", "sync", "--upgrade")
 	if !strings.HasPrefix(callWith(f, "pnpm update"), "pnpm update --latest --ignore-scripts") {
 		t.Errorf("calls %v", f.calls)
 	}
@@ -1023,7 +1023,7 @@ func TestSyncPnpmFailureKeepsCatalog(t *testing.T) {
 	write(t, cat, "old\n")
 	f.results["pnpm inst"] = result{"ERR_PNPM_FETCH_404 nope", errors.New("exit 1")}
 	var exit *ExitError
-	if err := f.run("sync"); !errors.As(err, &exit) || exit.Code != 1 {
+	if err := f.run("catalog", "sync"); !errors.As(err, &exit) || exit.Code != 1 {
 		t.Errorf("got %v", err)
 	}
 	if data, _ := os.ReadFile(cat); string(data) != "old\n" || !strings.Contains(f.out.String(), "ERR_PNPM_FETCH_404") {
@@ -1033,12 +1033,12 @@ func TestSyncPnpmFailureKeepsCatalog(t *testing.T) {
 
 func TestSyncNeedsPnpmAndSources(t *testing.T) {
 	f := newFake(checkout(t))
-	if err := f.run("sync"); err == nil || !strings.Contains(err.Error(), "pnpm") {
+	if err := f.run("catalog", "sync"); err == nil || !strings.Contains(err.Error(), "pnpm") {
 		t.Errorf("no pnpm: %v", err)
 	}
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
-	if err := f.run("sync"); err == nil || !strings.Contains(err.Error(), "ipm source add") {
+	if err := f.run("catalog", "sync"); err == nil || !strings.Contains(err.Error(), "ipm marketplace add") {
 		t.Errorf("no sources: %v", err)
 	}
 }
@@ -1046,7 +1046,7 @@ func TestSyncNeedsPnpmAndSources(t *testing.T) {
 func TestIndexNeedsSync(t *testing.T) {
 	f := newFake(checkout(t))
 	sources.Add(filepath.Join(f.env["IPM_HOME"], "sources"), []string{"o/r"})
-	if err := f.run("index"); err == nil || !strings.Contains(err.Error(), "ipm sync") {
+	if err := f.run("catalog", "rebuild"); err == nil || !strings.Contains(err.Error(), "ipm catalog sync") {
 		t.Errorf("got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(f.env["IPM_CACHE_DIR"], "catalog")); !os.IsNotExist(err) {
@@ -1057,13 +1057,13 @@ func TestIndexNeedsSync(t *testing.T) {
 func TestScanSources(t *testing.T) {
 	f := newFake(checkout(t))
 	withSources(t, f, map[string]map[string]string{"o/r": {".claude-plugin/plugin.json": "{}", "skills/one/SKILL.md": "x", "skills/two/SKILL.md": "x"}})
-	if err := f.run("scan", "--paths"); err != nil {
+	if err := f.run("catalog", "scan", "--paths"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if !strings.Contains(f.out.String(), "o/r") || !strings.Contains(f.out.String(), "1 (2)") || len(f.calls) != 0 {
 		t.Errorf("output:\n%s\ncalls %v", f.out.String(), f.calls)
 	}
-	if err := f.run("scan", "x/y"); err == nil || !strings.Contains(err.Error(), "ipm source add") {
+	if err := f.run("catalog", "scan", "x/y"); err == nil || !strings.Contains(err.Error(), "ipm marketplace add") {
 		t.Errorf("unknown: %v", err)
 	}
 }
@@ -1073,7 +1073,7 @@ func TestSyncWritesPnpmfile(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	if err := f.run("sync"); err != nil {
+	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(f.env["IPM_HOME"], "sources", ".pnpmfile.cjs"))
@@ -1090,7 +1090,7 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 	f.onPath["pnpm"], f.onPath["npx"] = true, true
 	f.results["pnpm --ve"] = result{"10.33.2\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	if err := f.run("sync"); err != nil {
+	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if !strings.HasPrefix(callWith(f, "npx "), "npx -y pnpm@12.10.1 install --no-frozen-lockfile --ignore-scripts") {
@@ -1100,7 +1100,7 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 	f.onPath["pnpm"] = true
 	f.results["pnpm --ve"] = result{"10.33.2\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
-	if err := f.run("sync"); err == nil || !strings.Contains(err.Error(), "12") {
+	if err := f.run("catalog", "sync"); err == nil || !strings.Contains(err.Error(), "12") {
 		t.Errorf("old pnpm and no npx: %v", err)
 	}
 }
@@ -1108,13 +1108,13 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 func TestServeRemovesLegacyContainer(t *testing.T) {
 	f, _ := dockerFake(t, result{"Error: No such object", errors.New("exit 1")})
 	f.results["docker ps"] = result{"aihs-typesense\n", nil}
-	if err := f.run("serve"); err != nil {
+	if err := f.run("catalog", "serve"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if callWith(f, "docker rm -f aihs-typesense") == "" || callWith(f, "docker run -d --name ipm-typesense") == "" {
 		t.Errorf("calls %v", f.calls)
 	}
-	if !strings.Contains(f.out.String(), "ipm load") {
+	if !strings.Contains(f.out.String(), "ipm catalog rebuild") {
 		t.Errorf("output:\n%s", f.out.String())
 	}
 }
@@ -1639,7 +1639,7 @@ func TestTuiSearcherFallsBack(t *testing.T) {
 	f = newFake(root)
 	typesenseAt(f, srv)
 	s = newTuiSearcher(f.system(), nil, "")
-	if s.Mode() != "local" || s.Notice() != "search index empty — run `ipm load`" {
+	if s.Mode() != "local" || s.Notice() != "search index empty — run `ipm catalog rebuild`" {
 		t.Errorf("empty index: mode %q notice %q", s.Mode(), s.Notice())
 	}
 	docs = 3
@@ -1707,7 +1707,7 @@ func TestTuiNeedsTerminal(t *testing.T) {
 		t.Errorf("no terminal: %v", err)
 	}
 	f.width = 120
-	if err := f.run("tui"); err == nil || err.Error() != "no catalog — run `ipm sync`" {
+	if err := f.run("tui"); err == nil || err.Error() != "no catalog — run `ipm catalog sync`" {
 		t.Errorf("no catalog: %v", err)
 	}
 }
@@ -2026,7 +2026,7 @@ func TestSearchOldIndex(t *testing.T) {
 	t.Cleanup(srv.Close)
 	f := newFake(root)
 	typesenseAt(f, srv)
-	if err := f.run("search", "x"); err == nil || err.Error() != "the search index is from an older ipm — run ipm load" {
+	if err := f.run("search", "x"); err == nil || err.Error() != "the search index is from an older ipm — run `ipm catalog rebuild`" {
 		t.Errorf("got %v", err)
 	}
 }
@@ -2126,5 +2126,128 @@ func TestShowSourceHintOnlyWhenUnresolved(t *testing.T) {
 	f.run("show", "plugin:a/m#other")
 	if !strings.Contains(f.out.String(), "ipm source add plugin:a/m#other") {
 		t.Errorf("c/x isn't a source:\n%s", f.out.String())
+	}
+}
+
+// upServer is a Typesense stand-in that is healthy and records imports.
+func upServer(t *testing.T, f *fake, rec *tsRecorder) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/health" {
+			fmt.Fprint(w, `{"ok":true}`)
+			return
+		}
+		rec.ServeHTTP(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	typesenseAt(f, srv)
+}
+
+func syncFake(t *testing.T) *fake {
+	t.Helper()
+	f := newFake(checkout(t))
+	f.onPath["pnpm"] = true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "---\nname: one\n---\n"}})
+	return f
+}
+
+func TestCatalogSyncLoadsWhenServerUp(t *testing.T) {
+	f := syncFake(t)
+	f.onPath["docker"] = true
+	f.results["docker info"] = result{"ok", nil}
+	write(t, filepath.Join(f.env["IPM_CACHE_DIR"], "typesense", "api-key"), "k")
+	rec := &tsRecorder{}
+	upServer(t, f, rec)
+	if err := f.run("catalog", "sync"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if callWith(f, "pnpm install") == "" {
+		t.Errorf("pnpm not called: %v", f.calls)
+	}
+	if data, _ := os.ReadFile(filepath.Join(f.env["IPM_CACHE_DIR"], "catalog", "skills.jsonl")); !strings.Contains(string(data), "skill:o/r:skills/one") {
+		t.Errorf("catalog %q", data)
+	}
+	if !slices.Contains(rec.requests, "POST /collections/artifacts/documents/import") || len(rec.batches) == 0 {
+		t.Errorf("documents not imported: %v", rec.requests)
+	}
+}
+
+func TestCatalogSyncWithoutDocker(t *testing.T) {
+	f := syncFake(t)
+	if err := f.run("catalog", "sync"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if !strings.Contains(f.out.String(), "ipm catalog serve") || !strings.Contains(f.out.String(), "ipm catalog rebuild") {
+		t.Errorf("want the serve hint:\n%s", f.out.String())
+	}
+}
+
+func TestCatalogRebuild(t *testing.T) {
+	f := syncFake(t)
+	if err := f.run("catalog", "rebuild"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if !strings.Contains(f.out.String(), "catalog: ") || !strings.Contains(f.out.String(), "ipm catalog serve") {
+		t.Errorf("without a server:\n%s", f.out.String())
+	}
+	g := syncFake(t)
+	g.onPath["docker"] = true
+	g.results["docker info"] = result{"ok", nil}
+	write(t, filepath.Join(g.env["IPM_CACHE_DIR"], "typesense", "api-key"), "k")
+	rec := &tsRecorder{}
+	upServer(t, g, rec)
+	if err := g.run("catalog", "rebuild"); err != nil {
+		t.Fatalf("%v\n%s", err, g.out.String())
+	}
+	if len(rec.batches) == 0 || strings.Contains(g.out.String(), "search not loaded") {
+		t.Errorf("want index then load:\n%s", g.out.String())
+	}
+}
+
+func TestCatalogSummary(t *testing.T) {
+	f := syncFake(t)
+	if _, err := sources.Add(filepath.Join(f.env["IPM_HOME"], "sources"), []string{"x/y"}); err != nil {
+		t.Fatal(err)
+	}
+	cat := filepath.Join(f.env["IPM_CACHE_DIR"], "catalog")
+	write(t, filepath.Join(cat, catalog.Files[catalog.TypeSkill]), "{}\n{}\n{}\n")
+	write(t, filepath.Join(cat, catalog.Files[catalog.TypeAgent]), "{}\n")
+	write(t, filepath.Join(cat, catalog.Files[catalog.TypeRepo]), "")
+	if err := f.run("catalog"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	out := f.out.String()
+	for _, want := range []string{`(?m)^sources\s+2 followed, 1 synced$`, `(?m)^items\s+skill 3 · agent 1$`, `(?m)^last index\s+\d{4}-\d\d-\d\d`, `(?m)^search\s+\S`} {
+		if !regexpMatch(want, out) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	// A fresh home has never been indexed.
+	g := newFake(checkout(t))
+	if err := g.run("catalog"); err != nil || !strings.Contains(g.out.String(), "never — run `ipm catalog sync`") {
+		t.Errorf("%v\n%s", err, g.out.String())
+	}
+}
+
+func TestCatalogUnknownWord(t *testing.T) {
+	var usage *UsageError
+	err := newFake(checkout(t)).run("catalog", "bogus")
+	if !errors.As(err, &usage) || !strings.Contains(err.Error(), "sync, rebuild, serve, scan, search") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestTopLevelSearchMatchesCatalogSearch(t *testing.T) {
+	run := func(args ...string) string {
+		f, _ := searchFake(t, 0)
+		if err := f.run(args...); err != nil {
+			t.Fatal(err)
+		}
+		return f.out.String()
+	}
+	a, b := run("search", "x"), run("catalog", "search", "x")
+	if a == "" || a != b {
+		t.Errorf("top level:\n%s\ncatalog:\n%s", a, b)
 	}
 }

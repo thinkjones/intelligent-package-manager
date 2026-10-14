@@ -92,7 +92,7 @@ func TestDocuments(t *testing.T) {
 	if r := by["repo:o/r"]; r["description"] != "D" || !reflect.DeepEqual(r["tags"], []string{"t"}) || r["stars"] != 10 {
 		t.Errorf("repo doc %v", r)
 	}
-	if _, err := Documents(t.TempDir()); err == nil || !strings.Contains(err.Error(), "ipm index") {
+	if _, err := Documents(t.TempDir()); err == nil || !strings.Contains(err.Error(), "ipm catalog rebuild") {
 		t.Errorf("missing catalog: %v", err)
 	}
 }

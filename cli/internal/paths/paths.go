@@ -24,7 +24,7 @@ func (p Paths) Sources() string { return filepath.Join(p.Home, "sources") }
 // Store is pnpm's content-addressable store, dedicated to ipm.
 func (p Paths) Store() string { return filepath.Join(p.Home, "store") }
 
-// Catalog is where `ipm index` and `ipm stats` write.
+// Catalog is where `ipm catalog rebuild` and `ipm stats` write.
 func (p Paths) Catalog() string { return filepath.Join(p.Cache, "catalog") }
 
 // Typesense holds the search server's data and API key.

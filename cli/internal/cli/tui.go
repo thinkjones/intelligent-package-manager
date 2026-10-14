@@ -42,7 +42,7 @@ func runTui(sys System, global bool) error {
 	}
 	g, err := catgraph.Load(p.Catalog())
 	if err != nil {
-		return errors.New("no catalog — run `ipm sync`")
+		return errors.New("no catalog — run `ipm catalog sync`")
 	}
 	scope, err := currentScope(sys, global)
 	if err != nil {
@@ -60,8 +60,8 @@ func runTui(sys System, global bool) error {
 }
 
 const (
-	noticeServerOff  = "server off: keyword search only — run `ipm serve` and `ipm load` for semantic search"
-	noticeIndexEmpty = "search index empty — run `ipm load`"
+	noticeServerOff  = "server off: keyword search only — run `ipm catalog serve` and `ipm catalog rebuild` for semantic search"
+	noticeIndexEmpty = "search index empty — run `ipm catalog rebuild`"
 	tuiLimit         = 50
 )
 

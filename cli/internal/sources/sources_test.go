@@ -135,7 +135,7 @@ func TestCheckoutsNeedSync(t *testing.T) {
 	} {
 		dir := synced(t)
 		breakIt(dir)
-		if _, err := Checkouts(dir); err == nil || !strings.Contains(err.Error(), "ipm sync") {
+		if _, err := Checkouts(dir); err == nil || !strings.Contains(err.Error(), "ipm catalog sync") {
 			t.Errorf("%s: got %v", name, err)
 		}
 	}

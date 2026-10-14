@@ -15,7 +15,7 @@ func newSyncCmd(sys System) *cobra.Command {
 	var upgrade bool
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "fetch and pin every source with pnpm, then reindex",
+		Short: "fetch and pin every source with pnpm, rebuild the catalog and reload search",
 		Args:  noArgs,
 		RunE:  func(*cobra.Command, []string) error { return runSync(sys, upgrade) },
 	}
@@ -24,7 +24,7 @@ func newSyncCmd(sys System) *cobra.Command {
 }
 
 // runSync has pnpm fetch and pin every source (never running their
-// scripts), then reindexes. A failed pnpm run leaves the catalog as it was.
+// scripts), then reindexes and loads search when the server is up. A failed pnpm run leaves the catalog as it was.
 func runSync(sys System, upgrade bool) error {
 	p, err := ipmPaths(sys)
 	if err != nil {
@@ -35,7 +35,7 @@ func runSync(sys System, upgrade bool) error {
 		return err
 	}
 	if _, err := os.Stat(filepath.Join(p.Sources(), "package.json")); err != nil {
-		return fmt.Errorf("no sources yet — add some with `ipm source add owner/repo`")
+		return fmt.Errorf("no sources yet — add some with `ipm marketplace add owner/repo`")
 	}
 	args := []string{"install"}
 	if upgrade {
@@ -66,5 +66,8 @@ func runSync(sys System, upgrade bool) error {
 		return &ExitError{Code: 1}
 	}
 	fmt.Fprintf(sys.Stdout, "%s sources synced\n\n", ok)
-	return runIndex(sys)
+	if err := runIndex(sys); err != nil {
+		return err
+	}
+	return loadIfUp(sys)
 }

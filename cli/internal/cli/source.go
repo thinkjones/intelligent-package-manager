@@ -123,7 +123,7 @@ func sourceRepo(plugins []map[string]any, id string) (string, error) {
 		}
 		return "", fmt.Errorf("%s is not an external plugin — its repo is already a source", id)
 	}
-	return "", fmt.Errorf("no plugin %s in the catalog — run `ipm index`", id)
+	return "", fmt.Errorf("no plugin %s in the catalog — run `ipm catalog rebuild`", id)
 }
 
 // packsMaxAge is how old the saved source packs may be before ipm marketplace

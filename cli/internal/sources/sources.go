@@ -265,13 +265,9 @@ type Checkout struct {
 	Dir, Commit string
 }
 
-// Checkouts is every source as pnpm installed it. A source pnpm hasn't
-// installed or pinned to a commit is an error saying to run `ipm sync`.
-func Checkouts(dir string) ([]Checkout, error) {
-	srcs, err := Load(dir)
-	if err != nil {
-		return nil, err
-	}
+// lockedVersions is each dependency's pinned version in the lockfile, or nil
+// when there is no lockfile yet.
+func lockedVersions(dir string, srcs []Source) (map[string]string, error) {
 	var lock struct {
 		Importers map[string]struct {
 			Dependencies map[string]struct {
@@ -282,7 +278,7 @@ func Checkouts(dir string) ([]Checkout, error) {
 	data, err := os.ReadFile(filepath.Join(dir, "pnpm-lock.yaml"))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) && len(srcs) > 0 {
-			return nil, fmt.Errorf("sources are not synced yet — run `ipm sync`")
+			return nil, fmt.Errorf("sources are not synced yet — run `ipm catalog sync`")
 		}
 		if errors.Is(err, os.ErrNotExist) {
 			return nil, nil
@@ -292,22 +288,63 @@ func Checkouts(dir string) ([]Checkout, error) {
 	if err := yaml.Unmarshal(data, &lock); err != nil {
 		return nil, fmt.Errorf("%s: %v", filepath.Join(dir, "pnpm-lock.yaml"), err)
 	}
-	deps := lock.Importers["."].Dependencies
-	var out []Checkout
-	for _, s := range srcs {
-		commit := sha.FindString(deps[s.Alias].Version)
-		if commit == "" {
-			return nil, fmt.Errorf("%s has no pinned commit in pnpm-lock.yaml — run `ipm sync`", s.Repo)
-		}
-		// pnpm links node_modules/<alias> to its virtual store; walkers don't
-		// descend through a symlinked root, so hand out the real folder.
-		d, err := filepath.EvalSymlinks(filepath.Join(dir, "node_modules", s.Alias))
-		if err != nil {
-			return nil, fmt.Errorf("%s is not installed — run `ipm sync`", s.Repo)
-		}
-		out = append(out, Checkout{Source: s, Dir: d, Commit: commit})
+	out := map[string]string{}
+	for alias, d := range lock.Importers["."].Dependencies {
+		out[alias] = d.Version
 	}
 	return out, nil
+}
+
+// checkoutOf is source s as pnpm installed it, given the lockfile's versions.
+func checkoutOf(dir string, s Source, versions map[string]string) (Checkout, error) {
+	commit := sha.FindString(versions[s.Alias])
+	if commit == "" {
+		return Checkout{}, fmt.Errorf("%s has no pinned commit in pnpm-lock.yaml — run `ipm catalog sync`", s.Repo)
+	}
+	// pnpm links node_modules/<alias> to its virtual store; walkers don't
+	// descend through a symlinked root, so hand out the real folder.
+	d, err := filepath.EvalSymlinks(filepath.Join(dir, "node_modules", s.Alias))
+	if err != nil {
+		return Checkout{}, fmt.Errorf("%s is not installed — run `ipm catalog sync`", s.Repo)
+	}
+	return Checkout{Source: s, Dir: d, Commit: commit}, nil
+}
+
+// Checkouts is every source as pnpm installed it. A source pnpm hasn't
+// installed or pinned to a commit is an error saying to run `ipm catalog sync`.
+func Checkouts(dir string) ([]Checkout, error) {
+	srcs, err := Load(dir)
+	if err != nil {
+		return nil, err
+	}
+	versions, err := lockedVersions(dir, srcs)
+	if err != nil {
+		return nil, err
+	}
+	var out []Checkout
+	for _, s := range srcs {
+		c, err := checkoutOf(dir, s, versions)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, nil
+}
+
+// Synced is how many of the followed sources pnpm has installed and pinned.
+func Synced(dir string) (followed, synced int, err error) {
+	srcs, err := Load(dir)
+	if err != nil {
+		return 0, 0, err
+	}
+	versions, _ := lockedVersions(dir, srcs)
+	for _, s := range srcs {
+		if _, err := checkoutOf(dir, s, versions); err == nil {
+			synced++
+		}
+	}
+	return len(srcs), synced, nil
 }
 
 // WriteProject writes dir/package.json for a project's .ipm folder: deps as

@@ -7,21 +7,10 @@ import (
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/search"
-
-	"github.com/spf13/cobra"
 )
 
 // importBatch is how many documents go in one import request.
 const importBatch = 500
-
-func newLoadCmd(sys System) *cobra.Command {
-	return &cobra.Command{
-		Use:   "load",
-		Short: "rebuild the search index from the catalog",
-		Args:  noArgs,
-		RunE:  func(*cobra.Command, []string) error { return runLoad(sys) },
-	}
-}
 
 // runLoad rebuilds the search index from catalog/: drop, create, import.
 func runLoad(sys System) error {

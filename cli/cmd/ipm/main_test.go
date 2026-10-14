@@ -63,9 +63,9 @@ func TestExitCodes(t *testing.T) {
 		{"ok", "", []string{"version"}, 0, ""},
 		{"usage error", root, []string{"--upgrade"}, 2, "Try `ipm help`"},
 		{"unknown command", root, []string{"nope"}, 2, "unknown command"},
-		{"bad flag", root, []string{"sync", "--bogus"}, 2, "unknown flag: --bogus"},
-		{"no pnpm", root, []string{"sync"}, 1, "pnpm"},
-		{"no sources", root, []string{"index"}, 1, "ipm source add"},
+		{"bad flag", root, []string{"catalog", "sync", "--bogus"}, 2, "unknown flag: --bogus"},
+		{"no pnpm", root, []string{"catalog", "sync"}, 1, "pnpm"},
+		{"no sources", root, []string{"catalog", "rebuild"}, 1, "ipm marketplace add"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

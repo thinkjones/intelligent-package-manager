@@ -69,7 +69,7 @@ func TestOnboardProgressInTerminal(t *testing.T) {
 	out := f.out.String()
 	for _, want := range []string{
 		"] 2/5 sync · pnpm install",
-		"✓ sync · catalog: 6 record(s), 0 warning(s)\n",
+		"✓ sync · - search not loaded: run `ipm catalog serve` then `ipm catalog rebuild`\n", // runSync now ends with loadIfUp; Task 7 reworks onboard
 		"] 3/5 stats · 3/3 o/",
 		"✓ stats · 3 fetched, 0 skipped, 0 failed\n",
 		"- search skipped: start Docker, then ipm serve && ipm load\n",
