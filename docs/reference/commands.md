@@ -299,7 +299,7 @@ Gas City has no equivalent for some items, so ipm skips them and prints each as 
 | `skipped <id>: Gas City packs have no hooks` | A plugin's hooks are not written. |
 | `skipped <id>: external plugin — its files live in another repo; add its skills and agents directly` | A plugin whose files are in another repo. Add its skills and agents to the pack instead. |
 | `skipped <id>: its parts aren't recorded — run ipm pack build --update` | A whole plugin that the lock has no parts for; `ipm pack build --update` records them. |
-| `skipped <id>: nothing Gas City can hold` | A whole plugin whose parts are all things Gas City has no equivalent for (or that has none). |
+| `skipped <id>: nothing Gas City can hold` | A whole plugin with no recorded parts (`parts = []` in `ipm.lock`). A plugin whose parts are all commands or hooks gets one skip line per part instead. |
 | `agents/<name>: frontmatter is not valid YAML — wrote the body only` | The agent's frontmatter doesn't parse. ipm still writes `prompt.md` with the body and an `agent.toml` holding only `provider = "claude"`. |
 | `agents/<name>: dropped tools, color — Gas City agents have no equivalent` | Agent frontmatter keys other than `name`, `description` and `model` are dropped, one warning per agent. |
 | `mcp/<name>: dropped <keys>` | MCP server keys Gas City doesn't know (Claude's `type` is dropped silently). |
