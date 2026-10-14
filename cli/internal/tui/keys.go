@@ -12,7 +12,7 @@ var searchKeys = [][2]string{
 	{"t", "the pack tray (d removes, esc back)"},
 	{"f", "cycle the type filter"},
 	{"p", "switch pack, or n for a new one"},
-	{"b / i", "build every pack (ipm install)"},
+	{"b / i", "build every pack (ipm pack build)"},
 	{"D", "deploy the active pack to Claude Code"},
 	{"e", "external references to this repo"},
 	{"ctrl+r", "check the search server again"},

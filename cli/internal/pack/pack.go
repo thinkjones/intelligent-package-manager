@@ -1,6 +1,6 @@
 // Package pack holds the naming rules shared by everything ipm publishes,
 // and reads the [[repo]] list of an aihs-era manifest.toml for
-// `ipm source import`. (The old pack flow — root folders of manifest.toml
+// `ipm marketplace import`. (The old pack flow — root folders of manifest.toml
 // [[plugin]] tables — is gone; part 3 of the ipm design brings packs back as
 // ipm.toml.)
 package pack
@@ -51,7 +51,7 @@ func Reserved(s string) bool {
 }
 
 // Upstream is one repo at one version, as an aihs-era manifest.toml listed
-// it (read by `ipm source import`).
+// it (read by `ipm marketplace import`).
 type Upstream struct {
 	// Repo is a GitHub owner/repo, or a full git URL.
 	Repo string

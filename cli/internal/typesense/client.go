@@ -1,5 +1,5 @@
 // Package typesense is a minimal client for the local Typesense server that
-// `ipm serve` runs: health, collections, batched JSONL import and search.
+// `ipm catalog serve` runs: health, collections, batched JSONL import and search.
 // It speaks plain HTTP so ipm needs no client library.
 package typesense
 

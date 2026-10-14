@@ -12,7 +12,7 @@ import (
 
 // Write writes every type's file under dir, records sorted by ID, one per
 // line. A type with no records gets an empty file. github.jsonl, written by
-// `ipm stats`, is left alone.
+// `ipm marketplace stats`, is left alone.
 func Write(dir string, recs []Record) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err

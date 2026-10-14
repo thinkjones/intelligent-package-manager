@@ -348,7 +348,7 @@ func (in tuiInstaller) Install(_ context.Context, out io.Writer) error {
 	err := runBuild(sys, in.global, false, false)
 	var exit *ExitError
 	if errors.As(err, &exit) {
-		return errors.New("install failed — see the output above")
+		return errors.New("build failed — see the output above")
 	}
 	return err
 }
