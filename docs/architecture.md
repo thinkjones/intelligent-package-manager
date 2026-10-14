@@ -202,7 +202,7 @@ cli/
     ├── scan/                  the folder report behind ipm catalog scan
     ├── project/               scope root, ipm.toml packs, .ipm/ipm.lock
     ├── assemble/              resolve picks, plan each pack, place files by hard link
-    ├── pack/                  naming rules; reading an aihs-era manifest.toml for source import
+    ├── pack/                  naming rules; reading an aihs-era manifest.toml for marketplace import
     ├── copilot/               the skills a Copilot plugin.json lists
     ├── marketplace/           marketplace.json entries (ipm's own or upstream entry maps) and atomic Write
     ├── curated/               read and write curated source lists ([[repos]] TOML) for ipm onboard and ipm marketplace; fetch with a cached fallback

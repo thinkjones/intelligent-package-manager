@@ -72,7 +72,7 @@ internal/catgraph/         the catalog as a graph for show, show tree and show g
 internal/scan/             the folder report behind ipm catalog scan
 internal/project/          the scope root (ipm.toml up the tree, or $IPM_HOME/global), ipm.toml packs, .ipm/ipm.lock
 internal/assemble/         resolve picks (lock, then catalog), plan each pack's files and dependencies, place them by hard link
-internal/pack/             naming rules, and reading an aihs-era manifest.toml for source import
+internal/pack/             naming rules, and reading an aihs-era manifest.toml for marketplace import
 internal/copilot/          which skills a Copilot plugin.json lists
 internal/marketplace/      marketplace.json entries (including upstream entry maps) and atomic Write
 internal/curated/          curated source lists for ipm onboard and ipm marketplace: parse and write [[repos]] TOML, fetch with a cached copy for offline
