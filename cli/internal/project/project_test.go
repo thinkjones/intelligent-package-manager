@@ -115,3 +115,55 @@ func TestPacksDigestIgnoresInstalls(t *testing.T) {
 		t.Error("changing an item must change the digest")
 	}
 }
+
+const installsTOML = `# ipm packs: each becomes a Claude Code plugin under .ipm/plugins/ when you run ` + "`ipm pack build`" + `.
+
+[packs.kit]
+description = "My kit"
+items = [
+  "skill:o/r:skills/a",
+]
+
+[[packs.kit.installs]]
+target = "claude"
+path = "."
+scope = "project"
+
+[[packs.kit.installs]]
+target = "gascity"
+path = "city/packs/kit"
+name = "kit"
+`
+
+var installsPacks = []Pack{{Name: "kit", Description: "My kit", Items: []string{"skill:o/r:skills/a"}, Installs: []Install{
+	{Target: "claude", Path: ".", Scope: "project"},
+	{Target: "gascity", Path: "city/packs/kit", Name: "kit"},
+}}}
+
+func TestLoadPacksWithInstalls(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, File), []byte(installsTOML), 0o644)
+	got, err := LoadPacks(root)
+	if err != nil || !reflect.DeepEqual(got, installsPacks) {
+		t.Errorf("got %+v %v", got, err)
+	}
+}
+
+func TestSavePacksInstallsRoundTrip(t *testing.T) {
+	root := t.TempDir()
+	if err := SavePacks(root, installsPacks); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(root, File))
+	if string(data) != installsTOML {
+		t.Errorf("ipm.toml:\n%s\nwant:\n%s", data, installsTOML)
+	}
+}
+
+func TestLoadPacksUnknownKeyStillFails(t *testing.T) {
+	root := t.TempDir()
+	os.WriteFile(filepath.Join(root, File), []byte("[packs.kit]\ncolour = \"x\"\n"), 0o644)
+	if _, err := LoadPacks(root); err == nil || !strings.Contains(err.Error(), "colour") {
+		t.Errorf("got %v", err)
+	}
+}

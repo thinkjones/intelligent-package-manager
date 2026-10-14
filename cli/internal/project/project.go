@@ -67,12 +67,23 @@ type Pack struct {
 	Name        string
 	Description string
 	Items       []string
+	Installs    []Install
+}
+
+// Install is one place a pack was installed: a Claude Code scope or a Gas City
+// pack folder. Path is relative to the project root when inside it.
+type Install struct {
+	Target string `toml:"target"`
+	Path   string `toml:"path"`
+	Scope  string `toml:"scope"`
+	Name   string `toml:"name"`
 }
 
 type packsFile struct {
 	Packs map[string]struct {
-		Description string   `toml:"description"`
-		Items       []string `toml:"items"`
+		Description string    `toml:"description"`
+		Items       []string  `toml:"items"`
+		Installs    []Install `toml:"installs"`
 	} `toml:"packs"`
 }
 
@@ -116,7 +127,7 @@ func LoadPacks(root string) ([]Pack, error) {
 		if !pack.ValidName(name) || pack.Reserved(name) {
 			return nil, fmt.Errorf("%s: pack name %q must start with a letter or digit, use only letters, digits, '.', '_' and '-', and not be one Claude Code reserves", path, name)
 		}
-		out = append(out, Pack{Name: name, Description: p.Description, Items: p.Items})
+		out = append(out, Pack{Name: name, Description: p.Description, Items: p.Items, Installs: p.Installs})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out, nil
@@ -134,6 +145,15 @@ func SavePacks(root string, packs []Pack) error {
 			fmt.Fprintf(&b, "  %q,\n", it)
 		}
 		b.WriteString("]\n")
+		for _, in := range p.Installs {
+			fmt.Fprintf(&b, "\n[[packs.%s.installs]]\ntarget = %q\npath = %q\n", p.Name, in.Target, in.Path)
+			if in.Scope != "" {
+				fmt.Fprintf(&b, "scope = %q\n", in.Scope)
+			}
+			if in.Name != "" {
+				fmt.Fprintf(&b, "name = %q\n", in.Name)
+			}
+		}
 	}
 	return writeFile(filepath.Join(root, File), b.String())
 }

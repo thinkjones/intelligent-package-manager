@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"cmp"
 	"fmt"
 	"slices"
 	"strings"
@@ -272,5 +273,22 @@ func packShow(sys System, scope project.Scope, name string) error {
 	}
 	tw.Flush()
 	fmt.Fprintf(sys.Stdout, "\n%s — %d item(s)\n", packs[i].Description, len(packs[i].Items))
+	installs, err := loadInstalls(sys, scope)
+	if err != nil {
+		return err
+	}
+	for _, in := range installs {
+		if in.Pack != name {
+			continue
+		}
+		line := "installed: " + in.Target
+		if label := cmp.Or(in.Scope, in.Name); label != "" {
+			line += " " + label
+		}
+		if in.Path != "" {
+			line += " " + in.Path
+		}
+		fmt.Fprintln(sys.Stdout, line)
+	}
 	return nil
 }
