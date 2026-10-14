@@ -346,7 +346,7 @@ func (m *Model) marketDetail(r Repo, w, h int) []string {
 	var lines []string
 	add := func(name, value string) {
 		if value != "" {
-			lines = append(lines, stMuted.Render(fit(name, 8))+stText.Render(value))
+			lines = append(lines, stMuted.Render(fit(name, 9))+stText.Render(value))
 		}
 	}
 	var lists []string

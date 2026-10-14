@@ -65,7 +65,7 @@ func TestMarketplaceDetail(t *testing.T) {
 	m, _ := marketModel(t)
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	v := view(m)
-	for _, want := range []string{"Test-driven development guard", "tdd", "claude-code", "testing, review"} {
+	for _, want := range []string{"Test-driven development guard", "tdd", "claude-code", "testing, review", "followed yes"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("detail missing %q:\n%s", want, v)
 		}
