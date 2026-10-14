@@ -84,7 +84,7 @@ path = "."
 scope = "project"
 ```
 
-`target` is `claude`; `scope` is `user`, `project` or `local`; `path` is the folder for project or local scope, stored relative to the project when it is inside it. Installing the same pack to the same target and path again replaces its table. A user-scope pack's installs are kept in `$IPM_HOME/installs.json` instead: a JSON array of `{pack, target, path, scope}` objects sorted by pack, target and path, with absolute paths.
+`target` is `claude`; `scope` is `user`, `project` or `local`; `path` is the folder for project or local scope, stored relative to the project when it is inside it. Installing the same pack to the same target, path and scope again replaces its table; project and local scope at one folder are two tables. A user-scope pack's installs are kept in `$IPM_HOME/installs.json` instead: a JSON array of `{pack, target, path, scope}` objects sorted by pack, target, path and scope, with absolute paths.
 
 ## `.ipm/ipm.lock`
 

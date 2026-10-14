@@ -32,12 +32,15 @@ type installJSON struct {
 
 func sortInstalls(rs []installRecord) {
 	slices.SortStableFunc(rs, func(a, b installRecord) int {
-		return cmp.Or(cmp.Compare(a.Pack, b.Pack), cmp.Compare(a.Target, b.Target), cmp.Compare(a.Path, b.Path))
+		return cmp.Or(cmp.Compare(a.Pack, b.Pack), cmp.Compare(a.Target, b.Target), cmp.Compare(a.Path, b.Path),
+			cmp.Compare(a.Scope, b.Scope), cmp.Compare(a.Name, b.Name))
 	})
 }
 
+// sameInstall reports whether a and b are the same install: Claude's project
+// and local scopes at one folder are two installs.
 func sameInstall(a, b project.Install) bool {
-	return a.Target == b.Target && a.Path == b.Path && a.Name == b.Name
+	return a.Target == b.Target && a.Path == b.Path && a.Scope == b.Scope && a.Name == b.Name
 }
 
 // relativeTo is path made relative to root when it lies inside it.
@@ -80,7 +83,7 @@ func readGlobalInstalls(path string) ([]installRecord, error) {
 }
 
 // recordInstall notes that pack is installed at in, replacing an earlier record
-// of the same target, path and name. A project keeps it in ipm.toml, with a path
+// of the same target, path, scope and name. A project keeps it in ipm.toml, with a path
 // inside the project made relative; the user scope keeps it in installs.json.
 func recordInstall(sys System, scope project.Scope, pack string, in project.Install) error {
 	if scope.Global {
@@ -122,8 +125,8 @@ func recordInstall(sys System, scope project.Scope, pack string, in project.Inst
 	return err
 }
 
-// loadInstalls lists every recorded install in scope, sorted by pack, target
-// and path, with project paths made absolute.
+// loadInstalls lists every recorded install in scope, sorted by pack, target,
+// path, scope and name, with project paths made absolute.
 func loadInstalls(sys System, scope project.Scope) ([]installRecord, error) {
 	var out []installRecord
 	if scope.Global {

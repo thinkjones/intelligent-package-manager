@@ -14,10 +14,13 @@ func TestRecordInstallReplaces(t *testing.T) {
 	f, root := installFake(t)
 	scope, _ := currentScope(f.system(), false)
 	other := filepath.Join(root, "other")
+	// Project and local scope at one folder are two Claude installs; the same
+	// target, path, scope and name again replaces its record.
 	for _, in := range []project.Install{
 		{Target: "claude", Path: root, Scope: "project"},
 		{Target: "claude", Path: root, Scope: "local"},
 		{Target: "claude", Path: other, Scope: "project"},
+		{Target: "claude", Path: root, Scope: "project"},
 	} {
 		if err := recordInstall(f.system(), scope, "kit", in); err != nil {
 			t.Fatal(err)
@@ -26,6 +29,7 @@ func TestRecordInstallReplaces(t *testing.T) {
 	got, err := loadInstalls(f.system(), scope)
 	want := []installRecord{
 		{"kit", project.Install{Target: "claude", Path: root, Scope: "local"}},
+		{"kit", project.Install{Target: "claude", Path: root, Scope: "project"}},
 		{"kit", project.Install{Target: "claude", Path: other, Scope: "project"}},
 	}
 	if err != nil || !reflect.DeepEqual(got, want) {

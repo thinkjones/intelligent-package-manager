@@ -261,7 +261,7 @@ ipm install claude [pack] [--scope user|project|local] [--path DIR] [-g] [--upda
 ipm install [-g]
 ```
 
-`ipm install claude` installs `pack` into Claude Code. `pack` may be left out when the scope has only one. It builds first when `.ipm/` is out of date (the build stamp no longer matches), printing `build is current` when it is not needed, then prints each `claude` command before running it and needs no confirmation: typing the command is the decision. Afterwards it records the install: in the pack's `[[packs.<name>.installs]]` table in `ipm.toml` for a project pack (a path inside the project is stored relative to it), or in `$IPM_HOME/installs.json` for a user-scope pack. Installing the same pack to the same target and path again replaces its record. `ipm pack install claude` is the same command.
+`ipm install claude` installs `pack` into Claude Code. `pack` may be left out when the scope has only one. It builds first when `.ipm/` is out of date (the build stamp no longer matches), printing `build is current` when it is not needed, then prints each `claude` command before running it and needs no confirmation: typing the command is the decision. Afterwards it records the install: in the pack's `[[packs.<name>.installs]]` table in `ipm.toml` for a project pack (a path inside the project is stored relative to it), or in `$IPM_HOME/installs.json` for a user-scope pack. Installing the same pack to the same target, path and scope again replaces its record; project and local scope at one folder are two records. `ipm pack install claude` is the same command.
 
 | Flag | Does |
 | --- | --- |
