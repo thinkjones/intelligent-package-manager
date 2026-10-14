@@ -127,7 +127,6 @@ Config
 		newSearchCmd(sys),
 		newShowCmd(sys),
 		newPackCmd(sys),
-		newInstallCmd(sys),
 		newTuiCmd(sys),
 		newDeployCmd(sys),
 		newOnboardCmd(sys),

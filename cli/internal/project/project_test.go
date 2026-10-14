@@ -37,7 +37,7 @@ func TestPacksRoundTrip(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(filepath.Join(root, File))
-	want := `# ipm packs: each becomes a Claude Code plugin under .ipm/plugins/ when you run ` + "`ipm install`" + `.
+	want := `# ipm packs: each becomes a Claude Code plugin under .ipm/plugins/ when you run ` + "`ipm pack build`" + `.
 
 [packs.csharp-sdlc]
 description = "C# \"lifecycle\""
@@ -101,5 +101,17 @@ func TestLoadPacksRefusesUnsafeNames(t *testing.T) {
 		if _, err := LoadPacks(root); err == nil {
 			t.Errorf("%s accepted", name)
 		}
+	}
+}
+
+func TestPacksDigestIgnoresInstalls(t *testing.T) {
+	a := []Pack{{Name: "b", Description: "d", Items: []string{"x"}}, {Name: "a", Items: []string{"y"}}}
+	b := []Pack{{Name: "a", Items: []string{"y"}}, {Name: "b", Description: "d", Items: []string{"x"}}}
+	if PacksDigest(a) != PacksDigest(b) {
+		t.Error("digest must not depend on pack order")
+	}
+	b[1].Items = []string{"z"}
+	if PacksDigest(a) == PacksDigest(b) {
+		t.Error("changing an item must change the digest")
 	}
 }

@@ -345,7 +345,7 @@ type tuiInstaller struct {
 func (in tuiInstaller) Install(_ context.Context, out io.Writer) error {
 	sys := in.sys
 	sys.Stdout = out
-	err := runInstall(sys, in.global, false, false)
+	err := runBuild(sys, in.global, false, false)
 	var exit *ExitError
 	if errors.As(err, &exit) {
 		return errors.New("install failed — see the output above")

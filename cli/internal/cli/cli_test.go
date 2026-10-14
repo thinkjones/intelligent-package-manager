@@ -167,7 +167,7 @@ func TestHelpAndVersion(t *testing.T) {
 		t.Fatalf("search --help: %v\n%s", err, f.out.String())
 	}
 	f.out.Reset()
-	if err := f.run("help", "install"); err != nil || strings.Contains(f.out.String(), "-no-validate claude") {
+	if err := f.run("help", "pack", "build"); err != nil || strings.Contains(f.out.String(), "-no-validate claude") {
 		t.Fatalf("a backquoted usage turns into a flag argument name:\n%s", f.out.String())
 	}
 	f.out.Reset()
@@ -1295,9 +1295,9 @@ func installFake(t *testing.T) (*fake, string) {
 	return f, root
 }
 
-func TestInstallBuildsPlugin(t *testing.T) {
+func TestPackBuildBuildsPlugin(t *testing.T) {
 	f, root := installFake(t)
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	ipm := filepath.Join(root, ".ipm")
@@ -1332,36 +1332,56 @@ func TestInstallBuildsPlugin(t *testing.T) {
 	if !strings.Contains(f.out.String(), "plugin:o/r#e is not pinned upstream") {
 		t.Errorf("want the unpinned warning:\n%s", f.out.String())
 	}
-	if !strings.Contains(f.out.String(), "claude plugin marketplace add "+ipm) || !strings.Contains(f.out.String(), "/plugin install kit@work-ipm") {
+	if !strings.Contains(f.out.String(), "claude plugin marketplace add "+ipm) || !strings.Contains(f.out.String(), "ipm install claude") {
 		t.Errorf("hints:\n%s", f.out.String())
 	}
 }
 
-func TestInstallKeepsPinsUnlessUpdate(t *testing.T) {
+func TestPackBuildWritesStamp(t *testing.T) {
 	f, root := installFake(t)
-	f.run("install")
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	scope, _ := currentScope(f.system(), false)
+	if _, err := os.Stat(filepath.Join(root, ".ipm", "build.stamp")); err != nil {
+		t.Fatal("missing build.stamp")
+	}
+	if !buildCurrent(f.system(), scope) {
+		t.Error("a fresh build must be current")
+	}
+	packs, _ := project.LoadPacks(root)
+	packs[0].Items = []string{"agent:o/r:p/agents/rev.md"}
+	project.SavePacks(root, packs)
+	if buildCurrent(f.system(), scope) {
+		t.Error("editing ipm.toml items must make the build stale")
+	}
+}
+
+func TestPackBuildKeepsPinsUnlessUpdate(t *testing.T) {
+	f, root := installFake(t)
+	f.run("pack", "build")
 	ipm := filepath.Join(root, ".ipm")
 	lock, _ := project.LoadLock(ipm)
 	s1 := lock["skill:o/r:p/skills/s1"]
 	s1.SHA = strings.Repeat("d", 40)
 	lock[s1.ID] = s1
 	project.SaveLock(ipm, lock)
-	f.run("install")
+	f.run("pack", "build")
 	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != strings.Repeat("d", 40) {
 		t.Errorf("install must keep the pin: %+v", l[s1.ID])
 	}
-	f.run("install", "--update")
+	f.run("pack", "build", "--update")
 	if l, _ := project.LoadLock(ipm); l[s1.ID].SHA != "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1" {
 		t.Errorf("--update must re-pin: %+v", l[s1.ID])
 	}
 }
 
-func TestInstallFromLockWithoutCatalog(t *testing.T) {
+func TestPackBuildFromLockWithoutCatalog(t *testing.T) {
 	f, root := installFake(t)
-	f.run("install")
+	f.run("pack", "build")
 	os.RemoveAll(filepath.Join(cacheOf(root), "catalog"))
 	os.RemoveAll(filepath.Join(root, ".ipm", "plugins"))
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "agents", "reviewer.md")); err != nil {
@@ -1369,12 +1389,12 @@ func TestInstallFromLockWithoutCatalog(t *testing.T) {
 	}
 }
 
-func TestInstallUnknownItem(t *testing.T) {
+func TestPackBuildUnknownItem(t *testing.T) {
 	f, root := installFake(t)
 	packs, _ := project.LoadPacks(root)
 	packs[0].Items = append(packs[0].Items, "skill:gone")
 	project.SavePacks(root, packs)
-	if err := f.run("install"); err == nil || !strings.Contains(err.Error(), "skill:gone") {
+	if err := f.run("pack", "build"); err == nil || !strings.Contains(err.Error(), "skill:gone") {
 		t.Errorf("got %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(root, ".ipm", "ipm.lock")); !os.IsNotExist(err) {
@@ -1382,9 +1402,9 @@ func TestInstallUnknownItem(t *testing.T) {
 	}
 }
 
-func TestInstallIsDeterministic(t *testing.T) {
+func TestPackBuildIsDeterministic(t *testing.T) {
 	f, root := installFake(t)
-	f.run("install")
+	f.run("pack", "build")
 	snap := func() map[string]string {
 		m := map[string]string{}
 		filepath.WalkDir(filepath.Join(root, ".ipm"), func(p string, d os.DirEntry, err error) error {
@@ -1399,22 +1419,22 @@ func TestInstallIsDeterministic(t *testing.T) {
 	first := snap()
 	packs, _ := project.LoadPacks(root)
 	project.SavePacks(root, packs)
-	f.run("install")
+	f.run("pack", "build")
 	if !reflect.DeepEqual(first, snap()) {
-		t.Error("a second install changed .ipm")
+		t.Error("a second build changed .ipm")
 	}
 	packs[0].Items = []string{"agent:o/r:p/agents/rev.md"}
 	project.SavePacks(root, packs)
-	f.run("install")
+	f.run("pack", "build")
 	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "skills")); !os.IsNotExist(err) {
 		t.Error("a removed item's files must go")
 	}
 }
 
-func TestInstallValidates(t *testing.T) {
+func TestPackBuildValidates(t *testing.T) {
 	f, root := installFake(t)
 	f.onPath["claude"] = true
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatal(err)
 	}
 	if callWith(f, "claude plugin validate --strict "+filepath.Join(root, ".ipm")) == "" {
@@ -1422,17 +1442,17 @@ func TestInstallValidates(t *testing.T) {
 	}
 	f.results["claude plug"] = result{"✘ Validation failed", errors.New("exit 1")}
 	var exit *ExitError
-	if err := f.run("install"); !errors.As(err, &exit) || !strings.Contains(f.out.String(), "Validation failed") {
+	if err := f.run("pack", "build"); !errors.As(err, &exit) || !strings.Contains(f.out.String(), "Validation failed") {
 		t.Errorf("got %v\n%s", err, f.out.String())
 	}
 }
 
-func TestInstallGlobal(t *testing.T) {
+func TestPackBuildGlobal(t *testing.T) {
 	f, _ := installFake(t)
 	f.run("pack", "-g", "new", "mine")
 	f.run("pack", "-g", "add", "mine", "agent:o/r:p/agents/rev.md")
 	write(t, filepath.Join(f.env["IPM_HOME"], "global", ".ipm", "node_modules", "o--r", "p", "agents", "rev.md"), "x")
-	if err := f.run("install", "-g"); err != nil {
+	if err := f.run("pack", "build", "-g"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	mp, _ := os.ReadFile(filepath.Join(f.env["IPM_HOME"], "global", ".ipm", ".claude-plugin", "marketplace.json"))
@@ -1441,9 +1461,9 @@ func TestInstallGlobal(t *testing.T) {
 	}
 }
 
-func TestInstallFailureKeepsPreviousBuild(t *testing.T) {
+func TestPackBuildFailureKeepsPreviousBuild(t *testing.T) {
 	f, root := installFake(t)
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatal(err)
 	}
 	lockBefore, _ := os.ReadFile(filepath.Join(root, ".ipm", "ipm.lock"))
@@ -1451,7 +1471,7 @@ func TestInstallFailureKeepsPreviousBuild(t *testing.T) {
 	packs, _ := project.LoadPacks(root)
 	packs[0].Description = "changed"
 	project.SavePacks(root, packs)
-	if err := f.run("install"); err == nil {
+	if err := f.run("pack", "build"); err == nil {
 		t.Fatal("want a failure")
 	}
 	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "agents", "reviewer.md")); err != nil {
@@ -1514,8 +1534,8 @@ func TestSearchUsesTheTerminalWidth(t *testing.T) {
 
 func TestCobraCommandLine(t *testing.T) {
 	f := newFake("")
-	err := f.run("instal")
-	if err == nil || !strings.Contains(err.Error(), "did you mean install?") {
+	err := f.run("pack", "buidl")
+	if err == nil || !strings.Contains(err.Error(), "did you mean build?") {
 		t.Errorf("want a suggestion, got %v", err)
 	}
 	f.out.Reset()
@@ -1782,7 +1802,7 @@ func deployFake(t *testing.T) (*fake, string) {
 		"claude plugin marketplace list --json": {"[]", nil},
 		"claude plugin list --json":             {"[]", nil},
 	}
-	if err := f.run("install"); err != nil {
+	if err := f.run("pack", "build"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	f.calls, f.dirs = nil, nil

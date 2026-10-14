@@ -5,6 +5,8 @@
 package project
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -22,6 +24,8 @@ const (
 	File = "ipm.toml"
 	// LockFile, in the .ipm folder, resolves every picked item.
 	LockFile = "ipm.lock"
+	// StampFile, in the .ipm folder, records what the last build was made from.
+	StampFile = "build.stamp"
 )
 
 // Scope is where packs are read and plugins built.
@@ -72,6 +76,21 @@ type packsFile struct {
 	} `toml:"packs"`
 }
 
+// PacksDigest is a hex SHA-256 over each pack's name, description and items,
+// in name order. Installs are left out, so recording one keeps a build fresh.
+func PacksDigest(packs []Pack) string {
+	sorted := append([]Pack(nil), packs...)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
+	h := sha256.New()
+	for _, p := range sorted {
+		fmt.Fprintf(h, "pack %q %q %d\n", p.Name, p.Description, len(p.Items))
+		for _, it := range p.Items {
+			fmt.Fprintf(h, "%q\n", it)
+		}
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
 // LoadPacks reads root's ipm.toml, packs sorted by name; no file is none.
 func LoadPacks(root string) ([]Pack, error) {
 	path := filepath.Join(root, File)
@@ -108,7 +127,7 @@ func SavePacks(root string, packs []Pack) error {
 	sorted := append([]Pack(nil), packs...)
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 	var b strings.Builder
-	b.WriteString("# ipm packs: each becomes a Claude Code plugin under .ipm/plugins/ when you run `ipm install`.\n")
+	b.WriteString("# ipm packs: each becomes a Claude Code plugin under .ipm/plugins/ when you run `ipm pack build`.\n")
 	for _, p := range sorted {
 		fmt.Fprintf(&b, "\n[packs.%s]\ndescription = %q\nitems = [\n", p.Name, p.Description)
 		for _, it := range p.Items {

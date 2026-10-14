@@ -1,7 +1,10 @@
 package cli
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,18 +19,54 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newInstallCmd(sys System) *cobra.Command {
-	var global, update, noValidate bool
+func newPackBuildCmd(sys System, global *bool) *cobra.Command {
+	var update, noValidate bool
 	cmd := &cobra.Command{
-		Use:   "install",
+		Use:   "build",
 		Short: "build each pack in ipm.toml into a Claude Code plugin under .ipm/ (-g for your user scope)",
 		Args:  noArgs,
-		RunE:  func(*cobra.Command, []string) error { return runInstall(sys, global, update, noValidate) },
+		RunE:  func(*cobra.Command, []string) error { return runBuild(sys, *global, update, noValidate) },
 	}
-	cmd.Flags().BoolVarP(&global, "global", "g", false, "build your user scope's packs ($IPM_HOME/global)")
 	cmd.Flags().BoolVar(&update, "update", false, "re-pin every item to the commit in your current catalog")
 	cmd.Flags().BoolVar(&noValidate, "no-validate", false, "skip claude plugin validate --strict")
 	return cmd
+}
+
+// buildStamp is a hex SHA-256 over the packs, the lock and ipm's version: what
+// a build is made from.
+func buildStamp(scope project.Scope, version string) (string, error) {
+	packs, err := project.LoadPacks(scope.Root)
+	if err != nil {
+		return "", err
+	}
+	lock, err := os.ReadFile(filepath.Join(scope.IPMDir(), project.LockFile))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	h := sha256.New()
+	h.Write([]byte(project.PacksDigest(packs)))
+	h.Write([]byte{0})
+	h.Write(lock)
+	h.Write([]byte{0})
+	h.Write([]byte(version))
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// buildCurrent reports whether scope's .ipm holds a build made from its
+// current packs, lock and ipm version.
+func buildCurrent(sys System, scope project.Scope) bool {
+	dir := scope.IPMDir()
+	for _, rel := range []string{"plugins", filepath.Join(".claude-plugin", "marketplace.json")} {
+		if _, err := os.Stat(filepath.Join(dir, rel)); err != nil {
+			return false
+		}
+	}
+	have, err := os.ReadFile(filepath.Join(dir, project.StampFile))
+	if err != nil {
+		return false
+	}
+	want, err := buildStamp(scope, sys.Version)
+	return err == nil && strings.TrimSpace(string(have)) == want
 }
 
 // pluginJSON is a built pack's manifest, fields in a fixed order.
@@ -48,14 +87,14 @@ type pluginJSON struct {
 
 var unsafeName = regexp.MustCompile(`[^a-z0-9._-]+`)
 
-// runInstall builds every pack in the scope's ipm.toml into a plugin under
+// runBuild builds every pack in the scope's ipm.toml into a plugin under
 // .ipm/plugins and writes .ipm's marketplace. Nothing is written until every
 // item resolves.
-func runInstall(sys System, global, update, noValidate bool) error {
+func runBuild(sys System, global, update, noValidate bool) error {
 	return build(sys, global, update, noValidate, true)
 }
 
-// build is ipm install; hints adds the commands to install the result in
+// build is ipm pack build; hints adds the commands to install the result in
 // Claude Code, which deploy runs itself instead.
 func build(sys System, global, update, noValidate, hints bool) error {
 	scope, err := currentScope(sys, global)
@@ -181,13 +220,17 @@ func build(sys System, global, update, noValidate, hints bool) error {
 	} else {
 		fmt.Fprintln(sys.Stdout, "validate: ok")
 	}
+	stamp, err := buildStamp(scope, sys.Version)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, project.StampFile), []byte(stamp+"\n"), 0o644); err != nil {
+		return err
+	}
 	if !hints {
 		return nil
 	}
-	fmt.Fprintf(sys.Stdout, "\nInstall in Claude Code:\n  claude plugin marketplace add %s\n", dir)
-	for _, n := range names {
-		fmt.Fprintf(sys.Stdout, "  /plugin install %s@%s\n", n, name)
-	}
+	fmt.Fprintf(sys.Stdout, "\nInstall in Claude Code: ipm install claude\nOr wire it yourself:\n  claude plugin marketplace add %s\n", dir)
 	return nil
 }
 
@@ -202,7 +245,7 @@ func writeJSON(path string, v any) error {
 	return os.WriteFile(path, append(data, '\n'), 0o644)
 }
 
-// marketName is the name of the marketplace ipm install builds for scope:
+// marketName is the name of the marketplace ipm pack build builds for scope:
 // <project folder>-ipm, or ipm-global for the user scope.
 func marketName(scope project.Scope) string {
 	if scope.Global {

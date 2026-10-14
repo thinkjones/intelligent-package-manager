@@ -21,7 +21,7 @@ func newPackCmd(sys System) *cobra.Command {
 	cmd := verbs(&cobra.Command{
 		Use:   "pack",
 		Short: "create and edit packs of catalog items in ipm.toml (-g for your user scope)",
-	}, "new, add, remove, list or show")
+	}, "new, add, remove, list, show or build")
 	cmd.PersistentFlags().BoolVarP(&global, "global", "g", false, "use your user scope ($IPM_HOME/global) instead of the project")
 	// inScope runs f in the project's scope, or the user's with -g.
 	inScope := func(f func(project.Scope, []string) error) func(*cobra.Command, []string) error {
@@ -58,6 +58,7 @@ func newPackCmd(sys System) *cobra.Command {
 			Args:  noArgs,
 			RunE:  inScope(func(s project.Scope, _ []string) error { return packList(sys, s) }),
 		},
+		newPackBuildCmd(sys, &global),
 		&cobra.Command{
 			Use:   "show <pack>",
 			Short: "a pack's items: type, name, repo, stars and ID",
@@ -153,7 +154,7 @@ func packEdit(sys System, scope project.Scope, verb, name string, ids []string) 
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(sys.Stdout, "%s pack %s: %d item(s)\n\nNext: ipm install\n", ok, name, len(p.Items))
+	fmt.Fprintf(sys.Stdout, "%s pack %s: %d item(s)\n\nNext: ipm pack build\n", ok, name, len(p.Items))
 	return nil
 }
 
