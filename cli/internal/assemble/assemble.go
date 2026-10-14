@@ -18,7 +18,6 @@ import (
 
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/marketplace"
-	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 )
@@ -287,15 +286,7 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 			if base == "" {
 				return fmt.Errorf("%s has no name usable as a file name", it.ID)
 			}
-			name := base
-			if used[dir+"/"+name] {
-				owner, _, _ := strings.Cut(pack.NormalizeRepo(it.Repo), "/")
-				name = base + "-" + slug(owner)
-				for n := 2; used[dir+"/"+name]; n++ {
-					name = fmt.Sprintf("%s-%d", base, n)
-				}
-			}
-			used[dir+"/"+name] = true
+			name := uniqueName(used, dir, base, it.Repo)
 			pp.Files = append(pp.Files, Placed{Alias: sources.Alias(it.Repo), From: it.Path, To: dir + "/" + name + ext, Dir: it.Type == catalog.TypeSkill, Item: it})
 			return nil
 		}
