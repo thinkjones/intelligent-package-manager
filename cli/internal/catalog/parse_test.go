@@ -188,3 +188,9 @@ func TestBody(t *testing.T) {
 		}
 	}
 }
+
+func TestBodyNormalizesCRLFWithoutFrontmatter(t *testing.T) {
+	if got := string(Body([]byte("Hello\r\nthere\r\n"))); got != "Hello\nthere\n" {
+		t.Errorf("got %q", got)
+	}
+}

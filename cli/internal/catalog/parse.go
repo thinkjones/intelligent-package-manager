@@ -90,13 +90,13 @@ func splitFrontmatter(data []byte) (string, bool) {
 	return rest[:end], true
 }
 
-// Body is data without its leading frontmatter block, CRLF normalized to LF;
-// the whole file when there is none.
+// Body is data without its leading frontmatter block; the whole file when
+// there is none. CRLF is normalized to LF either way.
 func Body(data []byte) []byte {
 	text := strings.ReplaceAll(string(data), "\r\n", "\n")
 	raw, found := splitFrontmatter(data)
 	if !found {
-		return data
+		return []byte(text)
 	}
 	rest := text[len("---\n"):]
 	if rest == "---" {

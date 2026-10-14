@@ -87,7 +87,24 @@ func gasCheckTarget(target string, force bool) (bool, error) {
 	if force || gasIsOurs(target, info) {
 		return true, nil
 	}
-	return true, fmt.Errorf("%s exists and was not written by ipm — use --force to replace it: %w", target, ErrNotOurs)
+	return true, &NotOursError{Path: target}
+}
+
+// NotOursError is the refusal to replace Path, which ipm did not write.
+type NotOursError struct{ Path string }
+
+func (e *NotOursError) Error() string {
+	return e.Path + " exists and was not written by ipm — use --force to replace it"
+}
+
+// Is makes errors.Is(err, ErrNotOurs) true.
+func (e *NotOursError) Is(target error) bool { return target == ErrNotOurs }
+
+// CheckGascityTarget refuses, before anything is built, a folder
+// <dir>/<name> that ipm did not write, unless force is set.
+func CheckGascityTarget(dir, name string, force bool) error {
+	_, err := gasCheckTarget(filepath.Join(dir, name), force)
+	return err
 }
 
 func gasIsOurs(target string, info os.FileInfo) bool {

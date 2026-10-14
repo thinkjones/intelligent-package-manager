@@ -355,3 +355,31 @@ func TestBuildClashRule(t *testing.T) {
 		t.Errorf("got %v want %v", got, want)
 	}
 }
+
+func TestResolveRecordsEmptyPartsAsNonNil(t *testing.T) {
+	cat := fixtureCatalog(t)
+	f, err := os.OpenFile(filepath.Join(cat, catalog.Files[catalog.TypePlugin]), os.O_APPEND|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.WriteString(`{"id":"plugin:o/r:plugins/bare","type":"plugin","name":"bare","repo":"o/r","path":"plugins/bare","commit":"` + shaA + `"}` + "\n")
+	f.Close()
+	id := "plugin:o/r:plugins/bare"
+	packs := []project.Pack{{Name: "p", Items: []string{id}}}
+	items, err := Resolve(packs, nil, cat)
+	if err != nil || items[id].Parts == nil || len(items[id].Parts) != 0 {
+		t.Fatalf("fresh: %#v %v", items[id].Parts, err)
+	}
+	// An old lock (parts not recorded) at the catalog's commit is filled with "none".
+	old := project.LockItem{ID: id, Type: "plugin", Name: "bare", Repo: "o/r", Path: "plugins/bare", SHA: shaA}
+	items, err = Resolve(packs, map[string]project.LockItem{id: old}, cat)
+	if err != nil || items[id].Parts == nil {
+		t.Fatalf("old lock: %#v %v", items[id].Parts, err)
+	}
+	// A lock that records none stays recorded.
+	old.Parts = []string{}
+	items, err = Resolve(packs, map[string]project.LockItem{id: old}, cat)
+	if err != nil || items[id].Parts == nil {
+		t.Fatalf("recorded none: %#v %v", items[id].Parts, err)
+	}
+}

@@ -194,15 +194,21 @@ func TestRenderGascitySymlinkEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Walk the resolved skill folder: the link is skipped, not followed.
-	if _, _, err := RenderGascity(plan, nm); err != nil {
+	files, _, err := RenderGascity(plan, nm)
+	if err != nil {
 		t.Fatal(err)
+	}
+	for _, f := range files {
+		if f.Path == "skills/code-review/leak" {
+			t.Error("the symlink was rendered")
+		}
 	}
 	// A skill folder that is itself a link out is refused.
 	if err := os.Symlink(filepath.Dir(outside), filepath.Join(nm, "o--r", "skills/evil")); err != nil {
 		t.Fatal(err)
 	}
 	plan.Entries[0].From = "skills/evil"
-	_, _, err := RenderGascity(plan, nm)
+	_, _, err = RenderGascity(plan, nm)
 	if err == nil || !strings.Contains(err.Error(), "leads outside its repo") {
 		t.Errorf("got %v", err)
 	}
@@ -218,5 +224,44 @@ func TestRenderGascityBadServer(t *testing.T) {
 	_, _, err = RenderGascity(plan, nm)
 	if err == nil || !strings.Contains(err.Error(), rendNotes) {
 		t.Errorf("got %v", err)
+	}
+}
+
+func TestRenderGascityMCPServersArray(t *testing.T) {
+	nm, plan := rendRepo(t, rendMCP)
+	writeFile(t, filepath.Join(nm, "o--r"), "plugins/tools/.claude-plugin/plugin.json", `{"name": "tools", "mcpServers": [{"other": {"command": "x"}}, {"notes": {"command": "run"}}]}`, 0o644)
+	plan.Entries = plan.Entries[2:3]
+	plan.Entries[0].From = "plugins/tools/.claude-plugin/plugin.json"
+	files, _, err := RenderGascity(plan, nm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if f.Path == "mcp/notes.toml" && strings.Contains(string(f.Data), `command = "run"`) {
+			return
+		}
+	}
+	t.Errorf("no mcp/notes.toml with the command in %d files", len(files))
+}
+
+func TestRenderGascityBadAgentFrontmatter(t *testing.T) {
+	nm, plan := rendRepo(t, rendMCP)
+	writeFile(t, filepath.Join(nm, "o--r"), "agents/rev.md", "---\nname: [oops\n---\nDo the thing.\n", 0o644)
+	files, warns, err := RenderGascity(plan, nm)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, f := range files {
+		got[f.Path] = string(f.Data)
+	}
+	if got["agents/reviewer/prompt.md"] != "Do the thing.\n" {
+		t.Errorf("prompt %q", got["agents/reviewer/prompt.md"])
+	}
+	if got["agents/reviewer/agent.toml"] != "provider = \"claude\"\n" {
+		t.Errorf("agent.toml %q", got["agents/reviewer/agent.toml"])
+	}
+	if !strings.Contains(strings.Join(warns, "\n"), "agents/reviewer: frontmatter is not valid YAML — wrote the body only") {
+		t.Errorf("warns %q", warns)
 	}
 }

@@ -69,8 +69,8 @@ func TestWriteGascityRefusesForeign(t *testing.T) {
 	if !errors.Is(err, ErrNotOurs) {
 		t.Fatalf("err = %v", err)
 	}
-	if !strings.Contains(err.Error(), "exists and was not written by ipm — use --force to replace it") {
-		t.Errorf("message = %v", err)
+	if want := filepath.Join(dir, "kit") + " exists and was not written by ipm — use --force to replace it"; err.Error() != want {
+		t.Errorf("message = %q, want %q", err, want)
 	}
 	if b, _ := os.ReadFile(pack); string(b) != foreign {
 		t.Errorf("file changed: %q", b)
@@ -188,5 +188,26 @@ func TestWriteGascityForceReplacesSymlink(t *testing.T) {
 	entries, _ := os.ReadDir(dest)
 	if len(entries) != 1 {
 		t.Errorf("destination entries: %v", entries)
+	}
+}
+
+func TestNotOursErrorMessage(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "kit"), []byte("hi"), 0o644)
+	want := filepath.Join(dir, "kit") + " exists and was not written by ipm — use --force to replace it"
+	for name, err := range map[string]error{
+		"write": func() error { _, e := WriteGascity(gasTree(), dir, "kit", false); return e }(),
+		"check": CheckGascityTarget(dir, "kit", false),
+	} {
+		var no *NotOursError
+		if !errors.As(err, &no) || !errors.Is(err, ErrNotOurs) || err.Error() != want {
+			t.Errorf("%s: %v", name, err)
+		}
+	}
+	if err := CheckGascityTarget(dir, "kit", true); err != nil {
+		t.Errorf("force: %v", err)
+	}
+	if err := CheckGascityTarget(dir, "other", false); err != nil {
+		t.Errorf("missing: %v", err)
 	}
 }

@@ -159,7 +159,7 @@ func check(it project.LockItem) error {
 // pluginParts is a plugin record's child item IDs (skills, agents, commands,
 // hooks, MCP servers), sorted and deduplicated.
 func pluginParts(r map[string]any) []string {
-	var parts []string
+	parts := []string{} // non-nil: "recorded, none" differs from "not recorded"
 	for _, k := range []string{"skills", "agents", "commands", "hooks", "mcp"} {
 		parts = append(parts, strs(r[k])...)
 	}

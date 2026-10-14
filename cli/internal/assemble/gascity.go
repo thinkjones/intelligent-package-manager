@@ -84,6 +84,7 @@ const (
 	skipCommand  = "skipped %s: Gas City has no slash commands"
 	skipHook     = "skipped %s: Gas City packs have no hooks"
 	skipExternal = "skipped %s: external plugin — its files live in another repo; add its skills and agents directly"
+	skipNothing  = "skipped %s: nothing Gas City can hold"
 	skipNoParts  = "skipped %s: its parts aren't recorded — run ipm pack build --update"
 )
 
@@ -151,8 +152,12 @@ func PlanGascity(p project.Pack, name string, items map[string]project.LockItem)
 				plan.Skips = append(plan.Skips, fmt.Sprintf(skipExternal, it.ID))
 				continue
 			}
-			if len(it.Parts) == 0 {
+			if it.Parts == nil {
 				plan.Skips = append(plan.Skips, fmt.Sprintf(skipNoParts, it.ID))
+				continue
+			}
+			if len(it.Parts) == 0 {
+				plan.Skips = append(plan.Skips, fmt.Sprintf(skipNothing, it.ID))
 				continue
 			}
 			for _, part := range it.Parts {

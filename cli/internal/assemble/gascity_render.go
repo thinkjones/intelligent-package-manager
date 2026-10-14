@@ -154,7 +154,7 @@ func renderAgent(e GasEntry, src string) ([]GasFile, []string, error) {
 	}
 	fm, _, err := catalog.Frontmatter(raw)
 	if err != nil {
-		return nil, nil, err
+		return renderBadAgent(e, raw)
 	}
 	desc, _ := fm["description"].(string)
 	t := gasAgentTOML{Description: desc, Provider: "claude"}
@@ -193,8 +193,19 @@ func renderMCP(e GasEntry, src string) ([]GasFile, []string, error) {
 		return nil, nil, fmt.Errorf("%s: %v", e.From, err)
 	}
 	servers := doc
-	if m, ok := doc["mcpServers"].(map[string]any); ok {
+	switch m := doc["mcpServers"].(type) {
+	case map[string]any:
 		servers = m
+	case []any:
+		// An array of server maps: merge them, later ones winning.
+		servers = map[string]any{}
+		for _, el := range m {
+			if em, ok := el.(map[string]any); ok {
+				for k, v := range em {
+					servers[k] = v
+				}
+			}
+		}
 	}
 	cfg, ok := servers[e.Server].(map[string]any)
 	if !ok {
@@ -290,4 +301,25 @@ func renderMCP(e GasEntry, src string) ([]GasFile, []string, error) {
 		return nil, nil, err
 	}
 	return []GasFile{{Path: "mcp/" + e.Name + ".toml", Data: data, Mode: 0o644}}, warns, nil
+}
+
+// renderBadAgent writes an agent whose frontmatter is not valid YAML: the
+// body after the fences (the whole file if there are none) as the prompt,
+// and a config with only the provider.
+func renderBadAgent(e GasEntry, raw []byte) ([]GasFile, []string, error) {
+	cfg, err := encodeTOML(gasAgentTOML{Provider: "claude"})
+	if err != nil {
+		return nil, nil, err
+	}
+	body := catalog.Body(raw)
+	if body == nil {
+		body = []byte{}
+	}
+	dir := "agents/" + e.Name + "/"
+	return []GasFile{
+			{Path: dir + "agent.toml", Data: cfg, Mode: 0o644},
+			{Path: dir + "prompt.md", Data: body, Mode: 0o644},
+		}, []string{
+			fmt.Sprintf("agents/%s: frontmatter is not valid YAML — wrote the body only", e.Name),
+		}, nil
 }

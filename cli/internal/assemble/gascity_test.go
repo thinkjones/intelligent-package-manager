@@ -175,3 +175,18 @@ func TestPlanGascityMCPPartWithoutName(t *testing.T) {
 		t.Error("want an error for an MCP part without a server name")
 	}
 }
+
+func TestPlanGascityPluginWithNoPartsRecordedNone(t *testing.T) {
+	packs, items := resolved(t, "plugin:o/r:plugins/tools")
+	it := items["plugin:o/r:plugins/tools"]
+	it.Parts = []string{}
+	items[it.ID] = it
+	plan, err := PlanGascity(packs[0], "kit", items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"skipped plugin:o/r:plugins/tools: nothing Gas City can hold"}
+	if len(plan.Entries) != 0 || !reflect.DeepEqual(plan.Skips, want) {
+		t.Errorf("%+v", plan)
+	}
+}
