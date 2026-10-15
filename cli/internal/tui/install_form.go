@@ -43,7 +43,6 @@ type installForm struct {
 	packs   []string // the choices of the pack step
 	step    formStep
 	sel     int
-	kind    string
 	folder  textinput.Model
 	target  Target
 	plan    []string
@@ -163,7 +162,7 @@ func (m *Model) chooseKind(kind string) {
 		m.planForm(Target{Kind: "gascity", Name: name, Global: f.global})
 		return
 	}
-	f.kind, f.sel = kind, 0
+	f.sel = 0
 	f.folder.SetValue(def.Path)
 	for i, s := range claudeScopes {
 		if s[0] == def.Scope {
