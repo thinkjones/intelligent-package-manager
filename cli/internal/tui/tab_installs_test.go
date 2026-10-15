@@ -20,7 +20,7 @@ func withInstalls(f fakes) {
 func installsModel(t *testing.T) (*Model, fakes) {
 	t.Helper()
 	m, f := newTestWith(t, withInstalls)
-	press(t, m, "down", "3")
+	press(t, m, "3", "tab")
 	return m, f
 }
 
@@ -29,7 +29,7 @@ func TestInstallsTabLoadsOnFirstVisit(t *testing.T) {
 	if !strings.Contains(view(m), "INSTALLS (…)") || f.in.listCalls != 0 {
 		t.Fatalf("unloaded:\n%s", view(m))
 	}
-	press(t, m, "down", "3")
+	press(t, m, "3", "tab")
 	if !strings.Contains(view(m), "INSTALLS (2)") || f.in.listCalls != 1 {
 		t.Errorf("loaded:\n%s", view(m))
 	}
@@ -130,7 +130,7 @@ func TestInstallsNewInstall(t *testing.T) {
 
 func TestInstallsNewInstallPicksAPack(t *testing.T) {
 	m, _ := newTestWith(t, packsSetup)
-	press(t, m, "down", "3")
+	press(t, m, "3", "tab")
 	if !strings.Contains(view(m), "no installs yet — press a to install a pack") {
 		t.Fatalf("empty:\n%s", view(m))
 	}
@@ -146,7 +146,7 @@ func TestInstallsNewInstallPicksAPack(t *testing.T) {
 
 func TestInstallsNewInstallOnlyPack(t *testing.T) {
 	m, _ := newTestWith(t, withPacks(Pack{Name: "kit"}))
-	press(t, m, "down", "3", "a")
+	press(t, m, "3", "tab", "a")
 	if m.form == nil || m.form.pack != "kit" || m.form.step != formTarget {
 		t.Errorf("the only pack needs no picker: %+v", m.form)
 	}
@@ -154,7 +154,7 @@ func TestInstallsNewInstallOnlyPack(t *testing.T) {
 
 func TestInstallsNewInstallWithoutPacks(t *testing.T) {
 	m, _ := newTest(t)
-	press(t, m, "down", "3", "a")
+	press(t, m, "3", "tab", "a")
 	if m.form != nil || !strings.Contains(m.status, "no pack to install") {
 		t.Errorf("form %v status %q", m.form, m.status)
 	}
@@ -185,7 +185,7 @@ func TestInstallsGlobalInGlobalScope(t *testing.T) {
 		withInstalls(f)
 		f.p.scope = "global"
 	})
-	press(t, m, "down", "3", "g")
+	press(t, m, "3", "tab", "g")
 	if m.ins.global || !m.statusOK {
 		t.Errorf("g does nothing in global scope: global %v status %q", m.ins.global, m.status)
 	}
@@ -217,16 +217,16 @@ func TestInstallsFilter(t *testing.T) {
 func TestInstallsLoadError(t *testing.T) {
 	m, f := newTestWith(t, withInstalls)
 	f.in.listErr = errors.New("ipm.toml is broken")
-	press(t, m, "down", "3")
+	press(t, m, "3", "tab")
 	if v := view(m); !strings.Contains(v, "could not read installs: ipm.toml is broken") || !strings.Contains(v, "INSTALLS (…)") {
 		t.Errorf("error body:\n%s", v)
 	}
-	press(t, m, "down", "2")
+	press(t, m, "2", "tab")
 	if !strings.Contains(view(m), "csharp-sdlc") {
 		t.Errorf("other tabs keep working:\n%s", view(m))
 	}
 	f.in.listErr = nil
-	press(t, m, "down", "3")
+	press(t, m, "3", "tab")
 	if !strings.Contains(view(m), "INSTALLS (2)") {
 		t.Errorf("a retry loads:\n%s", view(m))
 	}
@@ -249,7 +249,7 @@ func TestInstallsGlobalRecordsWorkInGlobalScope(t *testing.T) {
 		f.in.installs = f.in.globalInstalls
 		f.p.scope = "global"
 	})
-	press(t, m, "down", "3", "enter", "y")
+	press(t, m, "3", "tab", "enter", "y")
 	if len(f.in.targets) != 1 || !f.in.targets[0].Global {
 		t.Errorf("reinstall in global scope: %+v status %q", f.in.targets, m.status)
 	}

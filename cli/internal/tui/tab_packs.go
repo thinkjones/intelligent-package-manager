@@ -145,7 +145,7 @@ func (m *Model) enterTab() tea.Cmd {
 func (m *Model) textFocused() bool {
 	switch m.tab {
 	case tabCatalog:
-		return m.focus == focusSearch
+		return !m.bar && m.focus == focusSearch
 	case tabPacks:
 		return m.pk.filter.typing
 	case tabInstalls:
@@ -192,6 +192,8 @@ func (m *Model) packsKey(msg tea.KeyPressMsg) tea.Cmd {
 			pk.filter.clear()
 			pk.sel, pk.offset = 0, 0
 			m.clampPacks()
+		case k == "esc":
+			m.toBar()
 		}
 	case "x":
 		m.removePackItem()
@@ -340,7 +342,7 @@ func (m *Model) packsBody(w, h int) []string {
 		pk.filter.in.SetWidth(max(10, tw-24))
 		title += stMuted.Render(" ── ") + f
 	}
-	list := panel(title, table(packCols, rows, styles, pk.sel, &pk.offset, tw-4, h-2, !pk.detail), tw, !pk.detail)
+	list := panel(title, table(packCols, rows, styles, pk.sel, &pk.offset, tw-4, h-2, !m.bar && !pk.detail), tw, !m.bar && !pk.detail)
 	if !wide {
 		return list
 	}
@@ -353,7 +355,7 @@ func (m *Model) packsMessage(line string, w, h int) []string {
 	for len(lines) < h-2 {
 		lines = append(lines, "")
 	}
-	return panel(stMuted.Render("packs"), lines, w, true)
+	return panel(stMuted.Render("packs"), lines, w, !m.bar)
 }
 
 // joinPanels puts two panels of the same height side by side.

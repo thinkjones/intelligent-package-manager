@@ -11,7 +11,7 @@ import (
 func formModel(t *testing.T) (*Model, fakes) {
 	t.Helper()
 	m, f := newTestWith(t, withPacks(Pack{Name: "kit", Items: []string{tddID}}))
-	press(t, m, "down", "2", "i")
+	press(t, m, "2", "tab", "i")
 	return m, f
 }
 
@@ -161,7 +161,7 @@ func TestInstallFormShowsCleanedTarget(t *testing.T) {
 
 func TestBuildModalEchoesTheCommand(t *testing.T) {
 	m, _ := newTestWith(t, withPacks(Pack{Name: "kit"}))
-	press(t, m, "down", "2", "b")
+	press(t, m, "2", "tab", "b")
 	v := view(m)
 	if !strings.Contains(v, "ipm pack build") || strings.Contains(v, "ipm build") {
 		t.Errorf("build header:\n%s", v)
@@ -176,7 +176,7 @@ func TestBusyRefusesNewRuns(t *testing.T) {
 		withInstalls(f)
 	})
 	f.b.gate = make(chan struct{})
-	press(t, m, "down", "2")
+	press(t, m, "2", "tab")
 	cmd := m.startBuild()
 	for _, k := range []string{"b", "i", "3", "enter", "a"} {
 		_, c := m.Update(key(k))

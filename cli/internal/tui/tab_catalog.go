@@ -59,7 +59,7 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	if m.focus == focusSearch {
 		switch k {
-		case "down", "tab", "esc":
+		case "down", "esc":
 			m.setFocus(focusResults)
 			return nil
 		}
@@ -87,11 +87,13 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.treeUp()
 	case "right", "l":
 		m.treeDown()
-	case "tab", "enter":
+	case "enter":
 		if m.cursor != "" {
 			m.setFocus(focusTree)
 			m.treeSel = m.tree.Cursor
 		}
+	case "esc":
+		m.toBar()
 	}
 	return nil
 }
@@ -104,7 +106,7 @@ func (m *Model) catalogBody(w, h int) []string {
 	if f := typeFilters[m.filter]; f != "" {
 		search += stMuted.Render("  type: ") + stAmber.Render(f)
 	}
-	resultsFocused := m.focus == focusSearch || m.focus == focusResults
+	resultsFocused := !m.bar && (m.focus == focusSearch || m.focus == focusResults)
 	mid := panel(search, m.resultLines(w-4, resH-2), w, resultsFocused)
 	sel := -1
 	if m.focus == focusTree {
@@ -177,7 +179,7 @@ func (m *Model) resultLines(w, rows int) []string {
 	if wide {
 		cols = append(cols, column{Title: "DESCRIPTION", Min: 1})
 	}
-	active := m.focus == focusResults || m.focus == focusSearch
+	active := !m.bar && (m.focus == focusResults || m.focus == focusSearch)
 	data := make([][]string, len(m.res.Hits))
 	styles := make([][]lipgloss.Style, len(m.res.Hits))
 	for i, h := range m.res.Hits {
@@ -239,7 +241,7 @@ func (m *Model) treeKey(k string) {
 			m.chosen[m.cursor] = m.tree.AlsoIn[i].ID
 			m.setCursor(m.cursor)
 		}
-	case "esc", "tab":
+	case "esc":
 		m.setFocus(focusResults)
 		m.followSelection()
 	}
@@ -308,7 +310,7 @@ func (m *Model) trayKey(k string) {
 		m.traySel = min(max(0, n-1), m.traySel+1)
 	case "left", "h", "up", "k":
 		m.traySel = max(0, m.traySel-1)
-	case "tab", "/":
+	case "/":
 		m.setFocus(focusSearch)
 	case "esc":
 		m.setFocus(focusResults)

@@ -108,42 +108,42 @@ func TestGoldenViews(t *testing.T) {
 		},
 		"install-form-target": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
-			press(t, m, "down", "2", "i")
+			press(t, m, "2", "tab", "i")
 			return m
 		},
 		"install-form-gascity": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
-			press(t, m, "down", "2", "i", "down", "enter", "enter")
+			press(t, m, "2", "tab", "i", "down", "enter", "enter")
 			return m
 		},
 		"install-form-confirm": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
-			press(t, m, "down", "2", "i", "enter", "enter", "enter")
+			press(t, m, "2", "tab", "i", "enter", "enter", "enter")
 			return m
 		},
 		"installs": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, withInstalls)
-			press(t, m, "down", "3")
+			press(t, m, "3", "tab")
 			return m
 		},
 		"installs-global": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, withInstalls)
-			press(t, m, "down", "3", "g")
+			press(t, m, "3", "tab", "g")
 			return m
 		},
 		"installs-empty": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
-			press(t, m, "down", "3")
+			press(t, m, "3", "tab")
 			return m
 		},
 		"marketplace": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, withMarket)
-			press(t, m, "down", "4", "down")
+			press(t, m, "4", "tab", "down")
 			return m
 		},
 		"marketplace-filtered": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, withMarket)
-			press(t, m, "down", "4", "/")
+			press(t, m, "4", "tab", "/")
 			typeText(t, m, "review")
 			press(t, m, "enter")
 			return m
@@ -156,26 +156,26 @@ func TestGoldenViews(t *testing.T) {
 				}
 			})
 			m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
-			press(t, m, "down", "4")
+			press(t, m, "4", "tab")
 			return m
 		},
 		"marketplace-loading": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, withMarket)
-			press(t, m, "down")
 			m.Update(key("4"))
+			m.Update(key("tab"))
 			return m
 		},
 		"marketplace-error": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, func(f fakes) {
 				f.mk.listErr = errors.New("fetch https://example.test/lists.toml: 503 Service Unavailable")
 			})
-			press(t, m, "down", "4")
+			press(t, m, "4", "tab")
 			return m
 		},
 		"marketplace-narrow": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, withMarket)
 			m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
-			press(t, m, "down", "4")
+			press(t, m, "4", "tab")
 			return m
 		},
 		"external-modal": func(t *testing.T) *Model {
@@ -206,7 +206,11 @@ func TestGoldenViews(t *testing.T) {
 		},
 		"help-catalog": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
-			press(t, m, "down", "?")
+			press(t, m, "?")
+			return m
+		},
+		"catalog-bar": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
 			return m
 		},
 	}

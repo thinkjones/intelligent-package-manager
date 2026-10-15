@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 // picker is the modal for switching packs or creating one.
@@ -39,12 +40,12 @@ func (m *Model) openPicker(creating bool) {
 }
 
 // pickerKey handles a key while the picker is open.
-func (m *Model) pickerKey(msg keyMsg) {
+func (m *Model) pickerKey(msg keyMsg) tea.Cmd {
 	p := m.picker
 	k := msg.String()
 	if k == "esc" {
 		m.picker = nil
-		return
+		return nil
 	}
 	if !p.creating {
 		switch k {
@@ -61,17 +62,17 @@ func (m *Model) pickerKey(msg keyMsg) {
 			}
 			m.picker = nil
 		}
-		return
+		return nil
 	}
 	if k == "enter" {
 		if p.step == 0 {
 			if strings.TrimSpace(p.name.Value()) == "" {
-				return
+				return nil
 			}
 			p.step = 1
 			p.name.Blur()
 			p.descr.Focus()
-			return
+			return nil
 		}
 		name := strings.TrimSpace(p.name.Value())
 		if err := m.d.Packs.Create(name, strings.TrimSpace(p.descr.Value())); err != nil {
@@ -79,19 +80,20 @@ func (m *Model) pickerKey(msg keyMsg) {
 			p.step = 0
 			p.descr.Blur()
 			p.name.Focus()
-			return
+			return nil
 		}
 		m.picker = nil
 		m.reloadPacks()
 		m.active, m.traySel = name, 0
 		m.note("created pack %s", name)
-		return
+		return nil
 	}
 	if p.step == 0 {
 		p.name, _ = p.name.Update(msg)
 	} else {
 		p.descr, _ = p.descr.Update(msg)
 	}
+	return nil
 }
 
 // pickerLines is the picker in place of the body: exactly rows lines.

@@ -21,7 +21,7 @@ func packsSetup(f fakes) {
 func packsModel(t *testing.T) (*Model, fakes) {
 	t.Helper()
 	m, f := newTestWith(t, packsSetup)
-	press(t, m, "down", "2")
+	press(t, m, "2", "tab")
 	return m, f
 }
 
@@ -48,7 +48,7 @@ func TestPacksStatsStrip(t *testing.T) {
 	m, _ := newTestWith(t, func(f fakes) {
 		f.p.packs = []Pack{{Name: "a", Built: "fresh", Installs: []Install{{}, {}}}, {Name: "b", Built: "fresh", Installs: []Install{{}, {}}}, {Name: "c", Built: "stale"}}
 	})
-	press(t, m, "down", "2")
+	press(t, m, "2", "tab")
 	if !strings.Contains(view(m), "3 packs · 2 fresh · 1 stale · 4 installs") {
 		t.Errorf("stats strip:\n%s", view(m))
 	}
@@ -134,7 +134,7 @@ func TestPacksGlobalInGlobalScope(t *testing.T) {
 		packsSetup(f)
 		f.p.scope = "global"
 	})
-	press(t, m, "down", "2", "g")
+	press(t, m, "2", "tab", "g")
 	if m.pk.global || len(m.pk.rows) != 3 || !m.statusOK {
 		t.Errorf("g does nothing in global scope: global %v rows %d status %q", m.pk.global, len(m.pk.rows), m.status)
 	}
@@ -203,7 +203,7 @@ func TestPacksFilter(t *testing.T) {
 	if m.tab != tabCatalog {
 		t.Error("1 switches tabs once the filter is left")
 	}
-	press(t, m, "2", "esc")
+	press(t, m, "2", "tab", "esc")
 	if m.pk.filter.value() != "" {
 		t.Error("esc clears a kept filter")
 	}
@@ -223,7 +223,7 @@ func TestFilterBoxMatch(t *testing.T) {
 func TestPacksLoadErrorShowsAndRetries(t *testing.T) {
 	m, f := newTestWith(t, packsSetup)
 	f.p.listErr = errors.New("ipm.toml is broken")
-	press(t, m, "down", "2")
+	press(t, m, "2", "tab")
 	if !strings.Contains(view(m), "ipm.toml is broken") || !strings.Contains(view(m), "PACKS (…)") {
 		t.Errorf("the error shows in the body, the count is unknown:\n%s", view(m))
 	}
@@ -241,7 +241,7 @@ func TestPacksLoadErrorShowsAndRetries(t *testing.T) {
 func TestLeavingCatalogDoesNotLeakFocus(t *testing.T) {
 	m, _ := newTestWith(t, packsSetup)
 	typeText(t, m, "tdd")
-	press(t, m, "down", "2")
+	press(t, m, "2", "tab")
 	if m.textFocused() {
 		t.Error("the Catalog's focus leaked into Packs")
 	}
@@ -253,7 +253,7 @@ func TestPacksFirstVisitLoads(t *testing.T) {
 	if m.pk.loaded {
 		t.Fatal("packs load on first visit")
 	}
-	press(t, m, "down", "2")
+	press(t, m, "2", "tab")
 	if !m.pk.loaded || len(m.pk.rows) != 3 {
 		t.Errorf("rows %d", len(m.pk.rows))
 	}
@@ -340,7 +340,7 @@ func TestGoldenPacks(t *testing.T) {
 		"packs-error": func(t *testing.T) *Model {
 			m, f := newTestWith(t, packsSetup)
 			f.p.listErr = errors.New("ipm.toml is broken")
-			press(t, m, "down", "2")
+			press(t, m, "2", "tab")
 			return m
 		},
 	}

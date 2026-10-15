@@ -35,6 +35,7 @@ type searchDone struct {
 type Model struct {
 	d        Deps
 	tab      tab
+	bar      bool          // the tab bar has focus, not one of the tab's panes
 	counts   [tabCount]int // the tab bar's counts, notLoaded until a tab reads its data
 	input    textinput.Model
 	focus    focus
@@ -91,7 +92,7 @@ func New(d Deps) *Model {
 	in.SetStyles(st)
 	in.Prompt = ""
 	in.Placeholder = "press / to search"
-	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}, focus: focusResults}
+	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}, focus: focusResults, bar: true}
 	m.pk.filter = newFilterBox()
 	m.ins.filter = newFilterBox()
 	m.mk.filter = newFilterBox()
@@ -200,11 +201,25 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return nil
 	}
 	if m.picker != nil {
-		m.pickerKey(msg)
-		return nil
+		return m.pickerKey(msg)
+	}
+	if m.bar {
+		return m.barKey(k)
 	}
 	if !m.textFocused() && m.tabKey(k) {
 		return m.enterTab()
+	}
+	if k == "tab" || k == "shift+tab" {
+		if f := m.typingFilter(); f != nil {
+			f.blur()
+			return nil
+		}
+		by := 1
+		if k == "shift+tab" {
+			by = -1
+		}
+		m.cyclePane(by)
+		return nil
 	}
 	switch m.tab {
 	case tabCatalog:

@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
@@ -44,12 +45,15 @@ func (m *Model) tabLabel(t tab) string {
 }
 
 // tabBar is the tab labels and, under them, a rule with the active tab
-// underlined.
+// underlined; while the bar has focus the active tab is marked ▶.
 func (m *Model) tabBar(w int) []string {
 	var labels, rule []string
 	for t := range tabCount {
 		l := m.tabLabel(t)
 		if t == m.tab {
+			if m.bar {
+				l = "▶ " + l
+			}
 			labels = append(labels, stSelected.Render(l))
 			rule = append(rule, stAmber.Render(strings.Repeat("━", lipgloss.Width(l))))
 		} else {
@@ -86,6 +90,15 @@ func (m *Model) statsStrip(w int) string {
 	return spaces(w)
 }
 
+// barHints are the footer's keys while the tab bar has focus.
+func (m *Model) barHints() []string {
+	find := "/ filter"
+	if m.tab == tabCatalog {
+		find = "/ search"
+	}
+	return []string{"←→ tabs", "tab/↓ enter", find}
+}
+
 // hints is the footer for the active tab.
 func (m *Model) hints() string {
 	switch {
@@ -103,6 +116,8 @@ func (m *Model) hints() string {
 		return "esc or ? close"
 	case m.picker != nil:
 		return "enter choose  n new pack  esc cancel"
+	case m.bar:
+		return strings.Join(append(m.barHints(), helpQuit), "  ")
 	}
 	if m.tab == tabCatalog {
 		return m.catalogHints()
@@ -140,6 +155,8 @@ func (m *Model) footer(w int) string {
 	switch {
 	case m.inst != nil, m.form != nil, m.ext != nil, m.help, m.picker != nil:
 		return m.hints()
+	case m.bar:
+		parts = m.barHints()
 	case m.tab == tabPacks && m.pk.filter.typing, m.tab == tabInstalls && m.ins.filter.typing, m.tab == tabMarketplace && m.mk.filter.typing:
 		return m.hints()
 	case m.tab != tabCatalog:
@@ -155,7 +172,8 @@ func (m *Model) footer(w int) string {
 	return strings.Join(append(parts, helpQuit), "  ")
 }
 
-// tabKey switches tabs on 1–4 and [ ]; it reports whether k was one of them.
+// tabKey switches tabs on 1–4 and [ ], landing on the tab bar; it reports
+// whether k was one of them.
 func (m *Model) tabKey(k string) bool {
 	switch k {
 	case "1", "2", "3", "4":
@@ -167,7 +185,133 @@ func (m *Model) tabKey(k string) bool {
 	default:
 		return false
 	}
+	m.toBar()
 	return true
+}
+
+// barKey handles a key while the tab bar has focus: ← → pick a tab, tab ↓
+// enter go into its first pane, shift+tab its last, / its search or filter.
+func (m *Model) barKey(k string) tea.Cmd {
+	switch k {
+	case "left", "h":
+		m.tab = (m.tab + tabCount - 1) % tabCount
+		return m.enterTab()
+	case "right", "l":
+		m.tab = (m.tab + 1) % tabCount
+		return m.enterTab()
+	case "tab", "down", "enter":
+		m.setPane(0)
+	case "shift+tab":
+		m.setPane(m.panes() - 1)
+	case "/":
+		m.bar = false
+		switch m.tab {
+		case tabCatalog:
+			m.setFocus(focusSearch)
+		case tabPacks:
+			m.pk.filter.focus()
+		case tabInstalls:
+			m.ins.filter.focus()
+		case tabMarketplace:
+			m.mk.filter.focus()
+		}
+	case "q":
+		return tea.Quit
+	case "?":
+		m.help = true
+	default:
+		if m.tabKey(k) {
+			return m.enterTab()
+		}
+	}
+	return nil
+}
+
+// toBar gives the tab bar focus; every tab's panes start over from the bar.
+func (m *Model) toBar() {
+	m.bar = true
+	m.setFocus(focusResults)
+	m.pk.detail = false
+	m.pk.filter.blur()
+	m.ins.filter.blur()
+	m.mk.filter.blur()
+}
+
+// panes is how many panes tab cycles through on the active tab: the Catalog's
+// search box, results and tree (when there is one), the Packs table and its
+// items (when the pack has some), the one table of the other tabs.
+func (m *Model) panes() int {
+	switch m.tab {
+	case tabCatalog:
+		if m.cursor == "" {
+			return 2
+		}
+		return 3
+	case tabPacks:
+		if p := m.selectedPack(); p != nil && len(p.Items) > 0 {
+			return 2
+		}
+	}
+	return 1
+}
+
+// pane is the index of the focused pane among panes; the tray counts as the
+// results.
+func (m *Model) pane() int {
+	switch {
+	case m.tab == tabCatalog && m.focus == focusSearch:
+		return 0
+	case m.tab == tabCatalog && m.focus == focusTree:
+		return 2
+	case m.tab == tabCatalog:
+		return 1
+	case m.tab == tabPacks && m.pk.detail:
+		return 1
+	}
+	return 0
+}
+
+// setPane focuses pane i of the active tab.
+func (m *Model) setPane(i int) {
+	m.bar = false
+	switch m.tab {
+	case tabCatalog:
+		switch i {
+		case 0:
+			m.setFocus(focusSearch)
+		case 1:
+			m.setFocus(focusResults)
+		default:
+			m.setFocus(focusTree)
+			m.treeSel = m.tree.Cursor
+		}
+	case tabPacks:
+		m.pk.detail = i == 1
+	}
+}
+
+// cyclePane moves by one pane, to the tab bar past either end.
+func (m *Model) cyclePane(by int) {
+	i := m.pane() + by
+	if i < 0 || i >= m.panes() {
+		m.toBar()
+		return
+	}
+	m.setPane(i)
+}
+
+// typingFilter is the filter box being typed into, nil when there is none.
+// The Catalog's search box is a pane, not a filter.
+func (m *Model) typingFilter() *filterBox {
+	for _, f := range []struct {
+		t tab
+		f *filterBox
+	}{{tabPacks, &m.pk.filter}, {tabInstalls, &m.ins.filter}, {tabMarketplace, &m.mk.filter}} {
+		if m.tab == f.t && f.f.typing {
+			return f.f
+		}
+	}
+	return nil
 }
 
 // typeOrder is how the catalog's types are listed in the stats strip; types

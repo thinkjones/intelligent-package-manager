@@ -23,6 +23,8 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "tab":
 		return tea.KeyPressMsg{Code: tea.KeyTab}
+	case "shift+tab":
+		return tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	case "up":
 		return tea.KeyPressMsg{Code: tea.KeyUp}
 	case "down":
@@ -90,11 +92,11 @@ func typeText(t *testing.T, m *Model, s string) {
 	}
 }
 
-// searchFocus presses / when the Catalog results have focus, as a person
-// does before typing a query; anywhere else it does nothing.
+// searchFocus presses / when the Catalog's tab bar or results have focus, as
+// a person does before typing a query; anywhere else it does nothing.
 func searchFocus(t *testing.T, m *Model) {
 	t.Helper()
-	if m.tab == tabCatalog && m.focus == focusResults && m.inst == nil && m.form == nil && m.picker == nil && !m.help {
+	if m.tab == tabCatalog && (m.bar || m.focus == focusResults) && m.inst == nil && m.form == nil && m.picker == nil && !m.help {
 		press(t, m, "/")
 	}
 }
@@ -618,9 +620,13 @@ func TestRemove(t *testing.T) {
 	if f.p.calls[1] != "remove a agent:o/r:agents/x.md" {
 		t.Errorf("d in the tray removes its selected item: %v", f.p.calls)
 	}
-	press(t, m, "tab")
+	press(t, m, "/")
 	if m.focus != focusSearch {
-		t.Errorf("tab from the tray should return to search")
+		t.Errorf("/ from the tray should focus the search box")
+	}
+	press(t, m, "down", "t", "tab")
+	if m.focus != focusTree {
+		t.Errorf("tab from the tray is the next pane after the results, the tree: focus %v", m.focus)
 	}
 }
 
@@ -750,9 +756,9 @@ func TestInstallFailure(t *testing.T) {
 
 func TestHelpOverlay(t *testing.T) {
 	m, _ := newTest(t)
-	press(t, m, "down", "?")
+	press(t, m, "?")
 	v := view(m)
-	for _, kh := range append(append([][2]string{}, searchKeys...), treeKeys...) {
+	for _, kh := range append(append(append([][2]string{}, searchKeys...), treeKeys...), navKeys...) {
 		if !strings.Contains(v, kh[0]) || !strings.Contains(v, kh[1]) {
 			t.Errorf("help lacks %q %q", kh[0], kh[1])
 		}
@@ -799,7 +805,7 @@ func TestTraySelectionStaysVisible(t *testing.T) {
 		items = append(items, fmt.Sprintf("skill:o/r:skills/item-number-%c-with-a-long-name", 'a'+i))
 	}
 	m, _ := newTestWith(t, withPacks(Pack{Name: "a", Items: items}))
-	press(t, m, "down", "t")
+	press(t, m, "tab", "tab", "t")
 	if m.focus != focusTray {
 		t.Fatalf("focus %v", m.focus)
 	}
@@ -910,12 +916,14 @@ func TestTreeModeAlsoIn(t *testing.T) {
 }
 
 func TestTreeModeExit(t *testing.T) {
-	for _, k := range []string{"esc", "tab"} {
-		m, _ := treeTest(t)
-		press(t, m, "tab", "down", k)
-		if m.focus != focusResults || m.cursor != "skill:o/r:skills/tdd" {
-			t.Errorf("%s: focus %v cursor %q", k, m.focus, m.cursor)
-		}
+	m, _ := treeTest(t)
+	press(t, m, "enter", "down", "esc")
+	if m.focus != focusResults || m.cursor != "skill:o/r:skills/tdd" {
+		t.Errorf("esc: focus %v cursor %q", m.focus, m.cursor)
+	}
+	press(t, m, "enter", "tab")
+	if !m.bar {
+		t.Errorf("tab from the tree, the last pane, is the tab bar")
 	}
 }
 
@@ -1205,7 +1213,7 @@ func TestExternalModalScrolls(t *testing.T) {
 func TestSyncDoesNotClearDirty(t *testing.T) {
 	m, _ := newTestWith(t, withPacks(Pack{Name: "a"}))
 	m.dirty = true
-	press(t, m, "down", "4")
+	press(t, m, "4", "tab")
 	drain(t, m, m.startSync())
 	if !m.dirty {
 		t.Error("a sync built nothing: the packs are still unbuilt")

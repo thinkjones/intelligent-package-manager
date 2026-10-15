@@ -21,7 +21,7 @@ func withMarket(f fakes) {
 func marketModel(t *testing.T) (*Model, fakes) {
 	t.Helper()
 	m, f := newTestWith(t, withMarket)
-	press(t, m, "down", "4")
+	press(t, m, "4", "tab")
 	return m, f
 }
 
@@ -30,7 +30,6 @@ func TestMarketplaceLoadsAsynchronouslyOnFirstVisit(t *testing.T) {
 	if !strings.Contains(view(m), "MARKETPLACE (…)") || f.mk.listCalls != 0 {
 		t.Fatalf("unloaded:\n%s", view(m))
 	}
-	press(t, m, "down")
 	_, cmd := m.Update(key("4"))
 	if v := view(m); !strings.Contains(v, "loading the marketplace…") {
 		t.Fatalf("loading:\n%s", v)
@@ -189,7 +188,7 @@ func TestMarketplaceFollowErrorGoesToStatus(t *testing.T) {
 
 func TestMarketplaceListError(t *testing.T) {
 	m, f := newTestWith(t, func(f fakes) { withMarket(f); f.mk.listErr = errors.New("offline") })
-	press(t, m, "down", "4")
+	press(t, m, "4", "tab")
 	v := view(m)
 	if !strings.Contains(v, "could not load the marketplace: offline") || !strings.Contains(v, "MARKETPLACE (…)") {
 		t.Errorf("error in the body, count unknown:\n%s", v)
@@ -283,7 +282,7 @@ func TestMarketplaceUnfollowLastFilteredRowKeepsSelectionInRange(t *testing.T) {
 func TestMarketplaceNilDepDoesNotPanic(t *testing.T) {
 	m, _ := newTest(t)
 	m.d.Marketplace = nil
-	press(t, m, "down", "4")
+	press(t, m, "4", "tab")
 	if !strings.Contains(view(m), "could not load the marketplace: no marketplace available") {
 		t.Errorf("view:\n%s", view(m))
 	}
@@ -291,13 +290,13 @@ func TestMarketplaceNilDepDoesNotPanic(t *testing.T) {
 
 func TestMarketplaceLoadingAndErrorFooterShowOnlyWorkingKeys(t *testing.T) {
 	m, _ := newTestWith(t, withMarket)
-	press(t, m, "down")
 	m.Update(key("4"))
+	m.Update(key("tab"))
 	if v := view(m); strings.Contains(v, "space follow") || !strings.Contains(v, "s sync") {
 		t.Errorf("loading footer:\n%s", v)
 	}
 	m, _ = newTestWith(t, func(f fakes) { f.mk.listErr = errors.New("x") })
-	press(t, m, "down", "4")
+	press(t, m, "4", "tab")
 	if v := view(m); strings.Contains(v, "space follow") {
 		t.Errorf("error footer:\n%s", v)
 	}
@@ -316,7 +315,7 @@ func TestFinishingARunDropsAStaleStatus(t *testing.T) {
 func TestSyncWithoutMarketplaceSaysSo(t *testing.T) {
 	m, _ := newTest(t)
 	m.d.Marketplace = nil
-	press(t, m, "down", "4", "s")
+	press(t, m, "4", "tab", "s")
 	if m.inst != nil || !strings.Contains(m.status, "no marketplace available") {
 		t.Errorf("inst %v status %q", m.inst != nil, m.status)
 	}

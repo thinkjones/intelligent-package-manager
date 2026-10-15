@@ -1,28 +1,28 @@
 ipm  project /work                                                                                              ● hybrid
-CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
-━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
+▶ CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                             
+━━━━━━━━━━━━━━━━━──────────────────────────────────────────                                                             
 skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
 ╭─ keys ───────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Search mode                                               Tree mode                                                  │
 │                                                                                                                      │
-│ typing        search (results refresh as you type)        ↑ ↓  k j      siblings and 'also in' rows                  │
-│ ↓ / tab       from the search box: focus the results      ← →  h l      parent / first child                         │
+│ typing        search · repo:<repo> pack:<name> narrow     ↑ ↓  k j      siblings and 'also in' rows                  │
+│ ↓  esc        from the search box: focus the results      ← →  h l      parent / first child                         │
 │ /             focus the search box                        enter         on an 'also in' row: follow it               │
 │ ↑ ↓  j k      move through results; the tree follows      → on ↗        jump into the repo it points at              │
 │ ← →  h l      move the tree to the parent / first child   ↑ to ↩        back to where you jumped from                │
-│ tab / enter   tree mode                                   a / d         add / remove the node                        │
-│ a / d         add / remove the selected result            tab / esc     back to search mode                          │
+│ enter         tree mode                                   a / d         add / remove the node                        │
+│ a / d         add / remove the selected result            esc           back to the results                          │
 │ t             the pack tray (d removes, esc back)                                                                    │
-│ f             cycle the type filter                                                                                  │
-│ p             switch pack, or n for a new one                                                                        │
-│ 1-4  [ ]      switch tab                                                                                             │
-│ e             external references to this repo                                                                       │
-│ ctrl+r        check the search server again                                                                          │
-│ ?             this help                                                                                              │
-│ q  ctrl+c     quit                                                                                                   │
+│ f             cycle the type filter                       Moving around                                              │
+│ p             pick the active pack and list it (n new)                                                               │
+│ e             external references to this repo            ← →  h l      on the tab bar: previous / next tab          │
+│ ctrl+r        check the search server again               tab ↓ enter   on the tab bar: into the tab's first pane    │
+│                                                           tab shift+tab next / previous pane, then the tab bar       │
+│                                                           esc           back one step, then to the tab bar           │
+│                                                           1-4  [ ]      switch tab, onto its tab bar                 │
+│                                                           ?  q  ctrl+c  this help · quit                             │
 │                                                                                                                      │
 │ esc or ? closes this                                                                                                 │
-│                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            

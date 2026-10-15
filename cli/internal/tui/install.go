@@ -164,8 +164,9 @@ func (m *Model) installLines(w, rows int) []string {
 	return out
 }
 
-// helpLines is the ? overlay in place of the body: the two modes' keys side
-// by side when there is room, one after the other otherwise.
+// helpLines is the ? overlay in place of the body: the tab's keys, and the
+// keys that move between panes, side by side when there is room, one after
+// the other otherwise. The Catalog's tree mode joins the second column.
 func (m *Model) helpLines(w, rows int) []string {
 	keyTable := func(title string, keys [][2]string, cw int) []string {
 		out := []string{fit(stTitle.Render(title), cw), spaces(cw)}
@@ -174,21 +175,28 @@ func (m *Model) helpLines(w, rows int) []string {
 		}
 		return out
 	}
-	var lines []string
-	if m.tab != tabCatalog {
-		keys := tabKeys
-		switch m.tab {
-		case tabPacks:
-			keys = packsKeys
-		case tabInstalls:
-			keys = installsKeys
-		case tabMarketplace:
-			keys = marketplaceKeys
+	title, keys := "Keys", searchKeys
+	switch m.tab {
+	case tabCatalog:
+		title = "Search mode"
+	case tabPacks:
+		keys = packsKeys
+	case tabInstalls:
+		keys = installsKeys
+	case tabMarketplace:
+		keys = marketplaceKeys
+	}
+	second := func(cw int) []string {
+		nav := keyTable("Moving around", navKeys, cw)
+		if m.tab != tabCatalog {
+			return nav
 		}
-		lines = keyTable("Keys", keys, w)
-	} else if w >= 100 {
+		return append(append(keyTable("Tree mode", treeKeys, cw), spaces(cw)), nav...)
+	}
+	var lines []string
+	if w >= 100 {
 		half := w / 2
-		left, right := keyTable("Search mode", searchKeys, half-2), keyTable("Tree mode", treeKeys, w-half)
+		left, right := keyTable(title, keys, half-2), second(w-half)
 		for i := range max(len(left), len(right)) {
 			l, r := spaces(half-2), ""
 			if i < len(left) {
@@ -200,8 +208,8 @@ func (m *Model) helpLines(w, rows int) []string {
 			lines = append(lines, l+"  "+r)
 		}
 	} else {
-		lines = append(keyTable("Search mode", searchKeys, w), "")
-		lines = append(lines, keyTable("Tree mode", treeKeys, w)...)
+		lines = append(keyTable(title, keys, w), "")
+		lines = append(lines, second(w)...)
 	}
 	lines = append(lines, "", stMuted.Render("esc or ? closes this"))
 	out := make([]string, 0, rows)

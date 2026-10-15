@@ -126,11 +126,13 @@ func (m *Model) installsKey(msg tea.KeyPressMsg) tea.Cmd {
 	case "up", "k":
 		ins.sel = max(0, ins.sel-1)
 	case "esc":
-		if ins.filter.value() != "" {
-			ins.filter.clear()
-			ins.sel, ins.offset = 0, 0
-			m.clampInstalls()
+		if ins.filter.value() == "" {
+			m.toBar()
+			return nil
 		}
+		ins.filter.clear()
+		ins.sel, ins.offset = 0, 0
+		m.clampInstalls()
 	case "enter", "i":
 		if in := m.selectedInstall(); in != nil {
 			if m.readOnlyInstall(in) {
@@ -219,7 +221,7 @@ func (m *Model) installsBody(w, h int) []string {
 		for len(lines) < h-2 {
 			lines = append(lines, "")
 		}
-		return panel(stMuted.Render("installs"), lines, w, true)
+		return panel(stMuted.Render("installs"), lines, w, !m.bar)
 	}
 	if ins.err != nil {
 		return message(stError.Render("could not read installs: " + ins.err.Error()))
@@ -251,7 +253,7 @@ func (m *Model) installsBody(w, h int) []string {
 		ins.filter.in.SetWidth(max(10, tw-26))
 		title += stMuted.Render(" ── ") + f
 	}
-	list := panel(title, table(installCols, rows, styles, ins.sel, &ins.offset, tw-4, h-2, true), tw, true)
+	list := panel(title, table(installCols, rows, styles, ins.sel, &ins.offset, tw-4, h-2, !m.bar), tw, !m.bar)
 	if !wide {
 		return list
 	}
