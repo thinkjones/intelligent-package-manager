@@ -98,5 +98,5 @@ Because the lock and pnpm's pins are committed, anyone with `ipm` can rebuild th
 
 - **Run upstream code.** pnpm runs with `--ignore-scripts`, and sources' npm dependencies are never installed.
 - **Modify upstream repos.** Picked files are hard-linked (or copied) from pnpm's fetched copy.
-- **Edit a Gas City city.** `ipm install gascity` writes a pack folder where you point it and prints the `[imports]` table to paste into the city's `pack.toml` or `city.toml`; ipm never edits a city.
+- **Edit a Gas City city.** `ipm install gascity` writes a pack folder (in `.ipm/.gascity` unless you point it elsewhere) and prints the `[imports]` table to paste into the city's `pack.toml` or `city.toml`; ipm never edits a city.
 - **Install into Claude Code on its own.** Building writes only `.ipm/`; `ipm install claude` (or an install from the TUI's Packs or Installs tab) installs a pack, at the scope you choose, only when you ask. Each install is recorded (in the pack's `[[packs.<name>.installs]]` table in `ipm.toml`, or in `$IPM_HOME/installs.json` for user-scope packs), and a bare `ipm install` replays them.
