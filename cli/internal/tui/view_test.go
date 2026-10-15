@@ -418,3 +418,19 @@ func TestResultsDescriptionColumn(t *testing.T) {
 		t.Errorf("narrow results drop the description first:\n%s", view(m))
 	}
 }
+
+// TestMinimumSizeWithBannerAndPack is the smallest screen with everything
+// that takes a line: the server banner and an active pack.
+func TestMinimumSizeWithBannerAndPack(t *testing.T) {
+	m, _ := newTestWith(t, func(f fakes) {
+		f.s.mode, f.s.notice = "local", "server off: keyword search only"
+		f.p.packs = []Pack{{Name: "a", Items: []string{tddID}}}
+	})
+	m.Update(tea.WindowSizeMsg{Width: minWidth, Height: minHeight})
+	for _, k := range []string{"1", "2", "3", "4"} {
+		press(t, m, k)
+		if v := view(m); strings.Count(v, "\n")+1 != minHeight {
+			t.Errorf("tab %s is %d lines, want %d:\n%s", k, strings.Count(v, "\n")+1, minHeight, v)
+		}
+	}
+}

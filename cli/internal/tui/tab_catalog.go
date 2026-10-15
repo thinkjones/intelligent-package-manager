@@ -101,7 +101,9 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 
 // catalogBody is the search results table over the tree, h lines in all.
 func (m *Model) catalogBody(w, h int) []string {
-	resH := max(5, h*40/100)
+	// The tree keeps at least one row; on the smallest screen the results
+	// give up rows for it.
+	resH := max(3, min(max(5, h*40/100), h-3))
 	m.input.SetWidth(min(w-24, max(lipglossWidth(m.input.Placeholder), lipglossWidth(m.input.Value())+1)))
 	search := stMuted.Render("search: ") + m.input.View()
 	if f := typeFilters[m.filter]; f != "" {
@@ -117,7 +119,7 @@ func (m *Model) catalogBody(w, h int) []string {
 	if m.cursor != "" {
 		title += stMuted.Render(" ── ") + stText.Render(m.cursor)
 	}
-	return append(mid, panel(title, m.tree.lines(w-4, h-resH-2, sel, m.focus == focusTree), w, m.focus == focusTree)...)
+	return append(mid, panel(title, m.tree.lines(w-4, max(0, h-resH-2), sel, m.focus == focusTree), w, m.focus == focusTree)...)
 }
 
 // catalogStats is the per-type item counts, in each type's colour.
