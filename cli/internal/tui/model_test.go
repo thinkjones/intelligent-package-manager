@@ -1415,3 +1415,10 @@ func TestAddRemoveRelistsPack(t *testing.T) {
 		t.Errorf("a re-lists too, keeping the item selected: seq %d→%d sel %d hits %v", seq, m.seq, m.sel, m.res.Hits)
 	}
 }
+
+func TestSearchTokensIgnoreCase(t *testing.T) {
+	text, repo, pack := searchQuery("Repo:o/r PACK:kit x")
+	if text != "x" || repo != "o/r" || pack != "kit" {
+		t.Errorf("%q %q %q", text, repo, pack)
+	}
+}

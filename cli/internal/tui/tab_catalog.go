@@ -395,16 +395,17 @@ func (m *Model) breadcrumb(w int) string {
 }
 
 // searchQuery splits the search box into its free text and its repo:owner/repo
-// and pack:name tokens, which may sit anywhere among the words; the last of
-// each kind wins. A token with nothing after the colon is text.
+// and pack:name tokens, which may sit anywhere among the words with the
+// keyword in any case; the last of each kind wins. A token with nothing
+// after the colon is text.
 func searchQuery(s string) (text, repo, pack string) {
 	var words []string
 	for _, w := range strings.Fields(s) {
 		switch {
-		case strings.HasPrefix(w, "repo:") && len(w) > len("repo:"):
-			repo = strings.TrimPrefix(w, "repo:")
-		case strings.HasPrefix(w, "pack:") && len(w) > len("pack:"):
-			pack = strings.TrimPrefix(w, "pack:")
+		case len(w) > len("repo:") && strings.EqualFold(w[:len("repo:")], "repo:"):
+			repo = w[len("repo:"):]
+		case len(w) > len("pack:") && strings.EqualFold(w[:len("pack:")], "pack:"):
+			pack = w[len("pack:"):]
 		default:
 			words = append(words, w)
 		}
