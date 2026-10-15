@@ -4,12 +4,15 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 )
 
 // picker is the modal for switching packs or creating one.
 type picker struct {
 	sel      int
 	creating bool
+	// list puts the chosen or created pack in the search box as pack:name.
+	list bool
 	// step is 0 while typing the name, 1 while typing the description.
 	step        int
 	name, descr textinput.Model
@@ -39,12 +42,12 @@ func (m *Model) openPicker(creating bool) {
 }
 
 // pickerKey handles a key while the picker is open.
-func (m *Model) pickerKey(msg keyMsg) {
+func (m *Model) pickerKey(msg keyMsg) tea.Cmd {
 	p := m.picker
 	k := msg.String()
 	if k == "esc" {
 		m.picker = nil
-		return
+		return nil
 	}
 	if !p.creating {
 		switch k {
@@ -54,24 +57,28 @@ func (m *Model) pickerKey(msg keyMsg) {
 			p.sel = max(0, p.sel-1)
 		case "n":
 			m.openPicker(true)
+			m.picker.list = p.list
 		case "enter":
+			m.picker = nil
 			if p.sel < len(m.packs) {
 				m.active, m.traySel = m.packs[p.sel].Name, 0
 				m.note("active pack: %s", m.active)
+				if p.list {
+					return m.runQuery("pack:" + m.active)
+				}
 			}
-			m.picker = nil
 		}
-		return
+		return nil
 	}
 	if k == "enter" {
 		if p.step == 0 {
 			if strings.TrimSpace(p.name.Value()) == "" {
-				return
+				return nil
 			}
 			p.step = 1
 			p.name.Blur()
 			p.descr.Focus()
-			return
+			return nil
 		}
 		name := strings.TrimSpace(p.name.Value())
 		if err := m.d.Packs.Create(name, strings.TrimSpace(p.descr.Value())); err != nil {
@@ -79,19 +86,26 @@ func (m *Model) pickerKey(msg keyMsg) {
 			p.step = 0
 			p.descr.Blur()
 			p.name.Focus()
-			return
+			return nil
 		}
 		m.picker = nil
 		m.reloadPacks()
 		m.active, m.traySel = name, 0
 		m.note("created pack %s", name)
-		return
+		if m.tab == tabPacks {
+			m.selectPackNamed(name)
+		}
+		if p.list {
+			return m.runQuery("pack:" + name)
+		}
+		return nil
 	}
 	if p.step == 0 {
 		p.name, _ = p.name.Update(msg)
 	} else {
 		p.descr, _ = p.descr.Update(msg)
 	}
+	return nil
 }
 
 // pickerLines is the picker in place of the body: exactly rows lines.

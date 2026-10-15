@@ -9,8 +9,9 @@ import (
 	"io"
 )
 
-// Filter narrows a search; an empty Type is every type.
-type Filter struct{ Type string }
+// Filter narrows a search; an empty Type is every type, an empty Repo every
+// repo. A search with no text and a Repo is every item of that repo.
+type Filter struct{ Type, Repo string }
 
 // Hit is one search result.
 type Hit struct {

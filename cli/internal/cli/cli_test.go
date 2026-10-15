@@ -1700,6 +1700,32 @@ func TestTuiHybridSearch(t *testing.T) {
 	if !strings.Contains(last.Get("filter_by"), "type:=[`skill`]") || last.Get("per_page") != "50" {
 		t.Errorf("query %v", *last)
 	}
+	if _, err := s.Search(context.Background(), "", tui.Filter{Repo: "o/r"}); err != nil {
+		t.Fatal(err)
+	}
+	if last.Get("q") != "*" || last.Get("filter_by") != "repo:=[`o/r`]" {
+		t.Errorf("repo filter with no text: q %q filter_by %q", last.Get("q"), last.Get("filter_by"))
+	}
+}
+
+func TestLocalSearchRepoFilter(t *testing.T) {
+	records := []map[string]any{rec("skill:o/r:tdd", "tdd", "Test first"), rec("skill:o/r:pdf", "pdf", ""), rec("skill:x/y:tdd", "tdd", "")}
+	records[2]["repo"] = "x/y"
+	none := func(string) (int, bool) { return 0, false }
+	res := localSearch(records, none, func(string) int { return 0 }, "", tui.Filter{Repo: "O/R"})
+	var ids []string
+	for _, h := range res.Hits {
+		ids = append(ids, h.ID)
+	}
+	if strings.Join(ids, ",") != "skill:o/r:pdf,skill:o/r:tdd" || res.Found != 2 {
+		t.Errorf("every record of the repo, ignoring case: %v found %d", ids, res.Found)
+	}
+	if res := localSearch(records, none, func(string) int { return 0 }, "tdd", tui.Filter{Repo: "x/y"}); len(res.Hits) != 1 || res.Hits[0].ID != "skill:x/y:tdd" {
+		t.Errorf("text and repo: %v", res.Hits)
+	}
+	if res := localSearch(records, none, func(string) int { return 0 }, "", tui.Filter{}); len(res.Hits) != 0 {
+		t.Errorf("no text and no filter matches nothing: %v", res.Hits)
+	}
 }
 
 func TestTuiPacks(t *testing.T) {

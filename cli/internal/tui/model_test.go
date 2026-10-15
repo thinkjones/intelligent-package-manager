@@ -23,6 +23,8 @@ func key(s string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: tea.KeyEscape}
 	case "tab":
 		return tea.KeyPressMsg{Code: tea.KeyTab}
+	case "shift+tab":
+		return tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	case "up":
 		return tea.KeyPressMsg{Code: tea.KeyUp}
 	case "down":
@@ -90,11 +92,11 @@ func typeText(t *testing.T, m *Model, s string) {
 	}
 }
 
-// searchFocus presses / when the Catalog results have focus, as a person
-// does before typing a query; anywhere else it does nothing.
+// searchFocus presses / when the Catalog's tab bar or results have focus, as
+// a person does before typing a query; anywhere else it does nothing.
 func searchFocus(t *testing.T, m *Model) {
 	t.Helper()
-	if m.tab == tabCatalog && m.focus == focusResults && m.inst == nil && m.form == nil && m.picker == nil && !m.help {
+	if m.tab == tabCatalog && (m.bar || m.focus == focusResults) && m.inst == nil && m.form == nil && m.picker == nil && !m.help {
 		press(t, m, "/")
 	}
 }
@@ -128,6 +130,7 @@ type fakeCatalog struct {
 	details map[string]Node
 	asked   []string
 	err     error
+	errIDs  map[string]bool // the IDs whose Node fails
 	counts  map[string]int
 }
 
@@ -137,6 +140,9 @@ func (f *fakeCatalog) Node(id string) (Node, error) {
 	f.asked = append(f.asked, id)
 	if f.err != nil {
 		return Node{}, f.err
+	}
+	if f.errIDs[id] {
+		return Node{}, fmt.Errorf("no node %s", id)
 	}
 	if d, ok := f.details[id]; ok {
 		return d, nil
@@ -618,9 +624,13 @@ func TestRemove(t *testing.T) {
 	if f.p.calls[1] != "remove a agent:o/r:agents/x.md" {
 		t.Errorf("d in the tray removes its selected item: %v", f.p.calls)
 	}
-	press(t, m, "tab")
+	press(t, m, "/")
 	if m.focus != focusSearch {
-		t.Errorf("tab from the tray should return to search")
+		t.Errorf("/ from the tray should focus the search box")
+	}
+	press(t, m, "down", "t", "tab")
+	if m.focus != focusTree {
+		t.Errorf("tab from the tray is the next pane after the results, the tree: focus %v", m.focus)
 	}
 }
 
@@ -750,9 +760,9 @@ func TestInstallFailure(t *testing.T) {
 
 func TestHelpOverlay(t *testing.T) {
 	m, _ := newTest(t)
-	press(t, m, "down", "?")
+	press(t, m, "?")
 	v := view(m)
-	for _, kh := range append(append([][2]string{}, searchKeys...), treeKeys...) {
+	for _, kh := range append(append(append([][2]string{}, searchKeys...), treeKeys...), navKeys...) {
 		if !strings.Contains(v, kh[0]) || !strings.Contains(v, kh[1]) {
 			t.Errorf("help lacks %q %q", kh[0], kh[1])
 		}
@@ -799,7 +809,7 @@ func TestTraySelectionStaysVisible(t *testing.T) {
 		items = append(items, fmt.Sprintf("skill:o/r:skills/item-number-%c-with-a-long-name", 'a'+i))
 	}
 	m, _ := newTestWith(t, withPacks(Pack{Name: "a", Items: items}))
-	press(t, m, "down", "t")
+	press(t, m, "tab", "tab", "t")
 	if m.focus != focusTray {
 		t.Fatalf("focus %v", m.focus)
 	}
@@ -910,12 +920,14 @@ func TestTreeModeAlsoIn(t *testing.T) {
 }
 
 func TestTreeModeExit(t *testing.T) {
-	for _, k := range []string{"esc", "tab"} {
-		m, _ := treeTest(t)
-		press(t, m, "tab", "down", k)
-		if m.focus != focusResults || m.cursor != "skill:o/r:skills/tdd" {
-			t.Errorf("%s: focus %v cursor %q", k, m.focus, m.cursor)
-		}
+	m, _ := treeTest(t)
+	press(t, m, "enter", "down", "esc")
+	if m.focus != focusResults || m.cursor != "skill:o/r:skills/tdd" {
+		t.Errorf("esc: focus %v cursor %q", m.focus, m.cursor)
+	}
+	press(t, m, "enter", "tab")
+	if !m.bar {
+		t.Errorf("tab from the tree, the last pane, is the tab bar")
 	}
 }
 
@@ -1205,7 +1217,7 @@ func TestExternalModalScrolls(t *testing.T) {
 func TestSyncDoesNotClearDirty(t *testing.T) {
 	m, _ := newTestWith(t, withPacks(Pack{Name: "a"}))
 	m.dirty = true
-	press(t, m, "down", "4")
+	press(t, m, "4", "tab")
 	drain(t, m, m.startSync())
 	if !m.dirty {
 		t.Error("a sync built nothing: the packs are still unbuilt")
@@ -1213,5 +1225,200 @@ func TestSyncDoesNotClearDirty(t *testing.T) {
 	drain(t, m, m.startBuild())
 	if m.dirty {
 		t.Error("a successful build clears dirty")
+	}
+}
+
+func TestSearchQueryTokens(t *testing.T) {
+	for in, want := range map[string][3]string{
+		"tdd":                          {"tdd", "", ""},
+		"repo:o/r":                     {"", "o/r", ""},
+		"test repo:o/r first":          {"test first", "o/r", ""},
+		"pack:kit guard":               {"guard", "", "kit"},
+		"repo: pack:":                  {"repo: pack:", "", ""},
+		"  repo:a/b  repo:c/d  x ":     {"x", "c/d", ""},
+		"pack:kit repo:o/r tdd agents": {"tdd agents", "o/r", "kit"},
+	} {
+		text, repo, pack := searchQuery(in)
+		if got := [3]string{text, repo, pack}; got != want {
+			t.Errorf("searchQuery(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestRepoTokenFiltersSearch(t *testing.T) {
+	m, f := newTest(t)
+	f.s.results["guard"] = Results{Hits: hits("tdd-guard"), Found: 1}
+	typeText(t, m, "repo:o/r guard")
+	n := len(f.s.queries)
+	if f.s.queries[n-1] != "guard" || f.s.filters[n-1].Repo != "o/r" || len(m.res.Hits) != 1 {
+		t.Errorf("queries %q filters %v hits %d", f.s.queries, f.s.filters, len(m.res.Hits))
+	}
+	f.s.results[""] = Results{Hits: hits("a", "b"), Found: 2}
+	for range " guard" {
+		press(t, m, "backspace")
+	}
+	n = len(f.s.queries)
+	if m.input.Value() != "repo:o/r" || f.s.queries[n-1] != "" || f.s.filters[n-1].Repo != "o/r" || len(m.res.Hits) != 2 {
+		t.Errorf("a query of only a token still searches: %q %v hits %d", f.s.queries, f.s.filters, len(m.res.Hits))
+	}
+}
+
+// setQuery puts q in the search box at once, as a paste does, and runs it.
+func setQuery(t *testing.T, m *Model, q string) {
+	t.Helper()
+	press(t, m, "/")
+	m.input.SetValue(q)
+	drain(t, m, m.queryChanged())
+}
+
+func packTokenModel(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	return newTestWith(t, func(f fakes) {
+		withPackRepos(f)
+		f.c.details["skill:o/r:skills/write"] = Node{ID: "skill:o/r:skills/write", Type: "skill", Name: "write", Repo: "o/r", Description: "Prose", Stars: 7}
+	})
+}
+
+func TestPackTokenListsPack(t *testing.T) {
+	m, f := packTokenModel(t)
+	setQuery(t, m, "pack:csharp-sdlc")
+	if len(f.s.queries) != 0 {
+		t.Errorf("pack: never asks the searcher: %v", f.s.queries)
+	}
+	var names []string
+	for _, h := range m.res.Hits {
+		names = append(names, h.Type+" "+h.Name+" "+h.Repo)
+	}
+	want := "skill tdd o/r,agent csharp-pro wshobson/agents,plugin stripe anthropics/claude-plugins-official"
+	if strings.Join(names, ",") != want || m.res.Found != 3 {
+		t.Errorf("hits %q found %d", names, m.res.Found)
+	}
+	typeText(t, m, " WSHOB")
+	if len(m.res.Hits) != 1 || m.res.Hits[0].Name != "csharp-pro" {
+		t.Errorf("text narrows by name, repo or description: %v", m.res.Hits)
+	}
+	setQuery(t, m, "pack:csharp-sdlc first")
+	if len(m.res.Hits) != 1 || m.res.Hits[0].Name != "tdd" {
+		t.Errorf("description matches: %v", m.res.Hits)
+	}
+	m.filter = 2 // agent
+	setQuery(t, m, "pack:csharp-sdlc")
+	if len(m.res.Hits) != 1 || m.res.Hits[0].Type != "agent" {
+		t.Errorf("the type filter applies: %v", m.res.Hits)
+	}
+}
+
+func TestPackTokenUnknownPack(t *testing.T) {
+	m, f := packTokenModel(t)
+	setQuery(t, m, "pack:nope")
+	if len(m.res.Hits) != 0 || m.status != "no pack nope" || len(f.s.queries) != 0 {
+		t.Errorf("hits %v status %q queries %v", m.res.Hits, m.status, f.s.queries)
+	}
+}
+
+func TestPickerChoiceListsPack(t *testing.T) {
+	m, f := packTokenModel(t)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "p", "down", "enter")
+	if m.active != "docs" || m.input.Value() != "pack:docs" {
+		t.Fatalf("active %q query %q", m.active, m.input.Value())
+	}
+	if len(m.res.Hits) != 1 || m.res.Hits[0].Name != "write" || m.res.Hits[0].Stars != 7 {
+		t.Errorf("the pack's items: %+v", m.res.Hits)
+	}
+	press(t, m, "p", "n")
+	for _, r := range "kit" {
+		press(t, m, string(r))
+	}
+	press(t, m, "enter", "enter")
+	if m.active != "kit" || m.input.Value() != "pack:kit" || len(m.res.Hits) != 0 {
+		t.Errorf("a new pack is listed too: active %q query %q hits %v", m.active, m.input.Value(), m.res.Hits)
+	}
+	if f.p.calls[len(f.p.calls)-1] != `create kit ""` {
+		t.Errorf("calls %v", f.p.calls)
+	}
+}
+
+func TestAddWithNoPackKeepsSearch(t *testing.T) {
+	m, _ := newTest(t)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "a")
+	for _, r := range "kit" {
+		press(t, m, string(r))
+	}
+	press(t, m, "enter", "enter")
+	if m.active != "kit" || m.input.Value() != "tdd" || len(m.res.Hits) != 2 {
+		t.Errorf("creating a pack from a keeps the results: active %q query %q hits %d", m.active, m.input.Value(), len(m.res.Hits))
+	}
+}
+
+func TestHelpScrollsWhenNarrow(t *testing.T) {
+	m, _ := newTestWith(t, packsSetup)
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	press(t, m, "2", "?")
+	v := view(m)
+	if !strings.Contains(v, "Moving around") || !strings.Contains(v, "↓") || !strings.Contains(v, "more") {
+		t.Fatalf("stacked, Moving around comes first and the rest scrolls:\n%s", v)
+	}
+	seen := map[string]bool{}
+	for range 40 {
+		v = view(m)
+		for _, want := range []string{"tab shift+tab", "1-4  [ ]", "?  q  ctrl+c", "open the selected item in the Catalog", "esc or ? closes this"} {
+			if strings.Contains(v, want) {
+				seen[want] = true
+			}
+		}
+		press(t, m, "j")
+	}
+	if len(seen) != 5 {
+		t.Errorf("reachable by scrolling: %v\n%s", seen, v)
+	}
+	if !strings.Contains(v, "↑") {
+		t.Errorf("scrolled down, an ↑ more marker shows:\n%s", v)
+	}
+	press(t, m, "esc", "?")
+	if m.helpOff != 0 {
+		t.Errorf("help reopens at the top: %d", m.helpOff)
+	}
+}
+
+func TestRevealDroppedWhenFocusMoves(t *testing.T) {
+	m, _ := newTestWith(t, func(f fakes) {
+		withPackRepos(f)
+		f.s.results[""] = Results{Hits: hits("tdd"), Found: 1}
+	})
+	press(t, m, "2", "tab", "enter")
+	cmd := m.openItemInCatalog()
+	press(t, m, "/")
+	drain(t, m, cmd)
+	if m.focus != focusSearch {
+		t.Errorf("results arriving after / leave the search box focused: focus %v", m.focus)
+	}
+}
+
+func TestAddRemoveRelistsPack(t *testing.T) {
+	m, _ := packTokenModel(t)
+	setQuery(t, m, "pack:csharp-sdlc")
+	press(t, m, "esc", "down")
+	if m.sel != 1 {
+		t.Fatalf("sel %d", m.sel)
+	}
+	press(t, m, "d")
+	if len(m.res.Hits) != 2 || m.sel != 1 || m.res.Hits[1].Name != "stripe" {
+		t.Errorf("d re-lists the pack, clamping the selection: sel %d hits %v", m.sel, m.res.Hits)
+	}
+	setQuery(t, m, "pack:docs")
+	press(t, m, "esc")
+	seq := m.seq
+	press(t, m, "a") // into the active pack, csharp-sdlc
+	if m.seq != seq+1 || len(m.res.Hits) != 1 || m.sel != 0 || m.res.Hits[0].Name != "write" {
+		t.Errorf("a re-lists too, keeping the item selected: seq %d→%d sel %d hits %v", seq, m.seq, m.sel, m.res.Hits)
+	}
+}
+
+func TestSearchTokensIgnoreCase(t *testing.T) {
+	text, repo, pack := searchQuery("Repo:o/r PACK:kit x")
+	if text != "x" || repo != "o/r" || pack != "kit" {
+		t.Errorf("%q %q %q", text, repo, pack)
 	}
 }

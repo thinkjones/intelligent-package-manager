@@ -151,11 +151,13 @@ func (m *Model) marketKey(msg tea.KeyPressMsg) tea.Cmd {
 	case "pgup":
 		mt.sel = max(0, mt.sel-page)
 	case "esc":
-		if mt.filter.value() != "" {
-			mt.filter.clear()
-			mt.sel, mt.offset = 0, 0
-			m.clampMarket()
+		if mt.filter.value() == "" {
+			m.toBar()
+			return nil
 		}
+		mt.filter.clear()
+		mt.sel, mt.offset = 0, 0
+		m.clampMarket()
 	case "space", " ":
 		m.toggleFollow()
 	case "s":
@@ -249,12 +251,12 @@ func (m *Model) marketplaceStats() string {
 // marketHints are the Marketplace footer's keys, before help and quit.
 func (m *Model) marketHints() []string {
 	if m.mk.filter.typing {
-		return []string{"type to filter", "enter keep", "esc clear"}
+		return []string{"type to filter", "enter/tab keep", "esc clear"}
 	}
 	if !m.mk.loaded || m.mk.err != nil {
-		return []string{"s sync", "1-4 tabs"}
+		return []string{"s sync", "esc tab bar"}
 	}
-	return []string{"↑↓ move", "space follow", "s sync", "/ filter", "1-4 tabs"}
+	return []string{"↑↓ move", "space follow", "s sync", "/ filter", "esc tab bar"}
 }
 
 // marketRow is a row of the table: a list's divider or a repo.
@@ -292,7 +294,7 @@ func (m *Model) marketBody(w, h int) []string {
 		for len(lines) < h-2 {
 			lines = append(lines, "")
 		}
-		return panel(stMuted.Render("marketplace"), lines, w, true)
+		return panel(stMuted.Render("marketplace"), lines, w, !m.bar)
 	}
 	if mt.err != nil {
 		return message(stError.Render("could not load the marketplace: " + mt.err.Error()))
@@ -338,7 +340,7 @@ func (m *Model) marketBody(w, h int) []string {
 		mt.filter.in.SetWidth(max(10, tw-30))
 		title += stMuted.Render(" ── ") + f
 	}
-	list := panel(title, table(marketCols, rows, styles, selRow, &mt.offset, tw-4, h-2, true), tw, true)
+	list := panel(title, table(marketCols, rows, styles, selRow, &mt.offset, tw-4, h-2, !m.bar), tw, !m.bar)
 	if !wide {
 		return list
 	}

@@ -1,0 +1,24 @@
+ipm  project /work                                                      ● hybrid
+CATALOG (2,024)  ▶ PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                     
+─────────────────━━━━━━━━━━━───────────────────────────────                     
+2 packs · 0 fresh · 0 stale · 0 installs                                        
+╭─ keys ───────────────────────────────────────────────────────────────────────╮
+│ ↑ 3 more (↑ k)                                                               │
+│ tab ↓ enter   on the tab bar: into the tab's first pane                      │
+│ tab shift+tab next / previous pane, then the tab bar                         │
+│ esc           back one step, then to the tab bar                             │
+│ 1-4  [ ]      switch tab, onto its tab bar                                   │
+│ ?  q  ctrl+c  this help · quit                                               │
+│                                                                              │
+│ Keys                                                                         │
+│                                                                              │
+│ ↑ ↓  j k      move through the packs, or the items                           │
+│ enter  →  l   focus the selected pack's items                                │
+│ esc  ←  h     from the items: back to the packs                              │
+│ n             new pack                                                       │
+│ x             remove the selected item from the pack                         │
+│ c             open the selected item in the Catalog                          │
+│ ↓ 6 more (↓ j)                                                               │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                                                                
+↑↓ scroll  esc or ? close                                                       

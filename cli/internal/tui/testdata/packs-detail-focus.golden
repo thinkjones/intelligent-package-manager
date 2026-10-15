@@ -2,29 +2,29 @@ ipm  project /work                                                              
 CATALOG (0)  PACKS (3)  INSTALLS (…)  MARKETPLACE (…)                                                                   
 ─────────────━━━━━━━━━───────────────────────────────                                                                   
 3 packs · 1 fresh · 1 stale · 3 installs                                                                                
-╭─ packs ───────────────────────────────────────────────────────────╮╭─ csharp-sdlc (3) ───────────────────────────────╮
-│   NAME        SCOPE   ITEMS BUILT INSTALLED TO                    ││ C# lifecycle                                    │
-│ ▶ csharp-sdlc project     3 fresh claude project, gascity kit     ││                                                 │
-│   docs        project     1 stale claude user                     ││   skill tdd                                     │
-│   empty       project     0 never                                 ││ ▶ agent csharp-pro                              │
-│                                                                   ││   plugin stripe                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-╰───────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────╯
+╭─ packs ──────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   NAME        SCOPE   ITEMS BUILT INSTALLED TO                                                                       │
+│ ▶ csharp-sdlc project     3 fresh claude project, gascity kit                                                        │
+│   docs        project     1 stale claude user                                                                        │
+│   empty       project     0 never                                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ csharp-sdlc (3) ────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ C# lifecycle                                                                                                         │
+│                                                                                                                      │
+│ ▾ o/r                                                                                                                │
+│     skill tdd                                                                                                        │
+│ ▾ wshobson/agents                                                                                                    │
+│   ▶ agent csharp-pro                                                                                                 │
+│ ▾ anthropics/claude-plugins-official                                                                                 │
+│     plugin stripe                                                                                                    │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                         
-↑↓ items  x remove  esc back  ? help  q quit                                                                            
+↑↓ items  x remove  c catalog  n new  esc back  ? help  q quit                                                          

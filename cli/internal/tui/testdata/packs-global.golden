@@ -2,29 +2,29 @@ ipm  project /work                                                              
 CATALOG (0)  PACKS (4)  INSTALLS (…)  MARKETPLACE (…)                                                                   
 ─────────────━━━━━━━━━───────────────────────────────                                                                   
 4 packs · 2 fresh · 1 stale · 3 installs                                                                                
-╭─ packs ───────────────────────────────────────────────────────────╮╭─ mine (1) ──────────────────────────────────────╮
-│   NAME        SCOPE   ITEMS BUILT INSTALLED TO                    ││ Everywhere                                      │
-│   csharp-sdlc project     3 fresh claude project, gascity kit     ││                                                 │
-│   docs        project     1 stale claude user                     ││   skill mine                                    │
-│   empty       project     0 never                                 ││                                                 │
-│ ▶ mine        global      1 fresh                                 ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-│                                                                   ││                                                 │
-╰───────────────────────────────────────────────────────────────────╯╰─────────────────────────────────────────────────╯
+╭─ packs ──────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   NAME        SCOPE   ITEMS BUILT INSTALLED TO                                                                       │
+│   csharp-sdlc project     3 fresh claude project, gascity kit                                                        │
+│   docs        project     1 stale claude user                                                                        │
+│   empty       project     0 never                                                                                    │
+│ ▶ mine        global      1 fresh                                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ mine (1) ───────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Everywhere                                                                                                           │
+│                                                                                                                      │
+│ ▾ o/r                                                                                                                │
+│     skill mine                                                                                                       │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                         
-↑↓ packs  enter items  b build  i install  g global  / filter  1-4 tabs  ? help  q quit                                 
+↑↓ packs  enter items  n new  b build  i install  g global  / filter  esc tab bar  ? help  q quit                       

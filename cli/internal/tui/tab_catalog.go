@@ -25,12 +25,13 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 		switch k {
 		case "a":
 			m.addSelected()
-			return nil
+			return m.relistPack()
 		case "d":
 			m.removeSelected()
-			return nil
+			return m.relistPack()
 		case "p":
 			m.openPicker(false)
+			m.picker.list = true
 			return nil
 		case "e":
 			m.openExternal()
@@ -59,7 +60,7 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 	}
 	if m.focus == focusSearch {
 		switch k {
-		case "down", "tab", "esc":
+		case "down", "esc":
 			m.setFocus(focusResults)
 			return nil
 		}
@@ -87,24 +88,28 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 		m.treeUp()
 	case "right", "l":
 		m.treeDown()
-	case "tab", "enter":
+	case "enter":
 		if m.cursor != "" {
 			m.setFocus(focusTree)
 			m.treeSel = m.tree.Cursor
 		}
+	case "esc":
+		m.toBar()
 	}
 	return nil
 }
 
 // catalogBody is the search results table over the tree, h lines in all.
 func (m *Model) catalogBody(w, h int) []string {
-	resH := max(5, h*40/100)
+	// The tree keeps at least one row; on the smallest screen the results
+	// give up rows for it.
+	resH := max(3, min(max(5, h*40/100), h-3))
 	m.input.SetWidth(min(w-24, max(lipglossWidth(m.input.Placeholder), lipglossWidth(m.input.Value())+1)))
 	search := stMuted.Render("search: ") + m.input.View()
 	if f := typeFilters[m.filter]; f != "" {
 		search += stMuted.Render("  type: ") + stAmber.Render(f)
 	}
-	resultsFocused := m.focus == focusSearch || m.focus == focusResults
+	resultsFocused := !m.bar && (m.focus == focusSearch || m.focus == focusResults)
 	mid := panel(search, m.resultLines(w-4, resH-2), w, resultsFocused)
 	sel := -1
 	if m.focus == focusTree {
@@ -114,7 +119,7 @@ func (m *Model) catalogBody(w, h int) []string {
 	if m.cursor != "" {
 		title += stMuted.Render(" ── ") + stText.Render(m.cursor)
 	}
-	return append(mid, panel(title, m.tree.lines(w-4, h-resH-2, sel, m.focus == focusTree), w, m.focus == focusTree)...)
+	return append(mid, panel(title, m.tree.lines(w-4, max(0, h-resH-2), sel, m.focus == focusTree), w, m.focus == focusTree)...)
 }
 
 // catalogStats is the per-type item counts, in each type's colour.
@@ -129,9 +134,9 @@ func (m *Model) catalogStats() string {
 func (m *Model) catalogHints() string {
 	switch m.focus {
 	case focusSearch:
-		return "type to search  ↓/esc results  ctrl+c quit"
+		return "type to search  ↓/tab/esc results  ctrl+c quit"
 	case focusTree:
-		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help"
+		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  esc back  tab tab bar  ? help"
 	case focusTray:
 		return "←→ items  d remove  esc back"
 	}
@@ -141,7 +146,7 @@ func (m *Model) catalogHints() string {
 // catalogResultHints are the Catalog footer's middle hints with the results
 // focused.
 func (m *Model) catalogResultHints() []string {
-	return []string{"/ search", "1-4 tabs", "↑↓ results", "←→ tree", "tab tree mode", "a add", "t tray", "p packs", "f type"}
+	return []string{"/ search", "↑↓ results", "←→ tree", "enter tree mode", "tab pane", "esc tab bar", "a add", "t tray", "p packs", "f type"}
 }
 
 // countLine is the Catalog's status line: how many results, and the path to
@@ -177,7 +182,7 @@ func (m *Model) resultLines(w, rows int) []string {
 	if wide {
 		cols = append(cols, column{Title: "DESCRIPTION", Min: 1})
 	}
-	active := m.focus == focusResults || m.focus == focusSearch
+	active := !m.bar && (m.focus == focusResults || m.focus == focusSearch)
 	data := make([][]string, len(m.res.Hits))
 	styles := make([][]lipgloss.Style, len(m.res.Hits))
 	for i, h := range m.res.Hits {
@@ -239,7 +244,7 @@ func (m *Model) treeKey(k string) {
 			m.chosen[m.cursor] = m.tree.AlsoIn[i].ID
 			m.setCursor(m.cursor)
 		}
-	case "esc", "tab":
+	case "esc":
 		m.setFocus(focusResults)
 		m.followSelection()
 	}
@@ -308,7 +313,7 @@ func (m *Model) trayKey(k string) {
 		m.traySel = min(max(0, n-1), m.traySel+1)
 	case "left", "h", "up", "k":
 		m.traySel = max(0, m.traySel-1)
-	case "tab", "/":
+	case "/":
 		m.setFocus(focusSearch)
 	case "esc":
 		m.setFocus(focusResults)
@@ -389,4 +394,98 @@ func (m *Model) breadcrumb(w int) string {
 		parts[0] = stMuted.Render("…")
 	}
 	return strings.Join(parts, sep)
+}
+
+// searchQuery splits the search box into its free text and its repo:owner/repo
+// and pack:name tokens, which may sit anywhere among the words with the
+// keyword in any case; the last of each kind wins. A token with nothing
+// after the colon is text.
+func searchQuery(s string) (text, repo, pack string) {
+	var words []string
+	for _, w := range strings.Fields(s) {
+		switch {
+		case len(w) > len("repo:") && strings.EqualFold(w[:len("repo:")], "repo:"):
+			repo = w[len("repo:"):]
+		case len(w) > len("pack:") && strings.EqualFold(w[:len("pack:")], "pack:"):
+			pack = w[len("pack:"):]
+		default:
+			words = append(words, w)
+		}
+	}
+	return strings.Join(words, " "), repo, pack
+}
+
+// packResults are the items of the pack named name as hits, in the pack's
+// order, narrowed by f and by text (a substring of the name, repo or
+// description, ignoring case). note says when there is no such pack.
+func (m *Model) packResults(name, text string, f Filter) (res Results, note string) {
+	p := m.packNamed(name)
+	if p == nil {
+		return Results{}, "no pack " + name
+	}
+	q := strings.ToLower(text)
+	for _, id := range p.Items {
+		h := Hit{ID: id}
+		if n, err := m.d.Catalog.Node(id); err == nil {
+			h.Type, h.Name, h.Repo, h.Description, h.Stars = n.Type, n.Name, n.Repo, n.Description, n.Stars
+		} else {
+			h.Type, h.Name, _ = strings.Cut(itemLabel(id), " ")
+		}
+		switch {
+		case f.Type != "" && h.Type != f.Type:
+		case f.Repo != "" && !strings.EqualFold(h.Repo, f.Repo):
+		case q != "" && !strings.Contains(strings.ToLower(h.Name+"\n"+h.Repo+"\n"+h.Description), q):
+		default:
+			res.Hits = append(res.Hits, h)
+		}
+	}
+	res.Found = len(res.Hits)
+	return res, ""
+}
+
+// packNamed is the scope's pack called name, or a global one the Packs tab
+// lists; nil when there is none.
+func (m *Model) packNamed(name string) *Pack {
+	for _, ps := range [][]Pack{m.packs, m.pk.rows} {
+		for i := range ps {
+			if ps[i].Name == name {
+				return &ps[i]
+			}
+		}
+	}
+	return nil
+}
+
+// revealItem puts the results' cursor on the item c opened from Packs, and
+// the tree on it with focus, whether or not the search returned it.
+func (m *Model) revealItem() {
+	id := m.reveal
+	m.reveal = ""
+	m.backStack = nil
+	for i, h := range m.res.Hits {
+		if h.ID == id {
+			m.sel = i
+		}
+	}
+	m.setCursor(id)
+	if m.tab == tabCatalog && !m.bar { // unless you moved on before the results came
+		m.setFocus(focusTree)
+		m.treeSel = m.tree.Cursor
+	}
+}
+
+// relistPack re-runs a pack: query after a or d changed a pack, so the list
+// matches it, keeping the selected result selected while it is still there.
+func (m *Model) relistPack() tea.Cmd {
+	if _, _, pack := searchQuery(m.input.Value()); pack == "" {
+		return nil
+	}
+	keep := ""
+	if m.sel < len(m.res.Hits) {
+		keep = m.res.Hits[m.sel].ID
+	}
+	m.seq++
+	m.reveal = ""
+	m.keepID = keep
+	return m.searchCmd(m.seq)
 }
