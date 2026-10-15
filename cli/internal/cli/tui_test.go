@@ -180,6 +180,13 @@ func TestTuiInstallerPlanGascity(t *testing.T) {
 	if _, _, err := in.Plan("kit", tui.Target{Kind: "gascity", Path: tmp, Name: "foreign"}); err == nil {
 		t.Error("a folder ipm didn't write should be refused at the form")
 	}
+	// A folder ipm wrote earlier is a reinstall, not a refusal.
+	if err := in.Install(context.Background(), "kit", tui.Target{Kind: "gascity", Path: tmp, Name: "kit"}, io.Discard); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	if _, _, err := in.Plan("kit", tui.Target{Kind: "gascity", Path: tmp, Name: "kit"}); err != nil {
+		t.Errorf("planning over a folder ipm wrote should pass: %v", err)
+	}
 	d := in.Default("kit", "gascity")
 	if d.Kind != "gascity" || d.Name != "kit" || d.Path != scopeOf(t, f, false).Root {
 		t.Errorf("default %+v", d)
