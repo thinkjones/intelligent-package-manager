@@ -1,21 +1,21 @@
-ipm  o/r › p                                                                                                    ● hybrid
-╭─ search: tdd             ────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ▶ 50   skill  ✓ tdd                              o/r                                                                 │
-│   50   skill    tdd-guard                        o/r                                                                 │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
+ipm  project /work                                                                                              ● hybrid
+CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
+━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
+skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
+╭─ search: tdd                ─────────────────────────────────────────────────────────────────────────────────────────╮
+│   TYPE   ✓ NAME       REPO  ↗      ★ SCORE DESCRIPTION                                                               │
+│ ▶ skill  ✓ tdd        o/r  ↗3 ★31.2k    50 Test-driven development: write the failing test first, then the code tha… │
+│   skill    tdd-guard  o/r       ★842    50                                                                           │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-╭─ tree ── plugin:o/r:p ───────────────────────────────────────────────────────────────────────────────────────────────╮
-│   repo    o/r                            The repo                                                                    │
-│ ▶ └ plugin  p                            The p plugin                                                                │
-│     ├ skill   tdd                        Test first.                                                                 │
+╭─ tree ── skill:o/r:skills/tdd ───────────────────────────────────────────────────────────────────────────────────────╮
+│   repo    o/r                              The repo                                                                  │
+│   └ plugin  p                              The p plugin                                                              │
+│ ▶   ├ skill   tdd                          Test first.                                                               │
+│     │ └ agent   helper                     Helps                                                                     │
 │     └ skill   tdd-guard                                                                                              │
-│                                                                                                                      │
-│                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -26,5 +26,5 @@ ipm  o/r › p                                                                  
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
-2 of 100                                                                                                                
-↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help                                       
+2 of 100  o/r › p › tdd                                                                                                 
+/ search  1-4 tabs  ↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  f type  ? help  q quit                  

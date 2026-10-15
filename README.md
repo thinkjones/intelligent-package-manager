@@ -88,7 +88,7 @@ ipm pack add my-pack 'skill:obra/superpowers:skills/test-driven-development'
 ipm install claude my-pack                # build, then into Claude Code, for this project
 ```
 
-The [build your own plugin](https://thinkjones.github.io/intelligent-package-manager/guides/build-a-plugin.html) guide walks through a pack built from several repos. Prefer keys to IDs? [`ipm tui`](https://thinkjones.github.io/intelligent-package-manager/guides/tui.html) does the same search, collect and build in one screen.
+The [build your own plugin](https://thinkjones.github.io/intelligent-package-manager/guides/build-a-plugin.html) guide walks through a pack built from several repos. Prefer keys to IDs? [`ipm tui`](https://thinkjones.github.io/intelligent-package-manager/guides/tui.html) does the same search, collect, build and install in one screen.
 
 ## Commands
 
@@ -105,7 +105,7 @@ The [build your own plugin](https://thinkjones.github.io/intelligent-package-man
 | `ipm pack build [--update]` | Build every pack into a plugin and validate it |
 | `ipm install claude [pack] [--scope] [--path]` | Build when stale, then install a pack into Claude Code; bare `ipm install` replays recorded installs |
 | `ipm install gascity [pack] [-C DIR] [--name N]` | Build when stale, then write a pack as a Gas City pack folder and print how to import it |
-| `ipm tui [-g]` | Search, see the tree, collect, build and deploy, in one screen |
+| `ipm tui [-g]` | Four tabs: search and collect, packs, installs and the marketplace |
 | `ipm doctor` | Check everything `ipm` depends on |
 | `ipm uninstall [--purge]` | Remove `ipm` and its search container (`--purge` also deletes your data) |
 

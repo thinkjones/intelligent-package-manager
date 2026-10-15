@@ -34,6 +34,8 @@ type searchDone struct {
 // Model is the TUI's state. It implements tea.Model.
 type Model struct {
 	d        Deps
+	tab      tab
+	counts   [tabCount]int // the tab bar's counts, notLoaded until a tab reads its data
 	input    textinput.Model
 	focus    focus
 	filter   int // index into typeFilters
@@ -46,12 +48,16 @@ type Model struct {
 	height   int
 	debounce time.Duration
 
+	catCounts map[string]int    // items per type, read once at start
 	cursor    string            // the tree's centre node
 	chosen    map[string]string // the parent picked for a node in tree mode
 	tree      treeView
 	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
 	backStack []string // external entries jumped from, newest last
 
+	pk       packsTab    // the Packs tab
+	ins      installsTab // the Installs tab
+	mk       marketTab   // the Marketplace tab
 	packs    []Pack
 	active   string // the active pack's name
 	traySel  int
@@ -59,11 +65,11 @@ type Model struct {
 	picker   *picker
 	statusOK bool // status is a note, not an error
 
-	inst   *install     // the install or deploy output modal, while open
-	deploy *deployModal // the deploy modal before it runs
-	ext    *extModal    // the e modal: external references
-	help   bool         // the ? overlay
-	plain  bool         // NO_COLOR: draw without colour
+	inst  *install     // the build or install output modal, while open
+	form  *installForm // the install form before it runs
+	ext   *extModal    // the e modal: external references
+	help  bool         // the ? overlay
+	plain bool         // NO_COLOR: draw without colour
 }
 
 type keyMsg = tea.KeyPressMsg
@@ -84,9 +90,16 @@ func New(d Deps) *Model {
 	st.Cursor.Blink = false
 	in.SetStyles(st)
 	in.Prompt = ""
-	in.Placeholder = "type to search"
-	in.Focus()
-	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
+	in.Placeholder = "press / to search"
+	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}, focus: focusResults}
+	m.pk.filter = newFilterBox()
+	m.ins.filter = newFilterBox()
+	m.mk.filter = newFilterBox()
+	m.catCounts = d.Catalog.Counts()
+	for i := range m.counts {
+		m.counts[i] = notLoaded
+	}
+	m.counts[tabCatalog] = sumCounts(m.catCounts)
 	m.input.SetWidth(m.width - 30)
 	m.plain = os.Getenv("NO_COLOR") != ""
 	m.reloadPacks()
@@ -127,11 +140,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case installDone:
 		if m.inst != nil {
 			m.inst.done, m.inst.err = true, msg.err
-			if msg.err == nil {
+			m.status, m.statusOK = "", false
+			if msg.err == nil && m.inst.kind != runSync {
 				m.dirty = false
 			}
 			m.reloadPacks()
+			if m.inst.kind == runInstall {
+				m.loadInstallsTab()
+			}
+			if m.inst.kind == runSync && msg.err == nil {
+				m.note(syncedMsg)
+				return m, m.loadMarket()
+			}
 		}
+	case marketLoaded:
+		m.marketReady(msg)
+		return m, nil
 	case tea.KeyPressMsg:
 		return m, m.key(msg)
 	}
@@ -140,11 +164,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // key handles a key press for whatever has focus.
 func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
-	m.status, m.statusOK = "", false
 	k := msg.String()
 	if m.inst != nil {
+		// A run's own status, set when it finished, outlives the key that closes it.
 		return m.installKey(k)
 	}
+	m.status, m.statusOK = "", false
 	if k == "ctrl+c" {
 		return tea.Quit
 	}
@@ -167,8 +192,8 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		}
 		return nil
 	}
-	if m.deploy != nil {
-		return m.deployKey(msg)
+	if m.form != nil {
+		return m.formKey(msg)
 	}
 	if m.ext != nil {
 		m.extKey(k)
@@ -178,184 +203,18 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		m.pickerKey(msg)
 		return nil
 	}
-	if m.focus != focusSearch {
-		switch k {
-		case "a":
-			m.addSelected()
-			return nil
-		case "d":
-			m.removeSelected()
-			return nil
-		case "p":
-			m.openPicker(false)
-			return nil
-		case "i", "b":
-			return m.startInstall()
-		case "D":
-			m.openDeploy()
-			return nil
-		case "e":
-			m.openExternal()
-			return nil
-		case "t":
-			m.setFocus(focusTray)
-			return nil
-		case "?":
-			m.help = true
-			return nil
-		}
+	if !m.textFocused() && m.tabKey(k) {
+		return m.enterTab()
 	}
-	if m.focus == focusTree {
-		if k == "q" {
-			return tea.Quit
-		}
-		m.treeKey(k)
-		return nil
+	switch m.tab {
+	case tabCatalog:
+		return m.catalogKey(msg)
+	case tabPacks:
+		return m.packsKey(msg)
+	case tabInstalls:
+		return m.installsKey(msg)
 	}
-	if m.focus == focusTray {
-		m.trayKey(k)
-		if k == "q" {
-			return tea.Quit
-		}
-		return nil
-	}
-	if m.focus == focusSearch {
-		switch k {
-		case "down", "tab":
-			m.setFocus(focusResults)
-			return nil
-		}
-		before := m.input.Value()
-		var cmd tea.Cmd
-		m.input, cmd = m.input.Update(msg)
-		if m.input.Value() != before {
-			return tea.Batch(cmd, m.queryChanged())
-		}
-		return cmd
-	}
-	switch k {
-	case "q":
-		return tea.Quit
-	case "/":
-		m.setFocus(focusSearch)
-	case "f":
-		m.filter = (m.filter + 1) % len(typeFilters)
-		return m.queryChanged()
-	case "down", "j":
-		m.move(1)
-	case "up", "k":
-		m.move(-1)
-	case "left", "h":
-		m.treeUp()
-	case "right", "l":
-		m.treeDown()
-	case "tab", "enter":
-		if m.cursor != "" {
-			m.setFocus(focusTree)
-			m.treeSel = m.tree.Cursor
-		}
-	}
-	return nil
-}
-
-// treeKey handles keys in tree mode.
-func (m *Model) treeKey(k string) {
-	switch k {
-	case "down", "j":
-		m.treeMove(1)
-	case "up", "k":
-		m.treeMove(-1)
-	case "left", "h":
-		m.treeUp()
-	case "right", "l":
-		if m.treeSel == backRow {
-			m.back()
-			return
-		}
-		m.treeDown()
-	case "enter":
-		if m.treeSel == backRow {
-			m.back()
-			return
-		}
-		if i := m.treeSel - m.tree.Cursor - 1; i >= 0 && i < len(m.tree.AlsoIn) {
-			m.chosen[m.cursor] = m.tree.AlsoIn[i].ID
-			m.setCursor(m.cursor)
-		}
-	case "esc", "tab":
-		m.setFocus(focusResults)
-		m.followSelection()
-	}
-}
-
-// treeUp moves the tree's cursor to its parent.
-func (m *Model) treeUp() {
-	if n := len(m.tree.Path); n > 0 {
-		m.setCursor(m.tree.Path[n-1].ID)
-	}
-}
-
-// treeDown moves the tree's cursor to its first child, or, on an external
-// entry, into the repo it points at.
-func (m *Model) treeDown() {
-	switch {
-	case m.tree.Node.External != nil:
-		m.jump()
-		return
-	case m.tree.Node.Unresolved != "":
-		m.status = m.tree.Node.Unresolved + " isn't one of your sources — ipm marketplace add " + m.cursor
-		return
-	}
-	if len(m.tree.Children) > 0 {
-		child := m.tree.Children[0].ID
-		m.chosen[child] = m.cursor
-		m.setCursor(child)
-	}
-}
-
-// treeMove steps through the siblings and the 'also in' rows; a sibling
-// becomes the cursor, under the same parent. Above the first sibling is the
-// back root, when there is one.
-func (m *Model) treeMove(by int) {
-	switch {
-	case m.treeSel == backRow && by > 0:
-		m.treeSel = m.tree.Cursor
-		return
-	case m.treeSel == backRow:
-		return
-	case m.treeSel == 0 && by < 0 && m.tree.Back != nil:
-		m.treeSel = backRow
-		return
-	}
-	rows := m.tree.selectable()
-	sel := max(0, min(len(rows)-1, m.treeSel+by))
-	also := sel > m.tree.Cursor && sel <= m.tree.Cursor+len(m.tree.AlsoIn)
-	if also || sel == m.treeSel {
-		m.treeSel = sel
-		return
-	}
-	if n := len(m.tree.Path); n > 0 {
-		m.chosen[rows[sel].ID] = m.tree.Path[n-1].ID
-	}
-	m.setCursor(rows[sel].ID)
-}
-
-// trayKey handles keys while the tray has focus.
-func (m *Model) trayKey(k string) {
-	n := 0
-	if p := m.activePack(); p != nil {
-		n = len(p.Items)
-	}
-	switch k {
-	case "right", "l", "down", "j":
-		m.traySel = min(max(0, n-1), m.traySel+1)
-	case "left", "h", "up", "k":
-		m.traySel = max(0, m.traySel-1)
-	case "tab", "/":
-		m.setFocus(focusSearch)
-	case "esc":
-		m.setFocus(focusResults)
-	}
+	return m.marketKey(msg)
 }
 
 func (m *Model) setFocus(f focus) {
@@ -364,14 +223,6 @@ func (m *Model) setFocus(f focus) {
 		m.input.Focus()
 	} else {
 		m.input.Blur()
-	}
-}
-
-func (m *Model) move(by int) {
-	sel := max(0, min(len(m.res.Hits)-1, m.sel+by))
-	if sel != m.sel {
-		m.sel = sel
-		m.followSelection()
 	}
 }
 
@@ -396,9 +247,8 @@ func (m *Model) searchCmd(seq int) tea.Cmd {
 	}
 }
 
-// View draws the screen: a header with the cursor's breadcrumb, the results
-// and tree panels (or a modal), the pack tray, the status line and the keys
-// for the current mode.
+// View draws the screen: the title line, tab bar and stats strip over the
+// active tab's body (or a modal), then the status line and the tab's keys.
 func (m *Model) View() tea.View {
 	content := m.render()
 	if m.plain {
@@ -414,161 +264,59 @@ func (m *Model) render() string {
 		return fmt.Sprintf("ipm needs at least %d×%d — enlarge the terminal (q quits)", minWidth, minHeight)
 	}
 	w := m.width
-	var top []string
-	mode := stTeal.Render("● hybrid")
-	if m.d.Searcher.Mode() != "hybrid" {
-		mode = stMuted.Render("○ local")
-	}
-	head := stTitle.Render("ipm") + "  " + m.breadcrumb(w-lipglossWidth(mode)-8)
-	top = append(top, fit(head, w-lipglossWidth(mode)-1)+" "+mode)
+	top := []string{m.titleLine(w)}
 	if n := m.d.Searcher.Notice(); n != "" {
 		top = append(top, fit(stAmber.Render(n), w))
 	}
-	tray := m.trayLines(w)
+	top = append(top, m.tabBar(w)...)
+	top = append(top, m.statsStrip(w))
+	var tray []string
+	if m.tab == tabCatalog {
+		tray = m.trayLines(w)
+	}
 	body := max(6, m.height-len(top)-len(tray)-2)
 
 	var mid []string
 	switch {
 	case m.inst != nil:
 		mid = panel(stTitle.Render(m.inst.title), m.installLines(w-4, body-2), w, true)
-	case m.deploy != nil:
-		mid = panel(stTitle.Render("deploy"), m.deployLines(w-4, body-2), w, true)
+	case m.form != nil:
+		mid = panel(stTitle.Render("install"), m.formLines(w-4, body-2), w, true)
 	case m.ext != nil:
 		mid = panel(stTitle.Render("external references"), m.extLines(w-4, body-2), w, true)
 	case m.help:
 		mid = panel(stTitle.Render("keys"), m.helpLines(w-4, body-2), w, true)
 	case m.picker != nil:
 		mid = panel(stTitle.Render("packs"), m.pickerLines(w-4, body-2), w, true)
+	case m.tab == tabCatalog:
+		mid = m.catalogBody(w, body)
+	case m.tab == tabPacks:
+		mid = m.packsBody(w, body)
+	case m.tab == tabInstalls:
+		mid = m.installsBody(w, body)
+	case m.tab == tabMarketplace:
+		mid = m.marketBody(w, body)
 	default:
-		resH := max(5, body*40/100)
-		m.input.SetWidth(min(w-24, max(lipglossWidth(m.input.Placeholder), lipglossWidth(m.input.Value())+1)))
-		search := stMuted.Render("search: ") + m.input.View()
-		if f := typeFilters[m.filter]; f != "" {
-			search += stMuted.Render("  type: ") + stAmber.Render(f)
+		for range body {
+			mid = append(mid, spaces(w))
 		}
-		resultsFocused := m.focus == focusSearch || m.focus == focusResults
-		mid = panel(search, m.resultLines(w-4, resH-2), w, resultsFocused)
-		sel := -1
-		if m.focus == focusTree {
-			sel = m.treeSel
-		}
-		title := stMuted.Render("tree")
-		if m.cursor != "" {
-			title += stMuted.Render(" ── ") + stText.Render(m.cursor)
-		}
-		mid = append(mid, panel(title, m.tree.lines(w-4, body-resH-2, sel, m.focus == focusTree), w, m.focus == focusTree)...)
 	}
 
-	status := stMuted.Render(m.countLine())
+	status := m.statusText()
 	switch {
 	case m.status != "" && m.statusOK:
 		status = stTeal.Render(m.status)
 	case m.status != "":
 		status = stError.Render(m.status)
 	}
-	lines := append(append(append(top, mid...), tray...), fit(status, w), fit(stMuted.Render(m.hints()), w))
+	lines := append(append(append(top, mid...), tray...), fit(status, w), fit(stMuted.Render(m.footer(w)), w))
 	return strings.Join(lines, "\n")
 }
 
-// hints is the footer: the keys that matter where the focus is.
-func (m *Model) hints() string {
-	switch {
-	case m.inst != nil:
-		return "esc close (when finished)"
-	case m.deploy != nil && m.deploy.step == stepConfirm:
-		return "y deploy  esc cancel"
-	case m.deploy != nil:
-		return "enter next  esc cancel"
-	case m.ext != nil:
-		return "↑↓ move  enter jump  esc close"
-	case m.help:
-		return "esc or ? close"
-	case m.picker != nil:
-		return "enter choose  n new pack  esc cancel"
-	case m.focus == focusSearch:
-		return "type to search  ↓ results  ctrl+c quit"
-	case m.focus == focusTree:
-		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help"
-	case m.focus == focusTray:
-		return "←→ items  d remove  esc back"
+// statusText is the status line when nothing has been said.
+func (m *Model) statusText() string {
+	if m.tab == tabCatalog {
+		return m.countLine()
 	}
-	return "↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  b build  D deploy  ? help  q quit"
-}
-
-func (m *Model) countLine() string {
-	if len(m.res.Hits) == 0 {
-		if strings.TrimSpace(m.input.Value()) == "" {
-			return "type to search"
-		}
-		return "no matches"
-	}
-	return fmt.Sprintf("%d of %d", len(m.res.Hits), m.res.Found)
-}
-
-// followSelection centres the tree on the selected result, forgetting jumps.
-func (m *Model) followSelection() {
-	m.backStack = nil
-	if m.sel < len(m.res.Hits) {
-		m.setCursor(m.res.Hits[m.sel].ID)
-		return
-	}
-	m.cursor, m.tree = "", treeView{}
-}
-
-// setCursor centres the tree on id.
-func (m *Model) setCursor(id string) {
-	tv, err := buildTree(m.d.Catalog, id, m.chosen)
-	if err != nil {
-		m.status = err.Error()
-	}
-	if n := len(m.backStack); n > 0 {
-		if e, err := m.d.Catalog.Node(m.backStack[n-1]); err == nil {
-			back := refOf(e)
-			tv.Back = &back
-		}
-	}
-	m.cursor, m.tree, m.treeSel = id, tv, tv.Cursor
-}
-
-// maxBack is how many jumps the back stack remembers.
-const maxBack = 20
-
-// jump moves from an external entry to what it references, in its own repo,
-// remembering the entry so back can return.
-func (m *Model) jump() {
-	target := m.tree.Node.External.ID
-	m.backStack = append(m.backStack, m.cursor)
-	if len(m.backStack) > maxBack {
-		m.backStack = m.backStack[len(m.backStack)-maxBack:]
-	}
-	m.setCursor(target)
-}
-
-// back returns to the external entry the last jump left.
-func (m *Model) back() {
-	n := len(m.backStack)
-	if n == 0 {
-		return
-	}
-	entry := m.backStack[n-1]
-	m.backStack = m.backStack[:n-1]
-	m.setCursor(entry)
-}
-
-// breadcrumb is the cursor's path, "repo › … › node", cut from the left to w.
-func (m *Model) breadcrumb(w int) string {
-	if m.cursor == "" {
-		return ""
-	}
-	refs := append(append([]Ref(nil), m.tree.Path...), refOf(m.tree.Node))
-	sep := stMuted.Render(" › ")
-	parts := make([]string, len(refs))
-	for i, r := range refs {
-		parts[i] = typeStyle(r.Type).Render(r.Name)
-	}
-	for len(parts) > 1 && lipglossWidth(strings.Join(parts, sep)) > w {
-		parts = parts[1:]
-		parts[0] = stMuted.Render("…")
-	}
-	return strings.Join(parts, sep)
+	return ""
 }

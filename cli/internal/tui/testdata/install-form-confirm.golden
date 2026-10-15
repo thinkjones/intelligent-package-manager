@@ -1,0 +1,30 @@
+ipm  project /work                                                                                              ● hybrid
+CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
+─────────────────━━━━━━━━━───────────────────────────────                                                               
+2 packs · 0 fresh · 0 stale · 0 installs                                                                                
+╭─ install ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ Install csharp-sdlc to Claude Code — project scope in /work                                                          │
+│                                                                                                                      │
+│   ipm install                                                                                                        │
+│   claude plugin marketplace add /work/.ipm --scope project                                                           │
+│   claude plugin install kit@work-ipm --scope project                                                                 │
+│                                                                                                                      │
+│ y install · esc cancel                                                                                               │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                        
+y install  esc cancel                                                                                                   

@@ -1,4 +1,7 @@
-ipm                                                                                                             ● hybrid
+ipm  project /work                                                                                              ● hybrid
+CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
+━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
+skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
 ╭─ keys ───────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Search mode                                               Tree mode                                                  │
 │                                                                                                                      │
@@ -12,8 +15,7 @@ ipm                                                                             
 │ t             the pack tray (d removes, esc back)                                                                    │
 │ f             cycle the type filter                                                                                  │
 │ p             switch pack, or n for a new one                                                                        │
-│ b / i         build every pack (ipm pack build)                                                                      │
-│ D             deploy the active pack to Claude Code                                                                  │
+│ 1-4  [ ]      switch tab                                                                                             │
 │ e             external references to this repo                                                                       │
 │ ctrl+r        check the search server again                                                                          │
 │ ?             this help                                                                                              │
@@ -21,10 +23,8 @@ ipm                                                                             
 │                                                                                                                      │
 │ esc or ? closes this                                                                                                 │
 │                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
-type to search                                                                                                          
+press / to search                                                                                                       
 esc or ? close                                                                                                          

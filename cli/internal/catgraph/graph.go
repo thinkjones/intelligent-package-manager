@@ -138,6 +138,15 @@ func (g *Graph) Node(id string) (map[string]any, bool) {
 	return n, ok
 }
 
+// Counts is how many records the graph holds of each type.
+func (g *Graph) Counts() map[string]int {
+	out := map[string]int{}
+	for _, n := range g.nodes {
+		out[str(n, "type")]++
+	}
+	return out
+}
+
 // Children are id's neighbours: what it contains, or with up, what contains it.
 func (g *Graph) Children(id string, up bool) []string {
 	if up {

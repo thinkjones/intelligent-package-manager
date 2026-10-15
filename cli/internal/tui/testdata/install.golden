@@ -1,14 +1,14 @@
-ipm  o/r › p › tdd                                                                                              ● hybrid
-╭─ install ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ ipm install                                                                                                          │
+ipm  project /work                                                                                              ● hybrid
+CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
+━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
+skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
+╭─ build ──────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ ipm pack build                                                                                                       │
 │                                                                                                                      │
 │ ✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)                                                                   │
 │ validate: ok                                                                                                         │
 │                                                                                                                      │
-│ ✓ installed  · esc close                                                                                             │
-│                                                                                                                      │
-│                                                                                                                      │
-│                                                                                                                      │
+│ ✓ built  · esc close                                                                                                 │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -26,5 +26,5 @@ ipm  o/r › p › tdd                                                          
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
-2 of 100                                                                                                                
-esc close (when finished)                                                                                               
+2 of 100  o/r › p › tdd                                                                                                 
+esc close                                                                                                               

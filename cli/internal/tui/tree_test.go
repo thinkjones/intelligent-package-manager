@@ -12,6 +12,8 @@ import (
 // mapCatalog is a Catalog over an in-memory set of nodes.
 type mapCatalog map[string]Node
 
+func (c mapCatalog) Counts() map[string]int { return map[string]int{} }
+
 func (c mapCatalog) Node(id string) (Node, error) {
 	n, ok := c[id]
 	if !ok {

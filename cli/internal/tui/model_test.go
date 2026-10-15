@@ -84,8 +84,18 @@ func press(t *testing.T, m *Model, keys ...string) (quit bool) {
 // typeText types s into whatever has focus.
 func typeText(t *testing.T, m *Model, s string) {
 	t.Helper()
+	searchFocus(t, m)
 	for _, r := range s {
 		press(t, m, string(r))
+	}
+}
+
+// searchFocus presses / when the Catalog results have focus, as a person
+// does before typing a query; anywhere else it does nothing.
+func searchFocus(t *testing.T, m *Model) {
+	t.Helper()
+	if m.tab == tabCatalog && m.focus == focusResults && m.inst == nil && m.form == nil && m.picker == nil && !m.help {
+		press(t, m, "/")
 	}
 }
 
@@ -118,7 +128,10 @@ type fakeCatalog struct {
 	details map[string]Node
 	asked   []string
 	err     error
+	counts  map[string]int
 }
+
+func (f *fakeCatalog) Counts() map[string]int { return f.counts }
 
 func (f *fakeCatalog) Node(id string) (Node, error) {
 	f.asked = append(f.asked, id)
@@ -134,17 +147,25 @@ func (f *fakeCatalog) Node(id string) (Node, error) {
 type fakePacks struct {
 	scope   string
 	packs   []Pack
+	global  []Pack // the user scope's packs, listed when global is set
 	listErr error
 	addErr  error
 	calls   []string
 }
 
 func (f *fakePacks) Scope() string { return f.scope }
-func (f *fakePacks) List() ([]Pack, error) {
+func (f *fakePacks) List(global bool) ([]Pack, error) {
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
-	return append([]Pack(nil), f.packs...), nil
+	out := append([]Pack(nil), f.packs...)
+	if global {
+		for _, p := range f.global {
+			p.Global = true
+			out = append(out, p)
+		}
+	}
+	return out, nil
 }
 func (f *fakePacks) find(name string) *Pack {
 	for i := range f.packs {
@@ -182,14 +203,14 @@ func (f *fakePacks) Remove(pack string, ids ...string) error {
 	return nil
 }
 
-type fakeInstaller struct {
+type fakeBuilder struct {
 	lines []string
 	err   error
-	// gate, when set, holds Install until it is closed.
+	// gate, when set, holds Build until it is closed.
 	gate chan struct{}
 }
 
-func (f *fakeInstaller) Install(_ context.Context, out io.Writer) error {
+func (f *fakeBuilder) Build(_ context.Context, out io.Writer) error {
 	for _, l := range f.lines {
 		fmt.Fprintln(out, l)
 	}
@@ -207,37 +228,108 @@ func hits(names ...string) []Hit {
 	return out
 }
 
-type fakeDeployer struct {
-	def      Target
-	cleaned  *Target // what Plan returns as the target; nil returns t unchanged
-	plan     []string
-	planErr  error
-	lines    []string
-	err      error
-	deployed []string
+type fakeInstaller struct {
+	def       Target
+	cleaned   *Target // what Plan returns as the target; nil returns t unchanged
+	plan      []string
+	planErr   error
+	lines     []string
+	err       error
+	installed []string
+	targets   []Target // every Target Install was given
+
+	installs       []Install // List's records
+	globalInstalls []Install // added when List is asked for global
+	listErr        error
+	listCalls      int
 }
 
-func (f *fakeDeployer) Default(pack string) Target { return f.def }
-func (f *fakeDeployer) Plan(pack string, t Target) (Target, []string, error) {
+func (f *fakeInstaller) Targets() []string                { return []string{"claude", "gascity"} }
+func (f *fakeInstaller) Default(pack, kind string) Target { return f.def }
+func (f *fakeInstaller) List(global bool) ([]Install, error) {
+	f.listCalls++
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	out := append([]Install(nil), f.installs...)
+	if global {
+		out = append(out, f.globalInstalls...)
+	}
+	return out, nil
+}
+func (f *fakeInstaller) Plan(pack string, t Target) (Target, []string, error) {
 	if f.cleaned != nil {
 		t = *f.cleaned
 	}
 	return t, f.plan, f.planErr
 }
-func (f *fakeDeployer) Deploy(_ context.Context, pack string, t Target, out io.Writer) error {
-	f.deployed = append(f.deployed, fmt.Sprintf("%s %s %s", pack, t.Scope, t.Path))
+func (f *fakeInstaller) Install(_ context.Context, pack string, t Target, out io.Writer) error {
+	f.installed = append(f.installed, fmt.Sprintf("%s %s %s", pack, t.Scope, t.Path))
+	f.targets = append(f.targets, t)
 	for _, l := range f.lines {
 		fmt.Fprintln(out, l)
 	}
 	return f.err
 }
 
+type fakeMarketplace struct {
+	repos     []Repo // List's repos; Follow and Unfollow change Followed here
+	listErr   error
+	listCalls int
+	followErr error
+	followed  []string // Follow's and Unfollow's calls, "+repo" and "-repo"
+	lines     []string
+	syncErr   error
+	syncs     int
+	// gate, when set, holds Sync until it is closed.
+	gate chan struct{}
+}
+
+func (f *fakeMarketplace) List() ([]Repo, error) {
+	f.listCalls++
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	return append([]Repo(nil), f.repos...), nil
+}
+
+func (f *fakeMarketplace) set(repo string, on bool) error {
+	sign := "-"
+	if on {
+		sign = "+"
+	}
+	f.followed = append(f.followed, sign+repo)
+	if f.followErr != nil {
+		return f.followErr
+	}
+	for i := range f.repos {
+		if f.repos[i].Repo == repo {
+			f.repos[i].Followed = on
+		}
+	}
+	return nil
+}
+
+func (f *fakeMarketplace) Follow(repo string) error   { return f.set(repo, true) }
+func (f *fakeMarketplace) Unfollow(repo string) error { return f.set(repo, false) }
+func (f *fakeMarketplace) Sync(_ context.Context, out io.Writer) error {
+	f.syncs++
+	for _, l := range f.lines {
+		fmt.Fprintln(out, l)
+	}
+	if f.gate != nil {
+		<-f.gate
+	}
+	return f.syncErr
+}
+
 type fakes struct {
-	s *fakeSearcher
-	c *fakeCatalog
-	p *fakePacks
-	i *fakeInstaller
-	d *fakeDeployer
+	mk *fakeMarketplace
+	s  *fakeSearcher
+	c  *fakeCatalog
+	p  *fakePacks
+	b  *fakeBuilder
+	in *fakeInstaller
 }
 
 func newTest(t *testing.T) (*Model, fakes) {
@@ -253,16 +345,17 @@ func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
 		s: &fakeSearcher{mode: "hybrid", results: map[string]Results{
 			"tdd": {Hits: hits("tdd", "tdd-guard"), Found: 100},
 		}, errs: map[string]error{}},
-		c: &fakeCatalog{details: map[string]Node{}},
-		p: &fakePacks{scope: "project /work"},
-		i: &fakeInstaller{},
-		d: &fakeDeployer{def: Target{Scope: "project", Path: "/work"},
+		c:  &fakeCatalog{details: map[string]Node{}},
+		p:  &fakePacks{scope: "project /work"},
+		b:  &fakeBuilder{},
+		mk: &fakeMarketplace{},
+		in: &fakeInstaller{def: Target{Scope: "project", Path: "/work"},
 			plan: []string{"ipm install", "claude plugin marketplace add /work/.ipm --scope project", "claude plugin install kit@work-ipm --scope project"}},
 	}
 	if setup != nil {
 		setup(f)
 	}
-	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Installer: f.i, Deployer: f.d})
+	m := New(Deps{Searcher: f.s, Catalog: f.c, Packs: f.p, Builder: f.b, Installer: f.in, Marketplace: f.mk})
 	m.debounce = 0
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
 	return m, f
@@ -270,6 +363,7 @@ func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
 
 func TestTypingSearches(t *testing.T) {
 	m, f := newTest(t)
+	press(t, m, "/")
 	typeText(t, m, "tdd")
 	if len(f.s.queries) == 0 || f.s.queries[len(f.s.queries)-1] != "tdd" {
 		t.Fatalf("queries %v", f.s.queries)
@@ -279,6 +373,22 @@ func TestTypingSearches(t *testing.T) {
 	}
 	if !strings.Contains(view(m), "2 of 100") {
 		t.Errorf("want the count in the view:\n%s", view(m))
+	}
+}
+
+// TestOpensOnResults: ipm tui opens with the results focused, so the tab
+// keys work at once and / focuses the search box.
+func TestOpensOnResults(t *testing.T) {
+	m, f := newTest(t)
+	press(t, m, "2")
+	if m.tab != tabPacks {
+		t.Fatalf("2 on launch: tab %v, want Packs", m.tab)
+	}
+	press(t, m, "1")
+	press(t, m, "/")
+	typeText(t, m, "tdd")
+	if m.focus != focusSearch || len(f.s.queries) == 0 || f.s.queries[len(f.s.queries)-1] != "tdd" {
+		t.Errorf("/ then typing: focus %v queries %v", m.focus, f.s.queries)
 	}
 }
 
@@ -305,6 +415,7 @@ func TestEmptyQueryClears(t *testing.T) {
 
 func TestSearchErrorKeepsResults(t *testing.T) {
 	m, f := newTest(t)
+	press(t, m, "/")
 	typeText(t, m, "tdd")
 	f.s.errs["tddx"] = errors.New("search server timed out")
 	typeText(t, m, "x")
@@ -320,6 +431,7 @@ func TestSearchErrorKeepsResults(t *testing.T) {
 
 func TestTypeFilterCycles(t *testing.T) {
 	m, f := newTest(t)
+	press(t, m, "/")
 	typeText(t, m, "tdd")
 	press(t, m, "down")
 	var got []string
@@ -365,6 +477,7 @@ func TestQuit(t *testing.T) {
 		t.Error("ctrl+c should quit")
 	}
 	m, _ = newTest(t)
+	press(t, m, "/")
 	if press(t, m, "q") || m.input.Value() != "q" {
 		t.Error("q in the search box is a letter")
 	}
@@ -556,11 +669,12 @@ func TestPacksErrorShown(t *testing.T) {
 
 func TestInstallStreams(t *testing.T) {
 	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
-	f.i.lines = []string{"✓ kit: 2 item(s)", "validate: ok"}
+	f.b.lines = []string{"✓ kit: 2 item(s)", "validate: ok"}
 	typeText(t, m, "tdd")
-	press(t, m, "down", "a", "i")
+	press(t, m, "down", "a")
+	drain(t, m, m.startBuild())
 	v := view(m)
-	for _, want := range []string{"✓ kit: 2 item(s)", "validate: ok", "✓ installed"} {
+	for _, want := range []string{"✓ kit: 2 item(s)", "validate: ok", "✓ built"} {
 		if !strings.Contains(v, want) {
 			t.Errorf("install modal lacks %q:\n%s", want, v)
 		}
@@ -576,31 +690,52 @@ func TestInstallStreams(t *testing.T) {
 
 func TestQuitIgnoredDuringInstall(t *testing.T) {
 	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
-	f.i.gate = make(chan struct{})
+	f.b.gate = make(chan struct{})
 	typeText(t, m, "tdd")
 	press(t, m, "down")
-	_, cmd := m.Update(key("i"))
-	for _, k := range []string{"q", "ctrl+c", "esc"} {
+	cmd := m.startBuild()
+	for _, k := range []string{"q", "esc"} {
 		if _, c := m.Update(key(k)); c != nil {
 			t.Errorf("%s during install returned a command", k)
 		}
 	}
-	if m.inst == nil || !strings.Contains(m.status, "install is running") {
+	if m.inst == nil || m.status != busyMsg {
 		t.Errorf("modal %v status %q", m.inst, m.status)
 	}
-	close(f.i.gate)
+	if _, c := m.Update(key("ctrl+c")); c != nil || m.status != abandonMsg {
+		t.Errorf("first ctrl+c: cmd %v status %q", c, m.status)
+	}
+	if !strings.Contains(view(m), abandonMsg) {
+		t.Errorf("the warning should show:\n%s", view(m))
+	}
+	close(f.b.gate)
 	drain(t, m, cmd)
-	if !strings.Contains(view(m), "✓ installed") {
+	if !strings.Contains(view(m), "✓ built") {
 		t.Errorf("install should finish:\n%s", view(m))
 	}
 }
 
+func TestCtrlCTwiceAbandonsARun(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	f.b.gate = make(chan struct{})
+	cmd := m.startBuild()
+	m.Update(key("ctrl+c"))
+	if _, c := m.Update(key("ctrl+c")); c == nil {
+		t.Fatal("the second ctrl+c should quit")
+	} else if _, ok := c().(tea.QuitMsg); !ok {
+		t.Errorf("second ctrl+c returned %T", c())
+	}
+	close(f.b.gate)
+	drain(t, m, cmd)
+}
+
 func TestInstallFailure(t *testing.T) {
 	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
-	f.i.lines = []string{"pnpm install …"}
-	f.i.err = errors.New("pnpm failed")
+	f.b.lines = []string{"pnpm install …"}
+	f.b.err = errors.New("pnpm failed")
 	typeText(t, m, "tdd")
-	press(t, m, "down", "a", "i")
+	press(t, m, "down", "a")
+	drain(t, m, m.startBuild())
 	if v := view(m); !strings.Contains(v, "pnpm install …") || !strings.Contains(v, "✗ pnpm failed") {
 		t.Errorf("modal:\n%s", v)
 	}
@@ -678,10 +813,10 @@ func TestTraySelectionStaysVisible(t *testing.T) {
 
 func TestInstallLongLineDoesNotHang(t *testing.T) {
 	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
-	f.i.lines = []string{strings.Repeat("x", 70*1024), "validate: ok"}
+	f.b.lines = []string{strings.Repeat("x", 70*1024), "validate: ok"}
 	typeText(t, m, "tdd")
 	press(t, m, "down")
-	_, cmd := m.Update(key("i"))
+	cmd := m.startBuild()
 	done := make(chan struct{})
 	go func() { drain(t, m, cmd); close(done) }()
 	select {
@@ -818,7 +953,7 @@ func TestBreadcrumb(t *testing.T) {
 	}
 }
 
-func deployTest(t *testing.T) (*Model, fakes) {
+func catalogWithPack(t *testing.T) (*Model, fakes) {
 	t.Helper()
 	m, f := newTestWith(t, withPacks(Pack{Name: "kit", Items: []string{tddID}}))
 	typeText(t, m, "tdd")
@@ -826,119 +961,16 @@ func deployTest(t *testing.T) (*Model, fakes) {
 	return m, f
 }
 
-func TestBuildKey(t *testing.T) {
-	for _, k := range []string{"b", "i"} {
-		m, _ := deployTest(t)
+func TestCatalogHasNoBuildOrInstallKeys(t *testing.T) {
+	for _, k := range []string{"b", "i", "D"} {
+		m, _ := catalogWithPack(t)
 		press(t, m, k)
-		if m.inst == nil {
-			t.Errorf("%s should build", k)
+		if m.inst != nil || m.form != nil || m.status != "" {
+			t.Errorf("%s should do nothing on Catalog: modal %v %v status %q", k, m.inst, m.form, m.status)
 		}
-	}
-}
-
-func TestDeployFlow(t *testing.T) {
-	m, f := deployTest(t)
-	f.d.lines = []string{"$ claude plugin install kit@work-ipm --scope project"}
-	press(t, m, "D")
-	if m.deploy == nil || !strings.Contains(view(m), "▶project") {
-		t.Fatalf("D should open the target step on the default:\n%s", view(m))
-	}
-	press(t, m, "enter")
-	if m.deploy.path.Value() != "/work" {
-		t.Fatalf("path step prefilled %q", m.deploy.path.Value())
-	}
-	press(t, m, "enter")
-	v := view(m)
-	for _, want := range append([]string{"Deploy kit to Claude Code — project scope in /work", "y deploy · esc cancel"}, f.d.plan...) {
-		if !strings.Contains(v, want) {
-			t.Errorf("confirm lacks %q:\n%s", want, v)
+		if h := m.hints(); strings.Contains(h, " b ") || strings.Contains(h, "deploy") {
+			t.Errorf("footer lists %s: %q", k, h)
 		}
-	}
-	press(t, m, "y")
-	v = view(m)
-	if strings.Join(f.d.deployed, ";") != "kit project /work" || !strings.Contains(v, "$ claude plugin install") || !strings.Contains(v, "✓ deployed kit (project /work)") {
-		t.Errorf("deployed %v:\n%s", f.d.deployed, v)
-	}
-	press(t, m, "esc")
-	if m.inst != nil || m.deploy != nil {
-		t.Error("esc should close the finished deploy")
-	}
-}
-
-func TestDeployUserSkipsPath(t *testing.T) {
-	m, _ := deployTest(t)
-	press(t, m, "D", "up", "enter")
-	if !strings.Contains(view(m), "Deploy kit to Claude Code — user scope") || strings.Contains(view(m), "user scope in") {
-		t.Errorf("user scope should go straight to confirm:\n%s", view(m))
-	}
-}
-
-func TestDeployBadPath(t *testing.T) {
-	m, f := deployTest(t)
-	f.d.planErr = errors.New("/nope is not a folder")
-	press(t, m, "D", "enter", "enter")
-	if m.deploy == nil || m.deploy.step != stepPath || !strings.Contains(m.status, "/nope is not a folder") {
-		t.Errorf("step %v status %q", m.deploy, m.status)
-	}
-}
-
-func TestDeployFailure(t *testing.T) {
-	m, f := deployTest(t)
-	f.d.err = errors.New("`claude plugin install kit@work-ipm --scope project` failed: exit status 1")
-	press(t, m, "D", "enter", "enter", "y")
-	if !strings.Contains(view(m), "✗ `claude plugin install") {
-		t.Errorf("modal:\n%s", view(m))
-	}
-	press(t, m, "esc")
-	if m.inst != nil {
-		t.Error("esc should close")
-	}
-}
-
-func TestDeployCancel(t *testing.T) {
-	for _, keys := range [][]string{{"D", "esc"}, {"D", "enter", "esc"}, {"D", "enter", "enter", "esc"}} {
-		m, f := deployTest(t)
-		press(t, m, keys...)
-		if m.deploy != nil || len(f.d.deployed) != 0 {
-			t.Errorf("%v: modal %v deployed %v", keys, m.deploy, f.d.deployed)
-		}
-	}
-}
-
-func TestDeployWithoutPack(t *testing.T) {
-	m, _ := newTest(t)
-	typeText(t, m, "tdd")
-	press(t, m, "down", "D")
-	if m.deploy != nil || !strings.Contains(m.status, "no pack to deploy — press p to create one") {
-		t.Errorf("modal %v status %q", m.deploy, m.status)
-	}
-}
-
-func TestDeployIgnoredWhileRunning(t *testing.T) {
-	m, f := deployTest(t)
-	f.i.gate = make(chan struct{})
-	_, cmd := m.Update(key("b"))
-	for _, k := range []string{"D", "b"} {
-		if _, c := m.Update(key(k)); c != nil || m.deploy != nil || !strings.Contains(m.status, "running") {
-			t.Errorf("%s while building: cmd %v deploy %v status %q", k, c, m.deploy, m.status)
-		}
-	}
-	close(f.i.gate)
-	drain(t, m, cmd)
-}
-
-func TestDeployShowsCleanedTarget(t *testing.T) {
-	m, f := deployTest(t)
-	f.d.cleaned = &Target{Scope: "project", Path: "/home/me/work"}
-	press(t, m, "D", "enter")
-	m.deploy.path.SetValue("~/work/")
-	press(t, m, "enter")
-	if !strings.Contains(view(m), "project scope in /home/me/work") {
-		t.Errorf("confirm should show the folder claude runs in:\n%s", view(m))
-	}
-	press(t, m, "y")
-	if !strings.Contains(view(m), "✓ deployed kit (project /home/me/work)") || f.d.deployed[0] != "kit project /home/me/work" {
-		t.Errorf("deployed %v:\n%s", f.d.deployed, view(m))
 	}
 }
 
@@ -1167,5 +1199,19 @@ func TestExternalModalScrolls(t *testing.T) {
 	}
 	if v := view(m); !strings.Contains(v, "▶ r25/m") || !strings.Contains(v, "enter jump · esc close") {
 		t.Errorf("the selected reference and the hint must stay visible:\n%s", v)
+	}
+}
+
+func TestSyncDoesNotClearDirty(t *testing.T) {
+	m, _ := newTestWith(t, withPacks(Pack{Name: "a"}))
+	m.dirty = true
+	press(t, m, "down", "4")
+	drain(t, m, m.startSync())
+	if !m.dirty {
+		t.Error("a sync built nothing: the packs are still unbuilt")
+	}
+	drain(t, m, m.startBuild())
+	if m.dirty {
+		t.Error("a successful build clears dirty")
 	}
 }

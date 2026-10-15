@@ -72,49 +72,91 @@ type Node struct {
 // Catalog describes artifacts.
 type Catalog interface {
 	Node(id string) (Node, error)
+	// Counts is how many items the catalog holds of each type.
+	Counts() map[string]int
+}
+
+// Install is one place a pack is installed.
+type Install struct {
+	Pack string
+	Target
 }
 
 // Pack is one pack in the scope's ipm.toml.
 type Pack struct {
 	Name, Description string
 	Items             []string
+	// Global marks a pack of the user scope, listed from a project.
+	Global bool
+	// Built is "fresh", "stale" or "never".
+	Built    string
+	Installs []Install
 }
 
 // Packs reads and edits the scope's packs, with the same rules as ipm pack.
 type Packs interface {
 	// Scope describes where the packs live: "project /path" or "global".
 	Scope() string
-	List() ([]Pack, error)
+	// List is the scope's packs, and the user scope's too when global is set.
+	List(global bool) ([]Pack, error)
 	Create(name, description string) error
 	Add(pack string, ids ...string) error
 	Remove(pack string, ids ...string) error
 }
 
-// Installer builds every pack, as ipm pack build does, writing its output to out.
-type Installer interface {
-	Install(ctx context.Context, out io.Writer) error
+// Builder builds every pack, as ipm pack build does, writing its output to out.
+type Builder interface {
+	Build(ctx context.Context, out io.Writer) error
 }
 
-// Target is where a pack is deployed in Claude Code: Scope is "user",
-// "project" or "local"; Path is the folder for project and local scope.
-type Target struct{ Scope, Path string }
+// Target is where a pack is installed: Kind "claude" (Scope user, project or
+// local; Path the folder for project and local) or "gascity" (Path the parent
+// folder, Name the pack folder). Global installs a pack of the user scope.
+type Target struct {
+	Kind, Scope, Path, Name string
+	Global                  bool
+}
 
-// Deployer installs a built pack into Claude Code.
-type Deployer interface {
-	// Default is the target a pack deploys to unless the user picks another.
-	Default(pack string) Target
-	// Plan checks t and returns it as Deploy will use it (its folder made
-	// absolute), with the commands Deploy will run, for the user to confirm.
+// Installer installs built packs into Claude Code or as a Gas City pack folder.
+type Installer interface {
+	// Targets are the kinds offered: "claude" and "gascity".
+	Targets() []string
+	// Default is the target a pack installs to unless the user picks another.
+	Default(pack, kind string) Target
+	// Plan checks t and returns it as Install will use it (its folder made
+	// absolute), with the commands Install will run, for the user to confirm.
 	Plan(pack string, t Target) (Target, []string, error)
-	// Deploy builds and installs pack at t, writing its output to out.
-	Deploy(ctx context.Context, pack string, t Target, out io.Writer) error
+	// Install builds if needed and installs pack at t, writing its output to out.
+	Install(ctx context.Context, pack string, t Target, out io.Writer) error
+	// List is the recorded installs of the project, and of the user scope when global is set.
+	List(global bool) ([]Install, error)
+}
+
+// Repo is a repo of a curated list, or one followed outside every list.
+type Repo struct {
+	Repo, List, Description string
+	Topics                  []string
+	Stars, Items            int
+	Followed                bool
+}
+
+// Marketplace is the curated repos and which of them the user follows.
+type Marketplace interface {
+	// List is the curated repos in list order, then the followed repos no
+	// list holds, under List "Other".
+	List() ([]Repo, error)
+	Follow(repo string) error
+	Unfollow(repo string) error
+	// Sync runs ipm catalog sync, writing its output to out.
+	Sync(ctx context.Context, out io.Writer) error
 }
 
 // Deps is what the TUI works with.
 type Deps struct {
-	Searcher  Searcher
-	Catalog   Catalog
-	Packs     Packs
-	Installer Installer
-	Deployer  Deployer
+	Searcher    Searcher
+	Catalog     Catalog
+	Packs       Packs
+	Builder     Builder
+	Installer   Installer
+	Marketplace Marketplace
 }

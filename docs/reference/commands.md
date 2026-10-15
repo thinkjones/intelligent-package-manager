@@ -327,11 +327,11 @@ Bare `ipm install` replays every install recorded for the scope (`-g` for your u
 ipm tui [-g]
 ```
 
-Search, see each artifact in its tree, collect into packs, build and deploy, in one screen. Uses the search server when it is running and indexed, and keyword search over the catalog otherwise. Needs a terminal and a catalog. See [Use the TUI](../guides/tui.md) for the keys.
+Four tabs in one screen: **Catalog** (search every artifact, see its tree, add it to a pack), **Packs** (build every pack, install one, remove items), **Installs** (the recorded installs, reinstall or make a new one) and **Marketplace** (follow repos from the curated lists and run `ipm catalog sync`). Installs go through a form that shows the exact commands for `ipm install claude` or `ipm install gascity` before running them. Uses the search server when it is running and indexed, and keyword search over the catalog otherwise. Needs a terminal and a catalog. Keys: `1`–`4` and `[` `]` switch tabs, `/` filters, `?` lists every key of the tab, `q` quits. Global packs and installs, listed from a project with `g`, are read-only; the TUI doesn't reload the catalog while it runs, so restart it after a sync. See [Use the TUI](../guides/tui.md) for each tab's columns and keys.
 
 | Flag | Does |
 | --- | --- |
-| `-g`, `--global` | Use your user scope's packs (`$IPM_HOME/global`). |
+| `-g`, `--global` | Use your user scope's packs and installs (`$IPM_HOME/global`). |
 
 ### `ipm doctor`
 

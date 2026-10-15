@@ -13,13 +13,17 @@ import (
 // reloadPacks reads the scope's packs, keeping the active pack when it still
 // exists and otherwise taking the first by name.
 func (m *Model) reloadPacks() {
-	packs, err := m.d.Packs.List()
+	if m.pk.loaded {
+		defer m.loadPacksTab()
+	}
+	packs, err := m.d.Packs.List(false)
 	if err != nil {
 		m.status = err.Error()
 		return
 	}
 	sort.Slice(packs, func(i, j int) bool { return packs[i].Name < packs[j].Name })
 	m.packs = packs
+	m.counts[tabPacks] = len(packs)
 	if m.activePack() == nil {
 		m.active = ""
 		if len(packs) > 0 {

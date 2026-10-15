@@ -17,29 +17,67 @@ type (
 
 // install is the state of the install modal.
 type install struct {
-	title   string // "install" or "deploy"
+	kind    runKind
+	title   string // the modal's title: "build" or "install"
+	command string // the ipm command the modal echoes under its title
 	success string // the line shown when it finishes without error
 	lines   []string
 	done    bool
 	err     error
+	armed   bool // ctrl+c was pressed once while it streams
 	scanner *bufio.Scanner
 	pipe    *io.PipeReader
 	result  chan error
 }
 
-// startInstall runs the installer in the background, its output piped into
-// the modal line by line.
-func (m *Model) startInstall() tea.Cmd {
-	return m.stream("install", "✓ installed", func(w io.Writer) error {
-		return m.d.Installer.Install(context.Background(), w)
+// runKind is what the output modal runs.
+type runKind int
+
+const (
+	runBuild runKind = iota
+	runInstall
+	runSync
+)
+
+// busyMsg is the status when a run is asked for while another still streams.
+const busyMsg = "busy — wait for the current run to finish"
+
+// abandonMsg is the status after the first ctrl+c while a run streams.
+const abandonMsg = "press ctrl+c again to abandon the run and quit"
+
+// busy reports whether the output modal is streaming a run.
+func (m *Model) busy() bool { return m.inst != nil && !m.inst.done }
+
+// refuseBusy says so in the status and reports true when a run is streaming;
+// every command that starts a run asks first.
+func (m *Model) refuseBusy() bool {
+	if !m.busy() {
+		return false
+	}
+	m.status, m.statusOK = busyMsg, false
+	return true
+}
+
+// startBuild builds every pack in the background, its output piped into the
+// modal line by line.
+func (m *Model) startBuild() tea.Cmd {
+	if m.refuseBusy() {
+		return nil
+	}
+	cmd := "ipm pack build"
+	if m.d.Packs.Scope() == "global" {
+		cmd += " -g"
+	}
+	return m.stream(runBuild, "build", cmd, "✓ built", func(w io.Writer) error {
+		return m.d.Builder.Build(context.Background(), w)
 	})
 }
 
 // stream runs work in the background with its output piped into the modal
-// line by line.
-func (m *Model) stream(title, success string, work func(io.Writer) error) tea.Cmd {
+// line by line; command is the ipm command it echoes under the title.
+func (m *Model) stream(kind runKind, title, command, success string, work func(io.Writer) error) tea.Cmd {
 	pr, pw := io.Pipe()
-	in := &install{title: title, success: success, scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
+	in := &install{kind: kind, title: title, command: command, success: success, scanner: bufio.NewScanner(pr), pipe: pr, result: make(chan error, 1)}
 	in.scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 	m.inst = in
 	go func() {
@@ -69,7 +107,16 @@ func (in *install) next() tea.Msg {
 // installKey handles keys while the modal is open.
 func (m *Model) installKey(k string) tea.Cmd {
 	if !m.inst.done {
-		m.status = m.inst.title + " is running — wait for it to finish"
+		if k == "ctrl+c" {
+			if m.inst.armed {
+				return tea.Quit
+			}
+			m.inst.armed = true
+			m.status, m.statusOK = abandonMsg, false
+			return nil
+		}
+		m.inst.armed = false
+		m.refuseBusy()
 		return nil
 	}
 	switch k {
@@ -92,7 +139,7 @@ func (m *Model) installLines(w, rows int) []string {
 	case in.done:
 		result = stTeal.Render(in.success) + stMuted.Render("  · esc close")
 	}
-	head := []string{stTitle.Render("ipm " + in.title), ""}
+	head := []string{stTitle.Render(in.command), ""}
 	room := max(0, rows-len(head)-2)
 	shown := in.lines
 	if len(shown) > room {
@@ -120,7 +167,7 @@ func (m *Model) installLines(w, rows int) []string {
 // helpLines is the ? overlay in place of the body: the two modes' keys side
 // by side when there is room, one after the other otherwise.
 func (m *Model) helpLines(w, rows int) []string {
-	table := func(title string, keys [][2]string, cw int) []string {
+	keyTable := func(title string, keys [][2]string, cw int) []string {
 		out := []string{fit(stTitle.Render(title), cw), spaces(cw)}
 		for _, kh := range keys {
 			out = append(out, fit(stAmber.Render(fit(kh[0], 14))+stText.Render(kh[1]), cw))
@@ -128,9 +175,20 @@ func (m *Model) helpLines(w, rows int) []string {
 		return out
 	}
 	var lines []string
-	if w >= 100 {
+	if m.tab != tabCatalog {
+		keys := tabKeys
+		switch m.tab {
+		case tabPacks:
+			keys = packsKeys
+		case tabInstalls:
+			keys = installsKeys
+		case tabMarketplace:
+			keys = marketplaceKeys
+		}
+		lines = keyTable("Keys", keys, w)
+	} else if w >= 100 {
 		half := w / 2
-		left, right := table("Search mode", searchKeys, half-2), table("Tree mode", treeKeys, w-half)
+		left, right := keyTable("Search mode", searchKeys, half-2), keyTable("Tree mode", treeKeys, w-half)
 		for i := range max(len(left), len(right)) {
 			l, r := spaces(half-2), ""
 			if i < len(left) {
@@ -142,8 +200,8 @@ func (m *Model) helpLines(w, rows int) []string {
 			lines = append(lines, l+"  "+r)
 		}
 	} else {
-		lines = append(table("Search mode", searchKeys, w), "")
-		lines = append(lines, table("Tree mode", treeKeys, w)...)
+		lines = append(keyTable("Search mode", searchKeys, w), "")
+		lines = append(lines, keyTable("Tree mode", treeKeys, w)...)
 	}
 	lines = append(lines, "", stMuted.Render("esc or ? closes this"))
 	out := make([]string, 0, rows)

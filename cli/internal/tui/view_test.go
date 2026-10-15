@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -37,17 +38,23 @@ func TestGoldenViews(t *testing.T) {
 	long := strings.Repeat("very-long-name-", 8)
 	setup := func(f fakes) {
 		withDetails(f)
+		f.c.counts = map[string]int{"skill": 1204, "agent": 312, "command": 98, "plugin": 410}
 		f.p.packs = []Pack{{Name: "csharp-sdlc", Description: "C# lifecycle", Items: []string{tddID, "agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md", "plugin:anthropics/claude-plugins-official#stripe"}}, {Name: "docs", Description: "Writing"}}
+		tdd := f.s.results["tdd"]
+		tdd.Hits[0].Stars, tdd.Hits[0].UsedBy = 31234, 3
+		tdd.Hits[0].Description = "Test-driven development: write the failing test first, then the code that makes it pass, then tidy up."
+		tdd.Hits[1].Stars = 842
 		f.s.results["long"] = Results{Hits: []Hit{{ID: "skill:o/r:skills/" + long, Type: "copilot-plugin", Name: long, Score: "99", Description: strings.Repeat("words ", 40)}}, Found: 1}
 	}
 	cases := map[string]func(t *testing.T) *Model{
-		"search-mode": func(t *testing.T) *Model {
+		"catalog-search": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
+			m.Update(tea.WindowSizeMsg{Width: 100, Height: 30})
 			typeText(t, m, "tdd")
 			press(t, m, "down")
 			return m
 		},
-		"tree-mode": func(t *testing.T) *Model {
+		"catalog-tree": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
 			typeText(t, m, "tdd")
 			press(t, m, "down", "left", "tab")
@@ -78,24 +85,97 @@ func TestGoldenViews(t *testing.T) {
 			press(t, m, "down", "tab")
 			return m
 		},
-		"no-color": func(t *testing.T) *Model {
+		"catalog-no-color": func(t *testing.T) *Model {
 			t.Setenv("NO_COLOR", "1")
 			m, _ := newTestWith(t, setup)
 			typeText(t, m, "tdd")
 			press(t, m, "down")
 			return m
 		},
-		"narrow": func(t *testing.T) *Model {
+		"catalog-narrow": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
-			m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+			m.Update(tea.WindowSizeMsg{Width: 60, Height: 20})
 			typeText(t, m, "long")
 			press(t, m, "down")
 			return m
 		},
-		"deploy-confirm": func(t *testing.T) *Model {
+		"catalog-wide": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
+			m.Update(tea.WindowSizeMsg{Width: 160, Height: 40})
 			typeText(t, m, "tdd")
-			press(t, m, "down", "D", "enter", "enter")
+			press(t, m, "down")
+			return m
+		},
+		"install-form-target": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			press(t, m, "down", "2", "i")
+			return m
+		},
+		"install-form-gascity": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			press(t, m, "down", "2", "i", "down", "enter", "enter")
+			return m
+		},
+		"install-form-confirm": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			press(t, m, "down", "2", "i", "enter", "enter", "enter")
+			return m
+		},
+		"installs": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withInstalls)
+			press(t, m, "down", "3")
+			return m
+		},
+		"installs-global": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withInstalls)
+			press(t, m, "down", "3", "g")
+			return m
+		},
+		"installs-empty": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			press(t, m, "down", "3")
+			return m
+		},
+		"marketplace": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withMarket)
+			press(t, m, "down", "4", "down")
+			return m
+		},
+		"marketplace-filtered": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withMarket)
+			press(t, m, "down", "4", "/")
+			typeText(t, m, "review")
+			press(t, m, "enter")
+			return m
+		},
+		"marketplace-long-list": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, func(f fakes) {
+				f.mk.repos = []Repo{
+					{Repo: "o/one", List: "AI · Agentic Engineering Methods and Practices for Teams", Stars: 900, Items: 4},
+					{Repo: "o/two", List: "AI · Agentic Engineering Methods and Practices for Teams", Stars: 12, Items: 2},
+				}
+			})
+			m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+			press(t, m, "down", "4")
+			return m
+		},
+		"marketplace-loading": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withMarket)
+			press(t, m, "down")
+			m.Update(key("4"))
+			return m
+		},
+		"marketplace-error": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, func(f fakes) {
+				f.mk.listErr = errors.New("fetch https://example.test/lists.toml: 503 Service Unavailable")
+			})
+			press(t, m, "down", "4")
+			return m
+		},
+		"marketplace-narrow": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, withMarket)
+			m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+			press(t, m, "down", "4")
 			return m
 		},
 		"external-modal": func(t *testing.T) *Model {
@@ -112,9 +192,10 @@ func TestGoldenViews(t *testing.T) {
 		},
 		"install": func(t *testing.T) *Model {
 			m, f := newTestWith(t, setup)
-			f.i.lines = []string{"✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)", "validate: ok"}
+			f.b.lines = []string{"✓ csharp-sdlc: 1 item(s), 0 plugin dependency(ies)", "validate: ok"}
 			typeText(t, m, "tdd")
-			press(t, m, "down", "i")
+			press(t, m, "down")
+			drain(t, m, m.startBuild())
 			return m
 		},
 		"local-banner": func(t *testing.T) *Model {
@@ -123,7 +204,7 @@ func TestGoldenViews(t *testing.T) {
 			typeText(t, m, "tdd")
 			return m
 		},
-		"help": func(t *testing.T) *Model {
+		"help-catalog": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
 			press(t, m, "down", "?")
 			return m
@@ -157,9 +238,9 @@ func TestPanelsByWeight(t *testing.T) {
 	m, _ := treeTest(t)
 	m.Update(tea.WindowSizeMsg{Width: 120, Height: 40})
 	ps := panels(m.View().Content)
-	// body = 40 - header - tray (2) - status - hints = 35; results 40%.
-	if len(ps) != 2 || len(ps[0]) != 14 || len(ps[1]) != 21 {
-		t.Fatalf("panel heights %d, want 14 and 21", lens(ps))
+	// body = 40 - title, tabs (2), stats - tray (2) - status - hints = 32; results 40%.
+	if len(ps) != 2 || len(ps[0]) != 12 || len(ps[1]) != 20 {
+		t.Fatalf("panel heights %d, want 12 and 20", lens(ps))
 	}
 	for _, p := range ps {
 		for _, l := range p {

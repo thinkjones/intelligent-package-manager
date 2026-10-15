@@ -1,12 +1,14 @@
-ipm  o/r › p › tdd                                                                                              ● hybrid
-╭─ deploy ─────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Deploy csharp-sdlc to Claude Code — project scope in /work                                                           │
+ipm  project /work                                                                                              ● hybrid
+CATALOG (0)  PACKS (0)  INSTALLS (…)  MARKETPLACE (…)                                                                   
+──────────────────────────────────────━━━━━━━━━━━━━━━                                                                   
+                                                                                                                        
+╭─ marketplace ────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ loading the marketplace…                                                                                             │
 │                                                                                                                      │
-│   ipm install                                                                                                        │
-│   claude plugin marketplace add /work/.ipm --scope project                                                           │
-│   claude plugin install kit@work-ipm --scope project                                                                 │
 │                                                                                                                      │
-│ y deploy · esc cancel                                                                                                │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -24,7 +26,5 @@ ipm  o/r › p › tdd                                                          
 │                                                                                                                      │
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
-─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
-skill tdd · agent csharp-pro · plugin stripe                                                                            
-2 of 100                                                                                                                
-y deploy  esc cancel                                                                                                    
+                                                                                                                        
+s sync  1-4 tabs  ? help  q quit                                                                                        

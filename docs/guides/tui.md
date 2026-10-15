@@ -7,7 +7,7 @@ nav_order: 3
 # Use the TUI
 {: .no_toc }
 
-Search, see where each artifact lives, collect it into a pack, build the pack and deploy it to Claude Code, all in one screen.
+Search the catalog, collect items into packs, build and install them, and follow repos, all in one screen with four tabs.
 {: .fs-6 .fw-300 }
 
 1. TOC
@@ -26,67 +26,89 @@ ipm tui -g         # your user-scope packs
 
 ## The screen
 
+Top to bottom: a title line, the tab bar, a one-line stats strip for the active tab, the tab's body, a status line, and the key footer for the active tab.
+
 ```text
-ipm  wshobson/agents › claude-code-workflows › jvm-languages › csharp-pro          ● hybrid
+ipm  project /work                                                          ● hybrid
+CATALOG (14,917)  PACKS (2)  INSTALLS (1)  MARKETPLACE (192)
+━━━━━━━━━━━━━━━━──────────────────────────────────────────
+skill 11,804 · agent 1,077 · command 838 · hook 28 · mcp 28 · plugin 643 · marketplace 28 · repo 298
 ╭─ search: c# testing ──────────────────────────────────────────────────────────────────╮
-│ ▶71   agent  ✓ csharp-pro                    wshobson/agents          ★40.3k           │
-│  65   copilt   csharp-dotnet-development     github/awesome-copilot   ★39.9k           │
-│  24   skill  ✓ dotnet-backend-patterns       wshobson/agents          ★40.3k           │
+│   TYPE   ✓ NAME           REPO                     ↗     ★ SCORE DESCRIPTION           │
+│ ▶ agent  ✓ csharp-pro     wshobson/agents              ★40.3k    71 Write modern C# …  │
 ╰────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─ tree ── agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md ─────────────╮
-│ repo    wshobson/agents                                                                │
-│ └ market  claude-code-workflows        Production-ready workflow orchestration with…   │
-│   └ plugin  jvm-languages              JVM language development including Java, Sca…   │
-│     ├ agent  ▶csharp-pro ────────────▶ Write modern C# code with advanced features      │
-│                                        like records, pattern matching, and async/…      │
-│     ├ agent   java-pro                 Master Java 21+ with modern features like vir…   │
-│     └ agent   scala-pro                Master enterprise-grade Scala development wit…   │
+│ …                                                                                      │
 ╰────────────────────────────────────────────────────────────────────────────────────────╯
 ─ csharp-sdlc (4) · project /work
 skill dotnet-backend-patterns · agent csharp-pro · command accessibility-audit · plugin stripe
 50 of 100
-↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  b build  D deploy  ? help  q quit
+↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  f type  1-4 tabs  ? help  q quit
 ```
 
-- **Header:** a breadcrumb of where the tree is (repo › marketplace › plugin › artifact), and `● hybrid` (the search server) or `○ local` (keyword search over the catalog).
-- **Results panel, top:** score, type, `✓` when the item is already in the active pack, name, repo, `↗N` (how many other repos use its repo) and stars. Under 100 columns, repo, `↗N` and stars drop out. A name starting `↗` is an external entry (see below).
-- **Tree panel, bottom:** the artifact in context — the path from its repo down to its parent, its siblings, and its children. Every node shows a one-line description, lined up in one column; the current node has an arrow to its description, which runs to three lines. When an artifact belongs to more than one plugin, `also in:` lists the others. Long lists scroll, with `↑ N more` / `↓ N more` rows.
-- **Tray:** the active pack, its item count, `• not built` once you've changed it since the last build, and its items.
+- **Title line:** `ipm`, the scope (`project <folder>` or `global`), and on the right `● hybrid` (the search server) or `○ local` (keyword search over the catalog).
+- **Tab bar:** `CATALOG (n)  PACKS (n)  INSTALLS (n)  MARKETPLACE (n)`, with thousands separators. A tab that hasn't loaded yet shows `(…)`: Installs and Marketplace load when you first open them. The Catalog is the tab you start on.
+- **Stats strip:** one line about the active tab; each tab below says what it holds. While you filter a tab, the strip ends with `filter: <text>`.
+- **Detail pane:** Packs, Installs and Marketplace show the selected row in full beside the table. Below 100 columns the pane is hidden; on Packs, `enter` then shows the pack's items across the whole body.
 - **Colour:** each type has its own colour everywhere (repo blue, marketplace purple, plugin amber, skill teal, agent pink, command green, hook and MCP server grey); the panel with focus has an amber border. Set `NO_COLOR` to turn colour off.
+- **A tab whose data fails to load** shows the error in its body; the other tabs keep working.
 
-Below 60×15 the TUI asks you to enlarge the terminal; in a short terminal the tree leaves out children.
+Below 60×15 the TUI asks you to enlarge the terminal; in a short terminal the Catalog's tree leaves out children.
 
-## Search mode
+## Keys on every tab
 
 | Key | Does |
 | --- | --- |
-| typing | search; results refresh as you type |
-| `↓`, `tab` (search box) | focus the results |
-| `/` | focus the search box |
+| `1`–`4` | go to Catalog, Packs, Installs or Marketplace |
+| `[` `]` | previous / next tab (wrapping) |
+| `/` | focus the active tab's filter (on the Catalog, the search box) |
+| `?` | every key of the active tab; `esc` or `?` closes it |
+| `q`, `ctrl+c` | quit (`ctrl+c` quits even while typing) |
+
+While a text input has focus (the Catalog's search box, a tab's filter, a field of a form), every printable key types into it and `esc` leaves it. `ipm tui` opens on the Catalog with the results focused, so the tab keys work at once; press `/` to search. In the search box `1`, `q` and `/` are part of the query: press `esc`, `↓` or `tab` to move to the results, and the other keys work.
+
+On Packs, Installs and Marketplace, `/` filters the rows by a case-insensitive substring of their visible column text. `enter` keeps the filter and returns to the rows; `esc` clears it.
+
+## Catalog
+
+Search every artifact in the catalog, see where each lives, and collect into the active pack. The stats strip is the number of items of each type.
+
+| Column | Is |
+| --- | --- |
+| `TYPE` | skill, agent, cmd, plugin, hook, mcp, market, repo or copilt |
+| `✓` | the item is already in the active pack |
+| `NAME`, `REPO` | the artifact and the repo it lives in |
+| `↗` | how many other repos use its repo (omitted when none) |
+| `★` | the repo's GitHub stars |
+| `SCORE` | the search score |
+| `DESCRIPTION` | its description |
+
+In a narrow terminal (under 100 columns) columns drop out: the repo, `↗N`, stars and description go first. A name starting `↗` is an external entry (see below). The panel below the results is the tree: the artifact in context, from its repo down to its parent, its siblings and its children. Every node shows a one-line description, lined up in one column; the current node has an arrow to its description, which runs to three lines. When an artifact belongs to more than one plugin, `also in:` lists the others. Long lists scroll, with `↑ N more` / `↓ N more` rows. The line under the tree is the active pack: its name, item count, `• not built` once you've changed it since the last build, and its items.
+
+| Key | Does |
+| --- | --- |
+| `/`, then typing | search; results refresh as you type |
+| `↓`, `tab`, `esc` (search box) | focus the results |
 | `↑` `↓`, `j` `k` | move through results; the tree follows |
 | `←` `→`, `h` `l` | move the tree to the parent / first child, without changing the result |
 | `tab`, `enter` | tree mode |
 | `a` / `d` | add / remove the selected result |
 | `t` | the pack tray (`←` `→` items, `d` removes, `esc` back) |
 | `f` | cycle the type filter: all, skill, agent, command, plugin |
-| `p` | switch pack, or `n` for a new one |
-| `b` (or `i`) | build every pack (`ipm pack build`) |
-| `D` | deploy the active pack to Claude Code (`ipm install claude`) |
+| `p` | switch the active pack, or `n` for a new one |
 | `e` | external references: the other repos that use this repo |
 | `ctrl+r` | check the search server again |
-| `?` | every key |
-| `q`, `ctrl+c` | quit |
 
-In the search box every letter is part of the query, so the other keys work once you've moved to the results (`↓` or `tab`).
+Building and installing are not on the Catalog: they live on Packs and Installs.
 
-## Tree mode
+### Tree mode
 
 | Key | Does |
 | --- | --- |
 | `↑` `↓`, `k` `j` | move between siblings, and onto `also in` rows |
 | `←` `→`, `h` `l` | parent / first child |
 | `enter` | on an `also in` row: follow that plugin instead |
-| `a` / `d` | add / remove the node — for example a whole plugin |
+| `a` / `d` | add / remove the node, for example a whole plugin |
 | `tab`, `esc` | back to search mode; the tree returns to the selected result |
 
 ## External references
@@ -101,26 +123,100 @@ A marketplace can list a plugin that lives in another repo: `anthropics/claude-p
 
 Being used by other repos is a strong sign a repo is useful, so search also prefers it when results are otherwise equal.
 
-## Build and deploy
+## Packs
 
-1. **Collect.** Search, look at the tree, and `a` what you want. `p`, then `n`, creates a pack.
-2. **Build.** `b` runs `ipm pack build`; its output streams in and ends with `✓ installed`.
-3. **Deploy.** `D` installs the active pack into Claude Code:
-   1. Pick where: **user** (every project, just you), **project** (a folder, shared through its `.claude/settings.json`) or **local** (a folder, just you). The default is project scope in the pack's own project.
-   2. For project and local scope, confirm or type the folder (`~` works).
-   3. Read the exact commands it will run, then `y` to deploy:
-      ```text
-      Deploy csharp-sdlc to Claude Code — project scope in /work
-        ipm pack build
-        claude plugin marketplace add /work/.ipm --scope project
-        claude plugin install csharp-sdlc@work-ipm --scope project
-      y deploy · esc cancel
-      ```
-   4. The output streams in and ends with `✓ deployed csharp-sdlc (project /work)`.
+Every pack of the scope, with what has been built and installed.
 
-Deploy builds first when `.ipm/` is out of date, so Claude Code gets the current pack. Deploying again adds the marketplace again (Claude Code accepts that), refreshes it, and updates the plugin instead of installing it. If Claude Code already has a marketplace of the same name from another folder — two projects in folders with the same name — deploy stops rather than repoint it. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
+| Column | Is |
+| --- | --- |
+| `NAME` | the pack |
+| `SCOPE` | `project` or `global` |
+| `ITEMS` | how many items it holds |
+| `BUILT` | `fresh` (`.ipm/` matches the pack), `stale` (something in the scope changed since the last build: the stamp covers every pack of the scope, so one changed pack makes all of them stale) or `never` |
+| `INSTALLED TO` | where its recorded installs went |
 
-The same works from the command line with [`ipm install claude`](../reference/commands.md#ipm-install). Like the command line, the TUI records each install, so a bare `ipm install` replays it.
+The stats strip counts packs, how many are fresh and stale, and how many installs are recorded. The detail pane lists the pack's description and items.
+
+| Key | Does |
+| --- | --- |
+| `↑` `↓`, `j` `k` | move through the packs, or through the items |
+| `enter`, `→` | focus the selected pack's items |
+| `esc`, `←` | back to the packs |
+| `x` | remove the selected item from the pack (with the items focused) |
+| `b` | build every pack (`ipm pack build`); the output streams in a modal and ends with `✓ built` |
+| `i` | install the selected pack: opens the install form |
+| `g` | include your global packs, when you started in a project (in `ipm tui -g` it says `already in global scope`) |
+
+From a project, `g` lists your user-scope packs too, marked `global`. They are read-only there: `x`, `b` and `i` on one say `global pack — open ipm tui -g to change it`. Start `ipm tui -g` to change them.
+
+## Installs
+
+The installs ipm has recorded for the scope: the `[[packs.<name>.installs]]` entries of `ipm.toml`, or `$IPM_HOME/installs.json` for your user scope.
+
+| Column | Is |
+| --- | --- |
+| `PACK` | the pack installed |
+| `TARGET` | `claude` or `gascity` |
+| `AS` | the Claude scope (`user`, `project`, `local`), or the Gas City folder name |
+| `PATH` | the folder it was installed to |
+| `FROM` | the scope whose `ipm.toml` records it, `project` or `global` |
+
+The stats strip counts installs and, per target, how many. The detail pane shows the install in full and the `ipm install` command that repeats it. There is no WHEN column: ipm doesn't record when an install ran.
+
+| Key | Does |
+| --- | --- |
+| `↑` `↓`, `j` `k` | move through the installs |
+| `enter`, `i` | reinstall the selected install: the install form opens at its confirm step with the exact commands; `y` runs them in the output modal, ending with `✓ installed <pack> (<target> …)`, and `esc` cancels. A reinstall the installer refuses shows why in the form |
+| `a` | a new install: the form goes straight to the target when there is only one pack; with several it asks which pack first, with the selected row's pack highlighted |
+| `g` | include your global installs, when you started in a project |
+
+Like global packs, global installs listed from a project are read-only: `enter`, `i` and `a` on one say `global pack — open ipm tui -g to change it`.
+
+## The install form
+
+`i` on Packs, or `a` on Installs, opens the form in place of the tab. Each step shows its keys at the bottom; `enter` goes on, `esc` cancels.
+
+1. **Pack** (only from `a` with several packs): pick one of the scope's packs.
+2. **Target:** `claude` (Claude Code, as a plugin) or `gascity` (a Gas City pack folder).
+3. **For `claude`, the scope:** **user** (every project, just you), **project** (a folder, shared through its `.claude/settings.json`) or **local** (a folder, just you). For project and local, then the folder (`~` works). The defaults are those of `ipm install claude`.
+4. **For `gascity`, the parent folder and the folder name** (the name defaults to the pack's). A name or folder `ipm install gascity` refuses (a bad name, a missing parent, a folder that holds the project or ipm's home, or one ipm didn't write) is shown in red and the form returns to the folder, before anything runs.
+5. **Confirm:** the exact commands it will run, then `y` to install:
+
+   ```text
+   Install csharp-sdlc to Claude Code — project scope in /work
+     ipm pack build
+     claude plugin marketplace add /work/.ipm --scope project
+     claude plugin install csharp-sdlc@work-ipm --scope project
+   y install · esc cancel
+   ```
+
+The output streams into the modal and ends with `✓ installed csharp-sdlc (claude project /work)`, or an error. While a build, install or sync runs, every key except `ctrl+c` is ignored and says `busy — wait for the current run to finish`; once it is done `esc` or `enter` closes the modal. `ctrl+c` while it runs asks `press ctrl+c again to abandon the run and quit`, and a second `ctrl+c` quits, abandoning the run; after it is done `ctrl+c` and `q` quit at once. The Packs and Installs tabs reload as the run finishes.
+
+An install builds first when `.ipm/` is out of date, so Claude Code gets the current pack. Installing again adds the marketplace again (Claude Code accepts that), refreshes it, and updates the plugin instead of installing it. If Claude Code already has a marketplace of the same name from another folder, two projects in folders with the same name, the install stops rather than repoint it. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
+
+The same works from the command line with [`ipm install claude`](../reference/commands.md#ipm-install) and `ipm install gascity`, and every install is recorded either way, so a bare `ipm install` replays what the Installs tab lists.
+
+## Marketplace
+
+The curated lists of repos, with a `✓` on the ones you follow. Repos you follow that no list names are grouped under `Other`.
+
+| Column | Is |
+| --- | --- |
+| `✓` | you follow the repo |
+| `REPO` | `owner/repo`, under a divider row for each list |
+| `LIST` | the list |
+| `★` | GitHub stars (from `ipm marketplace stats`) |
+| `ITEMS` | how many artifacts of the repo are in the catalog (0 until it is synced) |
+
+The stats strip is `N repos · F followed · L lists`: the same counts as `ipm marketplace` prints, with a repo of two lists counted once. The detail pane shows the lists, stars, items, topics and description of the selected repo.
+
+| Key | Does |
+| --- | --- |
+| `↑` `↓`, `j` `k` | move through the repos; the lists' divider rows are skipped |
+| `space` | follow or unfollow the selected repo (`ipm marketplace add` / `remove`); it changes the sources list at once, the catalog only after a sync |
+| `s` | run `ipm catalog sync` in the output modal: fetch the followed repos with pnpm and rebuild the catalog |
+
+After a successful sync the status says `catalog synced — restart ipm tui to search the new items`. The TUI doesn't reload the catalog or the search index while it runs, so restart it to see new items on the Catalog and in the stats.
 
 ## Without the search server
 
