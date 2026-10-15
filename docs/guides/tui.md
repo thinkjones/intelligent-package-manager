@@ -68,7 +68,7 @@ Below 60×15 the TUI asks you to enlarge the terminal; in a short terminal the C
 | `esc` | back out one step (leave the search box, clear a filter, leave tree mode, the tray or a pack's items); with nothing to undo, the tab bar |
 | `1`–`4`, `[` `]` | go to Catalog, Packs, Installs or Marketplace, or the previous / next tab, landing on its tab bar |
 | `/` | focus the active tab's filter (on the Catalog, the search box), from the bar or a pane |
-| `?` | every key of the active tab; `esc` or `?` closes it |
+| `?` | every key of the active tab; `↑` `↓` (`k` `j`) scroll it when it doesn't fit, `esc` or `?` closes it |
 | `q`, `ctrl+c` | quit (`ctrl+c` quits even while typing) |
 
 The panes, in `tab` order: on the Catalog the search box, the results and the tree (once there is a result); on Packs the packs and the selected pack's items (when it has some); on Installs and Marketplace the one table.
@@ -108,10 +108,10 @@ In a narrow terminal (under 100 columns) columns drop out: the repo, `↗N`, sta
 | `e` | external references: the other repos that use this repo |
 | `ctrl+r` | check the search server again |
 
-Two tokens narrow a search, anywhere among its words:
+Two tokens narrow a search, anywhere among its words (`Repo:` and `PACK:` work too):
 
 - **`repo:owner/repo`** keeps that repo's items. On its own it lists every item of the repo (up to 50); with other words it searches them.
-- **`pack:name`** lists the pack's items, in the pack's order, without asking the search server; the other words narrow them by name, repo or description, and the type filter applies. A pack that doesn't exist says `no pack <name>`. Packs listed with `g` on the Packs tab count too.
+- **`pack:name`** lists the pack's items, in the pack's order, without asking the search server; the other words narrow them by name, repo or description, and the type filter applies. A pack that doesn't exist says `no pack <name>`. Packs listed with `g` on the Packs tab count too. After `a` or `d` the list is read again, so it matches the pack, with the same item still selected when it is there.
 
 Adding with `a` when there is no pack yet opens the new pack form but keeps your search.
 
