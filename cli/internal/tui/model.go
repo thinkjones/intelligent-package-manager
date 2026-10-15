@@ -58,6 +58,7 @@ type Model struct {
 	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
 	backStack []string // external entries jumped from, newest last
 	reveal    string   // the item c opened from Packs: the tree goes to it when the search returns
+	keepID    string   // the result to keep selected when a pack: list is re-run after a or d
 
 	pk       packsTab    // the Packs tab
 	ins      installsTab // the Installs tab
@@ -134,6 +135,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status, m.reveal = msg.err.Error(), ""
 			return m, nil
 		}
+		old := m.sel
 		m.res, m.sel, m.offset = msg.res, 0, 0
 		if msg.note != "" {
 			m.note("%s", msg.note)
@@ -141,6 +143,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.reveal != "" {
 			m.revealItem()
 			return m, nil
+		}
+		if keep := m.keepID; keep != "" {
+			m.keepID, m.sel = "", max(0, min(old, len(m.res.Hits)-1))
+			for i, h := range m.res.Hits {
+				if h.ID == keep {
+					m.sel = i
+				}
+			}
+			if m.focus == focusTree { // the tree stays on the node a or d acted on
+				return m, nil
+			}
 		}
 		m.followSelection()
 		return m, nil
@@ -263,7 +276,7 @@ func (m *Model) setFocus(f focus) {
 // clears the results for an empty query.
 func (m *Model) queryChanged() tea.Cmd {
 	m.seq++
-	m.reveal = ""
+	m.reveal, m.keepID = "", ""
 	if strings.TrimSpace(m.input.Value()) == "" {
 		m.res, m.sel, m.offset = Results{}, 0, 0
 		m.followSelection()

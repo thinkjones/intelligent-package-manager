@@ -1395,3 +1395,23 @@ func TestRevealDroppedWhenFocusMoves(t *testing.T) {
 		t.Errorf("results arriving after / leave the search box focused: focus %v", m.focus)
 	}
 }
+
+func TestAddRemoveRelistsPack(t *testing.T) {
+	m, _ := packTokenModel(t)
+	setQuery(t, m, "pack:csharp-sdlc")
+	press(t, m, "esc", "down")
+	if m.sel != 1 {
+		t.Fatalf("sel %d", m.sel)
+	}
+	press(t, m, "d")
+	if len(m.res.Hits) != 2 || m.sel != 1 || m.res.Hits[1].Name != "stripe" {
+		t.Errorf("d re-lists the pack, clamping the selection: sel %d hits %v", m.sel, m.res.Hits)
+	}
+	setQuery(t, m, "pack:docs")
+	press(t, m, "esc")
+	seq := m.seq
+	press(t, m, "a") // into the active pack, csharp-sdlc
+	if m.seq != seq+1 || len(m.res.Hits) != 1 || m.sel != 0 || m.res.Hits[0].Name != "write" {
+		t.Errorf("a re-lists too, keeping the item selected: seq %d→%d sel %d hits %v", seq, m.seq, m.sel, m.res.Hits)
+	}
+}

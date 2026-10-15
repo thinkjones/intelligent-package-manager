@@ -25,10 +25,10 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 		switch k {
 		case "a":
 			m.addSelected()
-			return nil
+			return m.relistPack()
 		case "d":
 			m.removeSelected()
-			return nil
+			return m.relistPack()
 		case "p":
 			m.openPicker(false)
 			m.picker.list = true
@@ -469,4 +469,20 @@ func (m *Model) revealItem() {
 		m.setFocus(focusTree)
 		m.treeSel = m.tree.Cursor
 	}
+}
+
+// relistPack re-runs a pack: query after a or d changed a pack, so the list
+// matches it, keeping the selected result selected while it is still there.
+func (m *Model) relistPack() tea.Cmd {
+	if _, _, pack := searchQuery(m.input.Value()); pack == "" {
+		return nil
+	}
+	keep := ""
+	if m.sel < len(m.res.Hits) {
+		keep = m.res.Hits[m.sel].ID
+	}
+	m.seq++
+	m.reveal = ""
+	m.keepID = keep
+	return m.searchCmd(m.seq)
 }
