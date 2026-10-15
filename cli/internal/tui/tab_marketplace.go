@@ -36,7 +36,7 @@ const syncedMsg = "catalog synced — restart ipm tui to search the new items"
 
 var marketCols = []column{
 	{Title: "✓", Min: 1, Max: 1},
-	{Title: "REPO", Min: 12, Max: 36},
+	{Title: "REPO", Min: 12, Max: 28},
 	{Title: "LIST", Min: 6},
 	{Title: "★", Min: 2, Max: 7, Right: true},
 	{Title: "ITEMS", Min: 5, Max: 6, Right: true},
