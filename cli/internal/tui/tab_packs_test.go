@@ -387,6 +387,17 @@ func TestPacksOpenInCatalog(t *testing.T) {
 	}
 }
 
+func TestPacksOpenInCatalogThenLeave(t *testing.T) {
+	m, _ := newTestWith(t, withPackRepos)
+	press(t, m, "2", "tab", "enter")
+	cmd := m.openItemInCatalog()
+	press(t, m, "2")
+	drain(t, m, cmd)
+	if m.focus == focusTree || !m.bar || m.tab != tabPacks {
+		t.Errorf("results arriving after you left take no focus: focus %v bar %v tab %d", m.focus, m.bar, m.tab)
+	}
+}
+
 func TestPacksOpenInCatalogBeyondResults(t *testing.T) {
 	m, _ := newTestWith(t, func(f fakes) {
 		withPackRepos(f)

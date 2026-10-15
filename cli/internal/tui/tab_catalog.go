@@ -465,6 +465,8 @@ func (m *Model) revealItem() {
 		}
 	}
 	m.setCursor(id)
-	m.setFocus(focusTree)
-	m.treeSel = m.tree.Cursor
+	if m.tab == tabCatalog && !m.bar { // unless you moved on before the results came
+		m.setFocus(focusTree)
+		m.treeSel = m.tree.Cursor
+	}
 }
