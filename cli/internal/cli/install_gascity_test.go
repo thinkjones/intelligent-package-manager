@@ -160,6 +160,33 @@ func TestInstallGascityDefaultsToIPMFolder(t *testing.T) {
 	}
 }
 
+func TestInstallGascityDefaultSpelledWithC(t *testing.T) {
+	for _, spell := range []func(root string) string{
+		func(string) string { return ".ipm/.gascity" },
+		func(string) string { return "./.ipm/.gascity/" },
+		func(root string) string { return filepath.Join(root, ".ipm", "..", ".ipm", ".gascity") },
+		func(root string) string { return "~/" + filepath.Base(root) + "/.ipm/.gascity" },
+	} {
+		f, root, _ := gascityFake(t)
+		f.cwd = root
+		f.env["HOME"] = filepath.Dir(root)
+		dir := filepath.Join(root, ".ipm", ".gascity")
+		arg := spell(root)
+		if err := f.run("install", "gascity", "kit", "-C", arg); err != nil {
+			t.Fatalf("-C %s: %v\n%s", arg, err, f.out.String())
+		}
+		if _, err := os.Stat(filepath.Join(dir, "kit", "pack.toml")); err != nil {
+			t.Errorf("-C %s: %v", arg, err)
+		}
+	}
+	// Any other folder must still exist.
+	f, root, _ := gascityFake(t)
+	f.cwd = root
+	if err := f.run("install", "gascity", "kit", "-C", ".ipm/.other"); err == nil || !strings.Contains(err.Error(), "is not a folder") {
+		t.Errorf("got %v", err)
+	}
+}
+
 func TestInstallGascityGlobalDefault(t *testing.T) {
 	f, _, _ := gascityFake(t)
 	if err := f.run("pack", "-g", "new", "gk"); err != nil {

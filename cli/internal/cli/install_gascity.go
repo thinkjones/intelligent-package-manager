@@ -144,21 +144,25 @@ func gascityDefault(scope project.Scope) string {
 }
 
 // gascityFolder is the folder to write the pack folder into: p as gascityDir
-// makes it, or the scope's default folder when p is empty or names it.
-// isDefault reports the latter: that folder need not exist yet, and an
-// install creates it.
+// makes it, or the scope's default folder when p is empty or names it, however
+// spelled. isDefault reports the latter: that folder need not exist yet, and
+// an install creates it.
 func gascityFolder(sys System, scope project.Scope, p string) (dir string, isDefault bool, err error) {
 	def := gascityDefault(scope)
-	if strings.TrimSpace(p) == "" || filepath.Clean(p) == def {
+	if strings.TrimSpace(p) == "" {
 		return def, true, nil
 	}
-	dir, err = gascityDir(p, workDir(sys, scope), sys.Getenv("HOME"))
+	cwd, home := workDir(sys, scope), sys.Getenv("HOME")
+	if abs := resolveDir(p, cwd, home); abs == def || realPath(abs) == realPath(def) {
+		return def, true, nil
+	}
+	dir, err = gascityDir(p, cwd, home)
 	return dir, false, err
 }
 
-// gascityDir makes the folder to write into absolute: empty is cwd, a leading
-// ~ is home, a relative path is from cwd; it must be an existing folder.
-func gascityDir(p, cwd, home string) (string, error) {
+// resolveDir makes p absolute and clean: empty is cwd, a leading ~ is home, a
+// relative path is from cwd.
+func resolveDir(p, cwd, home string) string {
 	p = strings.TrimSpace(p)
 	if p == "" {
 		p = cwd
@@ -169,7 +173,12 @@ func gascityDir(p, cwd, home string) (string, error) {
 	if !filepath.IsAbs(p) {
 		p = filepath.Join(cwd, p)
 	}
-	p = filepath.Clean(p)
+	return filepath.Clean(p)
+}
+
+// gascityDir is p as resolveDir makes it, which must be an existing folder.
+func gascityDir(p, cwd, home string) (string, error) {
+	p = resolveDir(p, cwd, home)
 	if info, err := os.Stat(p); err != nil || !info.IsDir() {
 		return "", fmt.Errorf("%s is not a folder", p)
 	}
