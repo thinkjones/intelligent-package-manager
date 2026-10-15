@@ -51,12 +51,12 @@ $IPM_CACHE_DIR/
   .ipm/package.json                      one dependency per repo         commit
   .ipm/pnpm-lock.yaml                    pnpm's pins                     commit
   .ipm/.pnpmfile.cjs                     pnpm hooks                      commit
-  .ipm/.gitignore                        ignores the last three          commit
+  .ipm/.gitignore                        ignores the last four           commit
   .ipm/.claude-plugin/marketplace.json   the marketplace                 commit
   .ipm/build.stamp                       what the last build used        ignored
   .ipm/node_modules/                     pnpm's output                   ignored
   .ipm/plugins/<pack>/                   the built plugins               ignored
-  .ipm/.gascity/<name>/                  Gas City pack folders           not ignored
+  .ipm/.gascity/<name>/                  Gas City pack folders           ignored
 ```
 
 The project is the nearest folder, at or above where you run `ipm`, that holds an `ipm.toml`. Everything under `.ipm/` is generated: `.ipm/.gascity/` by `ipm install gascity` (which `ipm pack build` leaves alone), the rest by `ipm pack build`; don't edit it by hand.
