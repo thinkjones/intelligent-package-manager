@@ -1381,3 +1381,17 @@ func TestHelpScrollsWhenNarrow(t *testing.T) {
 		t.Errorf("help reopens at the top: %d", m.helpOff)
 	}
 }
+
+func TestRevealDroppedWhenFocusMoves(t *testing.T) {
+	m, _ := newTestWith(t, func(f fakes) {
+		withPackRepos(f)
+		f.s.results[""] = Results{Hits: hits("tdd"), Found: 1}
+	})
+	press(t, m, "2", "tab", "enter")
+	cmd := m.openItemInCatalog()
+	press(t, m, "/")
+	drain(t, m, cmd)
+	if m.focus != focusSearch {
+		t.Errorf("results arriving after / leave the search box focused: focus %v", m.focus)
+	}
+}

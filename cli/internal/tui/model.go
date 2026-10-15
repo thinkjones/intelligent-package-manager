@@ -248,8 +248,10 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 	return m.marketKey(msg)
 }
 
+// setFocus moves the Catalog's focus; a move drops a pending c reveal, so
+// results that land later don't take the focus back.
 func (m *Model) setFocus(f focus) {
-	m.focus = f
+	m.focus, m.reveal = f, ""
 	if f == focusSearch {
 		m.input.Focus()
 	} else {
