@@ -200,3 +200,13 @@ func TestBusyRefusesNewRuns(t *testing.T) {
 		t.Errorf("installed %v", f.in.installed)
 	}
 }
+
+func TestInstallFormLongFolderShowsTheEnd(t *testing.T) {
+	m, _ := formModel(t)
+	press(t, m, "down", "enter")
+	m.form.folder.SetValue("")
+	m.form.folder.SetValue("/" + strings.Repeat("deep/", 40) + "tail-end")
+	if v := view(m); !strings.Contains(v, "tail-end") {
+		t.Errorf("the folder field scrolls to the cursor:\n%s", v)
+	}
+}

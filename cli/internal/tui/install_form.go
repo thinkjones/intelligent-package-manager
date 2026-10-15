@@ -155,6 +155,9 @@ func (m *Model) chooseKind(kind string) {
 	f := m.form
 	def := m.d.Installer.Default(f.pack, kind)
 	f.kind, f.sel = kind, 0
+	// The width is set before the value so the field scrolls to its end.
+	f.folder.SetWidth(max(10, m.width-4-len("parent folder  ")-1))
+	f.name.SetWidth(max(10, m.width-4-len("name           ")-1))
 	f.folder.SetValue(def.Path)
 	if kind == "gascity" {
 		f.name.SetValue(def.Name)
@@ -285,8 +288,10 @@ func (m *Model) formLines(w, rows int) []string {
 		if f.kind == "gascity" {
 			label, head = "parent folder  ", "Install "+f.pack+" as a Gas City pack folder"
 		}
+		f.folder.SetWidth(max(10, w-lipgloss.Width(label)-1))
 		lines = append(lines, stTitle.Render(head), "", stMuted.Render(label)+f.folder.View())
 	case formName:
+		f.name.SetWidth(max(10, w-len("name           ")-1))
 		lines = append(lines, stTitle.Render("Install "+f.pack+" as a Gas City pack folder"), "",
 			stMuted.Render("parent folder  ")+stText.Render(f.folder.Value()),
 			stMuted.Render("name           ")+f.name.View())
