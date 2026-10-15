@@ -3,12 +3,12 @@ CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)
 ─────────────────━━━━━━━━━───────────────────────────────                                                               
 2 packs · 0 fresh · 0 stale · 0 installs                                                                                
 ╭─ install ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
-│ Install csharp-sdlc as a Gas City pack folder                                                                        │
+│ Install csharp-sdlc to Gas City — /work/.ipm/.gascity/csharp-sdlc                                                    │
 │                                                                                                                      │
-│ parent folder  /work                                                                                                 │
-│ name           csharp-sdlc                                                                                           │
+│   ipm install gascity csharp-sdlc                                                                                    │
 │                                                                                                                      │
-│ enter next · esc cancel                                                                                              │
+│ y install · esc cancel                                                                                               │
+│                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -27,4 +27,4 @@ CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                         
-enter next  esc cancel                                                                                                  
+y install  esc cancel                                                                                                   

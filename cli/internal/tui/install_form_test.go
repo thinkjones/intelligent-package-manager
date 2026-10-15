@@ -64,29 +64,38 @@ func TestInstallFormClaudeFlow(t *testing.T) {
 
 func TestInstallFormGascityFlow(t *testing.T) {
 	m, f := formModel(t)
+	f.in.def = Target{Kind: "gascity", Path: "/work/.ipm/.gascity", Name: "kit"}
+	f.in.cleaned = &Target{Kind: "gascity", Path: "/work/.ipm/.gascity", Name: "kit"}
+	f.in.plan = []string{"ipm install gascity kit"}
 	press(t, m, "down", "enter")
-	if m.form.step != formFolder || m.form.folder.Value() != "/work" || !strings.Contains(view(m), "parent folder") {
-		t.Fatalf("gascity asks for the parent folder first:\n%s", view(m))
-	}
-	press(t, m, "enter")
-	if m.form.step != formName || m.form.name.Value() != "kit" {
-		t.Fatalf("name defaults to the pack: step %v name %q", m.form.step, m.form.name.Value())
-	}
-	press(t, m, "backspace", "backspace", "backspace")
-	typeText(t, m, "crew")
-	press(t, m, "enter")
-	if m.form.step != formConfirm {
-		t.Fatalf("step %v", m.form.step)
-	}
-	press(t, m, "y")
 	v := view(m)
-	for _, want := range []string{"ipm install gascity kit -C /work --name crew", "✓ installed kit (gascity /work/crew)"} {
+	if m.form.step != formConfirm || strings.Contains(v, "folder") {
+		t.Fatalf("gascity goes straight to confirm: step %v\n%s", m.form.step, v)
+	}
+	for _, want := range []string{"Install kit to Gas City — /work/.ipm/.gascity/kit", "ipm install gascity kit", "y install · esc cancel"} {
 		if !strings.Contains(v, want) {
-			t.Errorf("modal lacks %q:\n%s", want, v)
+			t.Errorf("confirm lacks %q:\n%s", want, v)
 		}
 	}
-	if len(f.in.targets) != 1 || f.in.targets[0] != (Target{Kind: "gascity", Path: "/work", Name: "crew"}) {
+	// Plan gets the default name and no folder, so it picks the pack's
+	// scope's default folder.
+	if want := (Target{Kind: "gascity", Name: "kit"}); f.in.planned[0] != want {
+		t.Errorf("planned %+v, want %+v", f.in.planned[0], want)
+	}
+	press(t, m, "y")
+	if v := view(m); !strings.Contains(v, "✓ installed kit (gascity /work/.ipm/.gascity/kit)") {
+		t.Errorf("modal:\n%s", v)
+	}
+	if len(f.in.targets) != 1 || f.in.targets[0] != *f.in.cleaned {
 		t.Errorf("installed %+v", f.in.targets)
+	}
+}
+
+func TestInstallFormGascityNameFallsBackToPack(t *testing.T) {
+	m, f := formModel(t)
+	press(t, m, "down", "enter")
+	if f.in.planned[0].Name != "kit" {
+		t.Errorf("planned %+v", f.in.planned[0])
 	}
 }
 
@@ -110,14 +119,15 @@ func TestInstallFormPlanErrorStaysOnStep(t *testing.T) {
 	if m.form == nil || m.form.step != formFolder || !strings.Contains(view(m), "/nope is not a folder") {
 		t.Errorf("claude: step %v:\n%s", m.form, view(m))
 	}
-	press(t, m, "esc", "i", "down", "enter", "enter", "enter")
-	if m.form == nil || m.form.step != formFolder || !strings.Contains(view(m), "/nope is not a folder") {
-		t.Errorf("gascity returns to the folder: step %v:\n%s", m.form, view(m))
+	f.in.planErr = errors.New("/work/.ipm/.gascity/kit exists and was not written by ipm — use --force to replace it")
+	press(t, m, "esc", "i", "down", "enter")
+	v := view(m)
+	if m.form == nil || m.form.step != formTarget || !strings.Contains(v, "was not written by ipm") || !strings.Contains(v, "▶gascity") {
+		t.Errorf("gascity stays on the target step: step %v:\n%s", m.form, v)
 	}
-	f.in.planErr = nil
-	press(t, m, "enter", "enter")
-	if m.form.step != formConfirm {
-		t.Errorf("a fixed folder goes on: step %v", m.form.step)
+	press(t, m, "esc")
+	if m.form != nil || len(f.in.installed) != 0 {
+		t.Errorf("esc cancels: form %v installed %v", m.form, f.in.installed)
 	}
 }
 
@@ -135,7 +145,7 @@ func TestInstallFormFailure(t *testing.T) {
 }
 
 func TestInstallFormCancelAtEveryStep(t *testing.T) {
-	for _, keys := range [][]string{{"esc"}, {"enter", "esc"}, {"enter", "enter", "esc"}, {"enter", "enter", "enter", "esc"}, {"down", "enter", "esc"}, {"down", "enter", "enter", "esc"}, {"down", "enter", "enter", "enter", "esc"}} {
+	for _, keys := range [][]string{{"esc"}, {"enter", "esc"}, {"enter", "enter", "esc"}, {"enter", "enter", "enter", "esc"}, {"down", "enter", "esc"}} {
 		m, f := formModel(t)
 		press(t, m, keys...)
 		if m.form != nil || m.inst != nil || len(f.in.installed) != 0 {
@@ -209,7 +219,7 @@ func TestBusyRefusesNewRuns(t *testing.T) {
 func TestInstallFormLongFolderShowsTheEnd(t *testing.T) {
 	m, f := formModel(t)
 	f.in.def.Path = "/" + strings.Repeat("deep/", 40) + "tail-end"
-	press(t, m, "down", "enter")
+	press(t, m, "enter", "enter")
 	if v := view(m); !strings.Contains(v, "tail-end") {
 		t.Errorf("the folder field scrolls to the cursor:\n%s", v)
 	}
