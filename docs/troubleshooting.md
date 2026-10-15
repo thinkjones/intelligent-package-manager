@@ -112,9 +112,11 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `server off: keyword search only …` (banner) | The search server isn't running. Results still come from the catalog by keyword; for semantic search run `ipm catalog serve` and `ipm catalog rebuild`, then `ctrl+r`. |
 | `search index empty — run ipm catalog rebuild` (banner) | The server is running with an empty index. Run `ipm catalog rebuild`, then `ctrl+r`. |
 | `ipm needs at least 60×15 — enlarge the terminal` | Make the terminal bigger, or use the CLI commands. |
-| Letters and digits go into the search box instead of acting (`1`–`4` don't switch tabs) | A text input has focus, so every printable key types. Press `esc`, `↓` or `tab` to leave the Catalog's search box; `esc` leaves a filter. |
+| Letters and digits go into the search box instead of acting (`1`–`4` don't switch tabs) | A text input has focus, so every printable key types. Press `esc`, `↓` or `tab` to leave the Catalog's search box; `esc`, `enter` or `tab` leaves a filter. |
+| Keys like `a`, `x` or `b` do nothing | The tab bar has focus (its tab is marked `▶`). Press `tab`, `↓` or `enter` to go into the tab's panes. |
+| `no pack <name>` | The search box's `pack:<name>` names no pack of the scope. Check the name on the Packs tab, or press `p` on the Catalog to pick one. |
 | `busy — wait for the current run to finish` | A build, install or sync is running in the output modal; the modal closes with `esc` when it's done. To leave sooner press `ctrl+c` twice, which abandons the run and quits. |
-| `no pack to install — create one on the Packs tab` | Create a pack (on the Catalog, `p` then `n`) and add to it first. |
+| `no pack to install — create one on the Packs tab (n)` | Create a pack (`n` on the Packs tab, or `p` then `n` on the Catalog) and add to it first. |
 | `global pack — open ipm tui -g to change it` | A global pack or install listed from a project (`g`) is read-only there. Run `ipm tui -g` to build, install or remove from it. |
 | `catalog synced — restart ipm tui to search the new items` | The TUI doesn't reload the catalog or the search index while it runs. Quit and start it again. |
 | The Marketplace tab shows `0` items for a followed repo | The repo isn't synced yet: press `s` on the tab, or run `ipm catalog sync`. |

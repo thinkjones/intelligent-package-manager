@@ -43,13 +43,13 @@ skill 11,804 · agent 1,077 · command 838 · hook 28 · mcp 28 · plugin 643 ·
 ─ csharp-sdlc (4) · project /work
 skill dotnet-backend-patterns · agent csharp-pro · command accessibility-audit · plugin stripe
 50 of 100
-↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  f type  1-4 tabs  ? help  q quit
+/ search  ↑↓ results  ←→ tree  enter tree mode  tab pane  esc tab bar  a add  t tray  ? help  q quit
 ```
 
 - **Title line:** `ipm`, the scope (`project <folder>` or `global`), and on the right `● hybrid` (the search server) or `○ local` (keyword search over the catalog).
-- **Tab bar:** `CATALOG (n)  PACKS (n)  INSTALLS (n)  MARKETPLACE (n)`, with thousands separators. A tab that hasn't loaded yet shows `(…)`: Installs and Marketplace load when you first open them. The Catalog is the tab you start on.
+- **Tab bar:** `CATALOG (n)  PACKS (n)  INSTALLS (n)  MARKETPLACE (n)`, with thousands separators. A tab that hasn't loaded yet shows `(…)`: Installs and Marketplace load when you first open them. The Catalog is the tab you start on. While the bar has focus, the active tab is marked `▶ CATALOG (n)`.
 - **Stats strip:** one line about the active tab; each tab below says what it holds. While you filter a tab, the strip ends with `filter: <text>`.
-- **Detail pane:** Packs, Installs and Marketplace show the selected row in full beside the table. Below 100 columns the pane is hidden; on Packs, `enter` then shows the pack's items across the whole body.
+- **Panes:** the Catalog stacks its results over the tree, and Packs its packs over the selected pack's items. Installs and Marketplace show the selected row in full beside the table; below 100 columns that pane is hidden.
 - **Colour:** each type has its own colour everywhere (repo blue, marketplace purple, plugin amber, skill teal, agent pink, command green, hook and MCP server grey); the panel with focus has an amber border. Set `NO_COLOR` to turn colour off.
 - **A tab whose data fails to load** shows the error in its body; the other tabs keep working.
 
@@ -57,17 +57,25 @@ Below 60×15 the TUI asks you to enlarge the terminal; in a short terminal the C
 
 ## Keys on every tab
 
+`ipm tui` opens with the tab bar focused, on the Catalog. From the bar you pick a tab, then go into its panes; `tab` moves from pane to pane and, past the last, back to the bar.
+
 | Key | Does |
 | --- | --- |
-| `1`–`4` | go to Catalog, Packs, Installs or Marketplace |
-| `[` `]` | previous / next tab (wrapping) |
-| `/` | focus the active tab's filter (on the Catalog, the search box) |
+| `←` `→`, `h` `l` | on the tab bar: previous / next tab (wrapping) |
+| `tab`, `↓`, `enter` | on the tab bar: into the tab's first pane |
+| `shift+tab` | on the tab bar: into the tab's last pane |
+| `tab` / `shift+tab` | in a pane: the next / previous pane; past either end, the tab bar |
+| `esc` | back out one step (leave the search box, clear a filter, leave tree mode, the tray or a pack's items); with nothing to undo, the tab bar |
+| `1`–`4`, `[` `]` | go to Catalog, Packs, Installs or Marketplace, or the previous / next tab, landing on its tab bar |
+| `/` | focus the active tab's filter (on the Catalog, the search box), from the bar or a pane |
 | `?` | every key of the active tab; `esc` or `?` closes it |
 | `q`, `ctrl+c` | quit (`ctrl+c` quits even while typing) |
 
-While a text input has focus (the Catalog's search box, a tab's filter, a field of a form), every printable key types into it and `esc` leaves it. `ipm tui` opens on the Catalog with the results focused, so the tab keys work at once; press `/` to search. In the search box `1`, `q` and `/` are part of the query: press `esc`, `↓` or `tab` to move to the results, and the other keys work.
+The panes, in `tab` order: on the Catalog the search box, the results and the tree (once there is a result); on Packs the packs and the selected pack's items (when it has some); on Installs and Marketplace the one table.
 
-On Packs, Installs and Marketplace, `/` filters the rows by a case-insensitive substring of their visible column text. `enter` keeps the filter and returns to the rows; `esc` clears it.
+While a text input has focus (the Catalog's search box, a tab's filter, a field of a form), every printable key types into it, `h`, `l`, `q` and `1` included. In the search box press `esc`, `↓` or `tab` to move to the results, and the other keys work.
+
+On Packs, Installs and Marketplace, `/` filters the rows by a case-insensitive substring of their visible column text. `enter` or `tab` keeps the filter and returns to the rows; `esc` clears it.
 
 ## Catalog
 
@@ -91,13 +99,21 @@ In a narrow terminal (under 100 columns) columns drop out: the repo, `↗N`, sta
 | `↓`, `tab`, `esc` (search box) | focus the results |
 | `↑` `↓`, `j` `k` | move through results; the tree follows |
 | `←` `→`, `h` `l` | move the tree to the parent / first child, without changing the result |
-| `tab`, `enter` | tree mode |
+| `enter` | tree mode (`tab` from the results goes there too, as the next pane) |
+| `esc` (results) | the tab bar |
 | `a` / `d` | add / remove the selected result |
 | `t` | the pack tray (`←` `→` items, `d` removes, `esc` back) |
 | `f` | cycle the type filter: all, skill, agent, command, plugin |
-| `p` | switch the active pack, or `n` for a new one |
+| `p` | pick the active pack and list its items (`pack:<name>` in the search box), or `n` for a new one |
 | `e` | external references: the other repos that use this repo |
 | `ctrl+r` | check the search server again |
+
+Two tokens narrow a search, anywhere among its words:
+
+- **`repo:owner/repo`** keeps that repo's items. On its own it lists every item of the repo (up to 50); with other words it searches them.
+- **`pack:name`** lists the pack's items, in the pack's order, without asking the search server; the other words narrow them by name, repo or description, and the type filter applies. A pack that doesn't exist says `no pack <name>`. Packs listed with `g` on the Packs tab count too.
+
+Adding with `a` when there is no pack yet opens the new pack form but keeps your search.
 
 Building and installing are not on the Catalog: they live on Packs and Installs.
 
@@ -109,7 +125,8 @@ Building and installing are not on the Catalog: they live on Packs and Installs.
 | `←` `→`, `h` `l` | parent / first child |
 | `enter` | on an `also in` row: follow that plugin instead |
 | `a` / `d` | add / remove the node, for example a whole plugin |
-| `tab`, `esc` | back to search mode; the tree returns to the selected result |
+| `esc` | back to the results; the tree returns to the selected result |
+| `tab` | the tab bar (the tree is the last pane) |
 
 ## External references
 
@@ -135,14 +152,29 @@ Every pack of the scope, with what has been built and installed.
 | `BUILT` | `fresh` (`.ipm/` matches the pack), `stale` (something in the scope changed since the last build: the stamp covers every pack of the scope, so one changed pack makes all of them stale) or `never` |
 | `INSTALLED TO` | where its recorded installs went |
 
-The stats strip counts packs, how many are fresh and stale, and how many installs are recorded. The detail pane lists the pack's description and items.
+The stats strip counts packs, how many are fresh and stale, and how many installs are recorded. Below the table, the selected pack's description and its items as a tree of repos: one `▾ owner/repo` row per repo, in the order of each repo's first item in the pack, with the pack's items from it beneath as `type name`. Items the catalog can't read (a repo you no longer follow, say) come last, under `▾ ? unknown`, by their ID.
+
+```text
+╭─ csharp-sdlc (3) ─────────────────────────────╮
+│ C# lifecycle                                  │
+│                                               │
+│ ▾ o/r                                         │
+│     skill tdd                                 │
+│ ▾ wshobson/agents                             │
+│   ▶ agent csharp-pro                          │
+│ ▾ anthropics/claude-plugins-official          │
+│     plugin stripe                             │
+╰───────────────────────────────────────────────╯
+```
 
 | Key | Does |
 | --- | --- |
-| `↑` `↓`, `j` `k` | move through the packs, or through the items |
-| `enter`, `→` | focus the selected pack's items |
-| `esc`, `←` | back to the packs |
+| `↑` `↓`, `j` `k` | move through the packs, or through the items (the repo rows are skipped) |
+| `enter`, `→`, `l` | focus the selected pack's items (`tab` too) |
+| `esc`, `←`, `h` | from the items: back to the packs |
+| `n` | a new pack: name, then an optional description; the new pack is selected |
 | `x` | remove the selected item from the pack (with the items focused) |
+| `c` | open the selected item in the Catalog: the search becomes `repo:<its repo>`, the type filter is cleared, and the tree opens on the item, with focus |
 | `b` | build every pack (`ipm pack build`); the output streams in a modal and ends with `✓ built` |
 | `i` | install the selected pack: opens the install form |
 | `g` | include your global packs, when you started in a project (in `ipm tui -g` it says `already in global scope`) |
