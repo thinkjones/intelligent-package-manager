@@ -170,6 +170,16 @@ func TestTuiInstallerPlanGascity(t *testing.T) {
 	if err != nil || !reflect.DeepEqual(plan, []string{"ipm install gascity kit -C '" + spaced + "' --name kit"}) {
 		t.Errorf("spaced plan %v %v", plan, err)
 	}
+	root := scopeOf(t, f, false).Root
+	if _, _, err := in.Plan("kit", tui.Target{Kind: "gascity", Path: filepath.Dir(root), Name: filepath.Base(root)}); err == nil || !strings.Contains(err.Error(), "refusing to replace") {
+		t.Errorf("a folder holding the project should be refused at the form: %v", err)
+	}
+	foreign := filepath.Join(tmp, "foreign")
+	os.Mkdir(foreign, 0o755)
+	os.WriteFile(filepath.Join(foreign, "keep.txt"), []byte("x"), 0o644)
+	if _, _, err := in.Plan("kit", tui.Target{Kind: "gascity", Path: tmp, Name: "foreign"}); err == nil {
+		t.Error("a folder ipm didn't write should be refused at the form")
+	}
 	d := in.Default("kit", "gascity")
 	if d.Kind != "gascity" || d.Name != "kit" || d.Path != scopeOf(t, f, false).Root {
 		t.Errorf("default %+v", d)

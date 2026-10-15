@@ -312,3 +312,12 @@ func TestFinishingARunDropsAStaleStatus(t *testing.T) {
 		t.Errorf("finishing a run drops the old status: %q", m.status)
 	}
 }
+
+func TestSyncWithoutMarketplaceSaysSo(t *testing.T) {
+	m, _ := newTest(t)
+	m.d.Marketplace = nil
+	press(t, m, "down", "4", "s")
+	if m.inst != nil || !strings.Contains(m.status, "no marketplace available") {
+		t.Errorf("inst %v status %q", m.inst != nil, m.status)
+	}
+}

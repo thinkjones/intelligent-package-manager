@@ -56,3 +56,21 @@ func TestTableScrollsToSelection(t *testing.T) {
 		t.Errorf("scrolling back up: offset %d", off)
 	}
 }
+
+func TestTableOpenColumnTakesSlack(t *testing.T) {
+	cols := []column{{Title: "A", Min: 1, Max: 3}, {Title: "LIST", Min: 6}, {Title: "N", Min: 2, Max: 4}}
+	rows := [][]string{{"x", "a fairly long list name", "1"}}
+	got := columnWidths(cols, rows, 60)
+	if got[1] < len(rows[0][1]) {
+		t.Errorf("the open column should take the slack, not be cut: %v", got)
+	}
+}
+
+func TestTableSpanRowKeepsItsEnd(t *testing.T) {
+	cols := []column{{Title: "A", Min: 1, Max: 1}, {Title: "B", Min: 4, Max: 6}, {Title: "C", Min: 4, Max: 6}}
+	off := 0
+	lines := table(cols, [][]string{{"── a long divider text (12)"}, {"x", "b", "c"}}, nil, 1, &off, 40, 3, true)
+	if !strings.Contains(ansi.Strip(lines[1]), "(12)") {
+		t.Errorf("a row of one cell spans the table: %q", ansi.Strip(lines[1]))
+	}
+}

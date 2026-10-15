@@ -3,10 +3,10 @@ CATALOG (0)  PACKS (0)  INSTALLS (…)  MARKETPLACE (4)
 ──────────────────────────────────────━━━━━━━━━━━━━━━                                                                   
 4 repos · 2 followed · 2 lists · filter: review                                                                         
 ╭─ marketplace ── filter: review ────────────────────────────────────────╮╭─ x/review-kit ─────────────────────────────╮
-│   ✓ REPO          LIST        ★ ITEMS                                  ││ lists    review                            │
-│     ── review (2)                                                      ││ stars    120                               │
-│ ▶   x/review-kit  review   ★120     7                                  ││ items    7                                 │
-│   ✓ o/tdd-guard   review ★31.2k    12                                  ││ topics   review                            │
+│   ✓ REPO         LIST                                          ★ ITEMS ││ lists    review                            │
+│   ── review (2)                                                        ││ stars    120                               │
+│ ▶   x/review-kit review                                     ★120     7 ││ items    7                                 │
+│   ✓ o/tdd-guard  review                                   ★31.2k    12 ││ topics   review                            │
 │                                                                        ││                                            │
 │                                                                        ││ Review agents.                             │
 │                                                                        ││                                            │

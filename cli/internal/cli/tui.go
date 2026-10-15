@@ -494,6 +494,13 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 		if err != nil {
 			return t, nil, err
 		}
+		folder := filepath.Join(dir, name)
+		if err := gascityRefusal(in.sys, scope, folder); err != nil {
+			return t, nil, err
+		}
+		if err := assemble.CheckGascityTarget(dir, name, false); err != nil {
+			return t, nil, err
+		}
 		line := "ipm install gascity " + shellQuote(pack) + " -C " + shellQuote(dir) + " --name " + shellQuote(name)
 		if t.Global {
 			line += " -g"

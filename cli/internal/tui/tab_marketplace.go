@@ -37,7 +37,7 @@ const syncedMsg = "catalog synced — restart ipm tui to search the new items"
 var marketCols = []column{
 	{Title: "✓", Min: 1, Max: 1},
 	{Title: "REPO", Min: 12, Max: 36},
-	{Title: "LIST", Min: 6, Max: 22},
+	{Title: "LIST", Min: 6},
 	{Title: "★", Min: 2, Max: 7, Right: true},
 	{Title: "ITEMS", Min: 5, Max: 6, Right: true},
 }
@@ -199,6 +199,10 @@ func (m *Model) startSync() tea.Cmd {
 	if m.refuseBusy() {
 		return nil
 	}
+	if m.d.Marketplace == nil {
+		m.status, m.statusOK = "no marketplace available", false
+		return nil
+	}
 	return m.stream(runSync, "sync", "ipm catalog sync", "✓ synced", func(w io.Writer) error {
 		return m.d.Marketplace.Sync(context.Background(), w)
 	})
@@ -314,8 +318,8 @@ func (m *Model) marketBody(w, h int) []string {
 	for _, row := range marketRows(vis) {
 		if row.divider != "" {
 			divider = len(rows)
-			rows = append(rows, []string{"", row.divider, "", "", ""})
-			styles = append(styles, []lipgloss.Style{stMuted, stMuted, stMuted, stMuted, stMuted})
+			rows = append(rows, []string{row.divider})
+			styles = append(styles, []lipgloss.Style{stMuted})
 			continue
 		}
 		r := vis[row.repo]

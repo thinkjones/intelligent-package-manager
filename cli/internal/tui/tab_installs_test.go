@@ -61,10 +61,18 @@ func TestInstallsDetailShowsTheCommand(t *testing.T) {
 	}
 }
 
-func TestInstallsReinstall(t *testing.T) {
+func TestInstallsReinstallConfirmsFirst(t *testing.T) {
 	for _, k := range []string{"enter", "i"} {
 		m, f := installsModel(t)
+		f.in.plan = []string{"claude plugin install docs@x --scope user"}
 		press(t, m, "down", k)
+		if len(f.in.targets) != 0 || m.inst != nil || m.form == nil || m.form.step != formConfirm {
+			t.Fatalf("%s: nothing runs before the confirm: installed %+v form %+v", k, f.in.targets, m.form)
+		}
+		if v := view(m); !strings.Contains(v, "claude plugin install docs@x") || !strings.Contains(v, "y install") {
+			t.Errorf("%s: the form shows the commands:\n%s", k, v)
+		}
+		press(t, m, "y")
 		if len(f.in.targets) != 1 || f.in.targets[0] != (Target{Kind: "gascity", Path: "/x", Name: "kit"}) || m.form != nil {
 			t.Errorf("%s: installed %+v form %v", k, f.in.targets, m.form)
 		}
@@ -74,11 +82,49 @@ func TestInstallsReinstall(t *testing.T) {
 	}
 }
 
+func TestInstallsReinstallEscCancels(t *testing.T) {
+	m, f := installsModel(t)
+	press(t, m, "down", "enter", "esc")
+	if m.form != nil || m.inst != nil || len(f.in.targets) != 0 {
+		t.Errorf("esc cancels: form %v installed %+v", m.form, f.in.targets)
+	}
+}
+
+func TestInstallsReinstallRefusedPlan(t *testing.T) {
+	m, f := installsModel(t)
+	f.in.planErr = errors.New("folder /x is not empty")
+	press(t, m, "down", "enter")
+	if m.form == nil || !strings.Contains(view(m), "folder /x is not empty") {
+		t.Fatalf("the refusal shows in the form:\n%s", view(m))
+	}
+	press(t, m, "y")
+	if m.inst != nil || len(f.in.targets) != 0 {
+		t.Errorf("y must not run a refused plan: %+v", f.in.targets)
+	}
+	press(t, m, "esc")
+	if m.form != nil {
+		t.Error("esc closes the form")
+	}
+}
+
+func TestInstallsNewInstallPicksSelectedPack(t *testing.T) {
+	m, _ := installsModel(t)
+	m.packs = []Pack{{Name: "alpha"}, {Name: "docs"}}
+	press(t, m, "down", "a")
+	if m.form == nil || m.form.step != formPack || m.form.sel != 1 {
+		t.Errorf("several packs: the picker preselects the row's pack")
+	}
+}
+
 func TestInstallsNewInstall(t *testing.T) {
 	m, _ := installsModel(t)
 	press(t, m, "down", "a")
-	if m.form == nil || m.form.pack != "docs" || m.form.step != formTarget {
-		t.Errorf("a uses the pack under the selection: %+v", m.form)
+	if m.form == nil || m.form.step != formPack || m.form.packs[m.form.sel] != "docs" {
+		t.Errorf("several packs: a asks which, with the selection's pack chosen")
+	}
+	press(t, m, "enter")
+	if m.form.pack != "docs" || m.form.step != formTarget {
+		t.Errorf("enter takes the preselected pack")
 	}
 }
 
@@ -203,12 +249,12 @@ func TestInstallsGlobalRecordsWorkInGlobalScope(t *testing.T) {
 		f.in.installs = f.in.globalInstalls
 		f.p.scope = "global"
 	})
-	press(t, m, "down", "3", "enter")
+	press(t, m, "down", "3", "enter", "y")
 	if len(f.in.targets) != 1 || !f.in.targets[0].Global {
 		t.Errorf("reinstall in global scope: %+v status %q", f.in.targets, m.status)
 	}
 	press(t, m, "esc", "a")
-	if m.form == nil || m.form.pack != "mine" {
-		t.Errorf("a opens the form: %v status %q", m.form, m.status)
+	if m.form == nil || m.form.step != formPack {
+		t.Errorf("a opens the pack picker: status %q", m.status)
 	}
 }

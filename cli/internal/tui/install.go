@@ -24,6 +24,7 @@ type install struct {
 	lines   []string
 	done    bool
 	err     error
+	armed   bool // ctrl+c was pressed once while it streams
 	scanner *bufio.Scanner
 	pipe    *io.PipeReader
 	result  chan error
@@ -40,6 +41,9 @@ const (
 
 // busyMsg is the status when a run is asked for while another still streams.
 const busyMsg = "busy — wait for the current run to finish"
+
+// abandonMsg is the status after the first ctrl+c while a run streams.
+const abandonMsg = "press ctrl+c again to abandon the run and quit"
 
 // busy reports whether the output modal is streaming a run.
 func (m *Model) busy() bool { return m.inst != nil && !m.inst.done }
@@ -103,6 +107,15 @@ func (in *install) next() tea.Msg {
 // installKey handles keys while the modal is open.
 func (m *Model) installKey(k string) tea.Cmd {
 	if !m.inst.done {
+		if k == "ctrl+c" {
+			if m.inst.armed {
+				return tea.Quit
+			}
+			m.inst.armed = true
+			m.status, m.statusOK = abandonMsg, false
+			return nil
+		}
+		m.inst.armed = false
 		m.refuseBusy()
 		return nil
 	}

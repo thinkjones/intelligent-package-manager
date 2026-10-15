@@ -163,6 +163,7 @@ func (m *Model) countLine() string {
 // resultLines is the results pane: exactly rows lines of width w, a header
 // over the hits, scrolled so the selection is visible.
 func (m *Model) resultLines(w, rows int) []string {
+	// w is the panel's inner width: the screen is wideWidth columns or more.
 	wide := w >= wideWidth-4
 	cols := []column{{Title: "TYPE", Min: labelWidth, Max: labelWidth}, {Title: "✓", Min: 1, Max: 1}, {Title: "NAME", Min: 10}}
 	if wide {

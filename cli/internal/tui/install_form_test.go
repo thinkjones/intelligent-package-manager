@@ -1,6 +1,7 @@
 package tui
 
 import (
+	tea "charm.land/bubbletea/v2"
 	"errors"
 	"strings"
 	"testing"
@@ -190,8 +191,9 @@ func TestBusyRefusesNewRuns(t *testing.T) {
 		t.Errorf("openInstallForm: form %v status %q", m.form, m.status)
 	}
 	m.status = ""
-	if c := m.reinstall(Install{Pack: "kit", Target: Target{Kind: "claude", Scope: "user"}}); c != nil || m.status != busy {
-		t.Errorf("reinstall: cmd %v status %q", c, m.status)
+	m.reinstall(Install{Pack: "kit", Target: Target{Kind: "claude", Scope: "user"}})
+	if m.form != nil || m.status != busy {
+		t.Errorf("reinstall: form %v status %q", m.form, m.status)
 	}
 	m.status = ""
 	if c := m.startBuild(); c != nil || m.status != busy {
@@ -205,11 +207,15 @@ func TestBusyRefusesNewRuns(t *testing.T) {
 }
 
 func TestInstallFormLongFolderShowsTheEnd(t *testing.T) {
-	m, _ := formModel(t)
+	m, f := formModel(t)
+	f.in.def.Path = "/" + strings.Repeat("deep/", 40) + "tail-end"
 	press(t, m, "down", "enter")
-	m.form.folder.SetValue("")
-	m.form.folder.SetValue("/" + strings.Repeat("deep/", 40) + "tail-end")
 	if v := view(m); !strings.Contains(v, "tail-end") {
 		t.Errorf("the folder field scrolls to the cursor:\n%s", v)
+	}
+	// A narrower terminal re-fits the field around the cursor.
+	m.Update(tea.WindowSizeMsg{Width: 70, Height: 30})
+	if v := view(m); !strings.Contains(v, "tail-end") {
+		t.Errorf("after a resize:\n%s", v)
 	}
 }

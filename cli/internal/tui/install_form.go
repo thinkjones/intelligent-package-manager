@@ -49,6 +49,7 @@ type installForm struct {
 	target  Target
 	plan    []string
 	err     string // why the last plan was refused
+	refused bool   // a reinstall's plan was refused: nothing to confirm
 	targets []string
 }
 
@@ -61,14 +62,18 @@ func (m *Model) openInstallForm(pack string, global bool) {
 	m.form = &installForm{pack: pack, global: global, step: formTarget, folder: newInput("folder"), name: newInput("name"), targets: m.d.Installer.Targets()}
 }
 
-// openInstallPicker starts an install that first asks which pack.
-func (m *Model) openInstallPicker() {
+// openInstallPicker starts an install that first asks which pack, with preset
+// highlighted when it is one of them.
+func (m *Model) openInstallPicker(preset string) {
 	if m.refuseBusy() {
 		return
 	}
 	m.openInstallForm("", false)
 	m.form.step = formPack
 	for _, p := range m.packs {
+		if p.Name == preset {
+			m.form.sel = len(m.form.packs)
+		}
 		m.form.packs = append(m.form.packs, p.Name)
 	}
 }
@@ -80,7 +85,9 @@ func (m *Model) formKey(msg keyMsg) tea.Cmd {
 		m.form = nil
 		return nil
 	}
-	f.err = ""
+	if !f.refused {
+		f.err = ""
+	}
 	switch f.step {
 	case formPack:
 		if f.move(k, len(f.packs)) {
@@ -126,7 +133,7 @@ func (m *Model) formKey(msg keyMsg) tea.Cmd {
 		}
 		f.name, _ = f.name.Update(msg)
 	case formConfirm:
-		if k == "y" {
+		if k == "y" && !f.refused {
 			pack, t := f.pack, f.target
 			m.form = nil
 			return m.runInstall(pack, t)
@@ -155,9 +162,6 @@ func (m *Model) chooseKind(kind string) {
 	f := m.form
 	def := m.d.Installer.Default(f.pack, kind)
 	f.kind, f.sel = kind, 0
-	// The width is set before the value so the field scrolls to its end.
-	f.folder.SetWidth(max(10, m.width-4-len("parent folder  ")-1))
-	f.name.SetWidth(max(10, m.width-4-len("name           ")-1))
 	f.folder.SetValue(def.Path)
 	if kind == "gascity" {
 		f.name.SetValue(def.Name)
@@ -205,8 +209,22 @@ func (m *Model) runInstall(pack string, t Target) tea.Cmd {
 	})
 }
 
-// reinstall installs a recorded install again, without the form.
-func (m *Model) reinstall(in Install) tea.Cmd { return m.runInstall(in.Pack, in.Target) }
+// reinstall opens the form at its confirm step for a recorded install, showing
+// the exact commands; a refused plan shows in the form with nothing to confirm.
+func (m *Model) reinstall(in Install) {
+	m.openInstallForm(in.Pack, in.Global)
+	if m.form == nil {
+		return
+	}
+	f := m.form
+	cleaned, plan, err := m.d.Installer.Plan(in.Pack, in.Target)
+	f.step = formConfirm
+	if err != nil {
+		f.err, f.refused = err.Error(), true
+		return
+	}
+	f.target, f.plan = cleaned, plan
+}
 
 // describe is a target as people read it: "claude user", "claude project /work"
 // or "gascity /work/kit".
@@ -243,6 +261,16 @@ func quote(s string) string {
 		return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 	}
 	return s
+}
+
+// fitInput gives in the width it is drawn at, keeping its cursor in view: the
+// width is only known at render time, after the value was set.
+func fitInput(in *textinput.Model, w int) {
+	if in.Width() == w {
+		return
+	}
+	in.SetWidth(w)
+	in.SetCursor(in.Position())
 }
 
 // formLines is the form in place of the body: exactly rows lines.
@@ -288,16 +316,18 @@ func (m *Model) formLines(w, rows int) []string {
 		if f.kind == "gascity" {
 			label, head = "parent folder  ", "Install "+f.pack+" as a Gas City pack folder"
 		}
-		f.folder.SetWidth(max(10, w-lipgloss.Width(label)-1))
+		fitInput(&f.folder, max(10, w-lipgloss.Width(label)-1))
 		lines = append(lines, stTitle.Render(head), "", stMuted.Render(label)+f.folder.View())
 	case formName:
-		f.name.SetWidth(max(10, w-len("name           ")-1))
+		fitInput(&f.name, max(10, w-len("name           ")-1))
 		lines = append(lines, stTitle.Render("Install "+f.pack+" as a Gas City pack folder"), "",
 			stMuted.Render("parent folder  ")+stText.Render(f.folder.Value()),
 			stMuted.Render("name           ")+f.name.View())
 	case formConfirm:
 		head := "Install " + f.pack + " to "
-		if f.target.Kind == "gascity" {
+		if f.refused {
+			head = "Reinstall " + f.pack
+		} else if f.target.Kind == "gascity" {
 			head += "Gas City — " + filepath.Join(f.target.Path, f.target.Name)
 		} else {
 			head += "Claude Code — " + f.target.Scope + " scope"
@@ -314,7 +344,10 @@ func (m *Model) formLines(w, rows int) []string {
 		lines = append(lines, "", stError.Render(f.err))
 	}
 	foot := "enter next · esc cancel"
-	if f.step == formConfirm {
+	switch {
+	case f.refused:
+		foot = "esc cancel"
+	case f.step == formConfirm:
 		foot = "y install · esc cancel"
 	}
 	lines = append(lines, "", stMuted.Render(foot))

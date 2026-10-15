@@ -201,7 +201,8 @@ func (m *Model) packsKey(msg tea.KeyPressMsg) tea.Cmd {
 		}
 	case "i":
 		if m.writablePack() {
-			m.openInstallForm(m.selectedPack().Name, false)
+			p := m.selectedPack()
+			m.openInstallForm(p.Name, p.Global)
 		}
 	}
 	return nil

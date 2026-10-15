@@ -136,7 +136,8 @@ func (m *Model) installsKey(msg tea.KeyPressMsg) tea.Cmd {
 			if m.readOnlyInstall(in) {
 				return nil
 			}
-			return m.reinstall(*in)
+			m.reinstall(*in)
+			return nil
 		}
 		m.status = "no install selected"
 	case "a":
@@ -155,22 +156,23 @@ func (m *Model) readOnlyInstall(in *Install) bool {
 	return false
 }
 
-// newInstall opens the install form for the pack under the selection, or the
-// only pack; with several and none selected it asks which first.
+// newInstall opens the install form for the only pack, or, with several, asks
+// which first, with the selected record's pack highlighted.
 func (m *Model) newInstall() {
+	preset := ""
 	if in := m.selectedInstall(); in != nil {
-		if !m.readOnlyInstall(in) {
-			m.openInstallForm(in.Pack, in.Global)
+		if m.readOnlyInstall(in) {
+			return
 		}
-		return
+		preset = in.Pack
 	}
 	switch len(m.packs) {
 	case 0:
-		m.status = "no pack to install — create one on the Packs tab"
+		m.status = "no pack to install — create one from the Catalog (p, then n)"
 	case 1:
 		m.openInstallForm(m.packs[0].Name, false)
 	default:
-		m.openInstallPicker()
+		m.openInstallPicker(preset)
 	}
 }
 

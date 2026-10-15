@@ -142,7 +142,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.inst != nil {
 			m.inst.done, m.inst.err = true, msg.err
 			m.status, m.statusOK = "", false
-			if msg.err == nil {
+			if msg.err == nil && m.inst.kind != runSync {
 				m.dirty = false
 			}
 			m.reloadPacks()

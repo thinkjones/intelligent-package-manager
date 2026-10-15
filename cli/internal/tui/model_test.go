@@ -664,7 +664,7 @@ func TestQuitIgnoredDuringInstall(t *testing.T) {
 	typeText(t, m, "tdd")
 	press(t, m, "down")
 	cmd := m.startBuild()
-	for _, k := range []string{"q", "ctrl+c", "esc"} {
+	for _, k := range []string{"q", "esc"} {
 		if _, c := m.Update(key(k)); c != nil {
 			t.Errorf("%s during install returned a command", k)
 		}
@@ -672,11 +672,31 @@ func TestQuitIgnoredDuringInstall(t *testing.T) {
 	if m.inst == nil || m.status != busyMsg {
 		t.Errorf("modal %v status %q", m.inst, m.status)
 	}
+	if _, c := m.Update(key("ctrl+c")); c != nil || m.status != abandonMsg {
+		t.Errorf("first ctrl+c: cmd %v status %q", c, m.status)
+	}
+	if !strings.Contains(view(m), abandonMsg) {
+		t.Errorf("the warning should show:\n%s", view(m))
+	}
 	close(f.b.gate)
 	drain(t, m, cmd)
 	if !strings.Contains(view(m), "✓ built") {
 		t.Errorf("install should finish:\n%s", view(m))
 	}
+}
+
+func TestCtrlCTwiceAbandonsARun(t *testing.T) {
+	m, f := newTestWith(t, withPacks(Pack{Name: "a"}))
+	f.b.gate = make(chan struct{})
+	cmd := m.startBuild()
+	m.Update(key("ctrl+c"))
+	if _, c := m.Update(key("ctrl+c")); c == nil {
+		t.Fatal("the second ctrl+c should quit")
+	} else if _, ok := c().(tea.QuitMsg); !ok {
+		t.Errorf("second ctrl+c returned %T", c())
+	}
+	close(f.b.gate)
+	drain(t, m, cmd)
 }
 
 func TestInstallFailure(t *testing.T) {
@@ -1149,5 +1169,19 @@ func TestExternalModalScrolls(t *testing.T) {
 	}
 	if v := view(m); !strings.Contains(v, "▶ r25/m") || !strings.Contains(v, "enter jump · esc close") {
 		t.Errorf("the selected reference and the hint must stay visible:\n%s", v)
+	}
+}
+
+func TestSyncDoesNotClearDirty(t *testing.T) {
+	m, _ := newTestWith(t, withPacks(Pack{Name: "a"}))
+	m.dirty = true
+	press(t, m, "down", "4")
+	drain(t, m, m.startSync())
+	if !m.dirty {
+		t.Error("a sync built nothing: the packs are still unbuilt")
+	}
+	drain(t, m, m.startBuild())
+	if m.dirty {
+		t.Error("a successful build clears dirty")
 	}
 }

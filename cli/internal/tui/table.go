@@ -18,7 +18,8 @@ type column struct {
 // table renders a header row and rows as exactly height lines of width w,
 // scrolled so sel is visible, with the caret column and selection styling of
 // selectedRow/plainRow; cells are cut with "…". offset is updated in place.
-// styles holds one style per cell, matching rows.
+// styles holds one style per cell, matching rows. A row of one cell in a table
+// of several columns spans them all, cut with "…" only at the table's edge.
 func table(cols []column, rows [][]string, styles [][]lipgloss.Style, sel int, offset *int, w, height int, active bool) []string {
 	if height <= 0 {
 		return nil
@@ -41,7 +42,18 @@ func table(cols []column, rows [][]string, styles [][]lipgloss.Style, sel int, o
 	*offset = max(0, *offset)
 	for i := *offset; i < len(rows) && len(lines) < height; i++ {
 		var cells []string
+		span := spans(cols, rows[i])
+		if span {
+			var st lipgloss.Style
+			if i < len(styles) && len(styles[i]) > 0 {
+				st = styles[i][0]
+			}
+			cells = append(cells, st.Render(cell(rows[i][0], w-caretWidth, false)))
+		}
 		for j, c := range cols {
+			if span {
+				break
+			}
 			text := ""
 			if j < len(rows[i]) {
 				text = rows[i][j]
@@ -65,6 +77,18 @@ func table(cols []column, rows [][]string, styles [][]lipgloss.Style, sel int, o
 	return lines
 }
 
+// spans reports whether row is one cell standing for the whole row.
+func spans(cols []column, row []string) bool { return len(cols) > 1 && len(row) == 1 }
+
+// rowWidth is the width of a row of columns of widths, with their gaps.
+func rowWidth(widths []int) int {
+	t := len(widths) - 1
+	for _, n := range widths {
+		t += n
+	}
+	return t
+}
+
 // cell cuts s to w cells with "…" and pads it, on the left when right is set.
 func cell(s string, w int, right bool) string {
 	s = ansi.Truncate(s, w, "…")
@@ -84,7 +108,7 @@ func columnWidths(cols []column, rows [][]string, w int) []int {
 	for i, c := range cols {
 		n := lipgloss.Width(c.Title)
 		for _, r := range rows {
-			if i < len(r) {
+			if i < len(r) && !spans(cols, r) {
 				n = max(n, lipgloss.Width(r[i]))
 			}
 		}
@@ -96,13 +120,7 @@ func columnWidths(cols []column, rows [][]string, w int) []int {
 		}
 		widths[i] = n
 	}
-	total := func() int {
-		t := len(cols) - 1
-		for _, n := range widths {
-			t += n
-		}
-		return t
-	}
+	total := func() int { return rowWidth(widths) }
 	if open >= 0 {
 		widths[open] = max(cols[open].Min, widths[open]+w-total())
 	}

@@ -148,6 +148,17 @@ func TestGoldenViews(t *testing.T) {
 			press(t, m, "enter")
 			return m
 		},
+		"marketplace-long-list": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, func(f fakes) {
+				f.mk.repos = []Repo{
+					{Repo: "o/one", List: "AI · Agentic Engineering Methods and Practices for Teams", Stars: 900, Items: 4},
+					{Repo: "o/two", List: "AI · Agentic Engineering Methods and Practices for Teams", Stars: 12, Items: 2},
+				}
+			})
+			m.Update(tea.WindowSizeMsg{Width: 80, Height: 30})
+			press(t, m, "down", "4")
+			return m
+		},
 		"marketplace-loading": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, withMarket)
 			press(t, m, "down")
