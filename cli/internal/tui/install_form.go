@@ -122,9 +122,13 @@ func (m *Model) formKey(msg keyMsg) tea.Cmd {
 		}
 	case formConfirm:
 		if k == "y" && !f.refused {
-			pack, t := f.pack, f.target
+			pack, t, command := f.pack, f.target, installCommand(f.pack, f.target)
+			if t.Kind == "gascity" && len(f.plan) == 1 {
+				// Its plan is the one command the user confirmed.
+				command = f.plan[0]
+			}
 			m.form = nil
-			return m.runInstall(pack, t)
+			return m.runInstall(pack, t, command)
 		}
 	}
 	return nil
@@ -181,12 +185,12 @@ func (m *Model) planForm(t Target) {
 	f.target, f.plan, f.step = cleaned, plan, formConfirm
 }
 
-// runInstall installs pack at t in the output modal.
-func (m *Model) runInstall(pack string, t Target) tea.Cmd {
+// runInstall installs pack at t in the output modal, titled with command.
+func (m *Model) runInstall(pack string, t Target, command string) tea.Cmd {
 	if m.refuseBusy() {
 		return nil
 	}
-	return m.stream(runInstall, "install", installCommand(pack, t), "✓ installed "+pack+" ("+describe(t)+")", func(w io.Writer) error {
+	return m.stream(runInstall, "install", command, "✓ installed "+pack+" ("+describe(t)+")", func(w io.Writer) error {
 		return m.d.Installer.Install(context.Background(), pack, t, w)
 	})
 }

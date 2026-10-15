@@ -83,8 +83,11 @@ func TestInstallFormGascityFlow(t *testing.T) {
 		t.Errorf("planned %+v, want %+v", f.in.planned[0], want)
 	}
 	press(t, m, "y")
-	if v := view(m); !strings.Contains(v, "✓ installed kit (gascity /work/.ipm/.gascity/kit)") {
+	if v := view(m); !strings.Contains(v, "✓ installed kit (gascity /work/.ipm/.gascity/kit)") || strings.Contains(v, "-C") {
 		t.Errorf("modal:\n%s", v)
+	}
+	if m.inst.command != "ipm install gascity kit" {
+		t.Errorf("the run shows the confirmed command, got %q", m.inst.command)
 	}
 	if len(f.in.targets) != 1 || f.in.targets[0] != *f.in.cleaned {
 		t.Errorf("installed %+v", f.in.targets)
