@@ -3,7 +3,7 @@ package tui
 // searchKeys and treeKeys are the Catalog tab's ? overlay, one table per mode.
 var searchKeys = [][2]string{
 	{"typing", "search · repo:<repo> pack:<name> narrow"},
-	{"↓  esc", "from the search box: focus the results"},
+	{"↓ tab esc", "from the search box: focus the results"},
 	{"/", "focus the search box"},
 	{"↑ ↓  j k", "move through results; the tree follows"},
 	{"← →  h l", "move the tree to the parent / first child"},

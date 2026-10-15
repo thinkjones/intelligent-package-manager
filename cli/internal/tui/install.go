@@ -208,16 +208,28 @@ func (m *Model) helpLines(w, rows int) []string {
 			lines = append(lines, l+"  "+r)
 		}
 	} else {
-		lines = append(keyTable(title, keys, w), "")
-		lines = append(lines, second(w)...)
+		// Stacked, the keys that move between panes come first: they are
+		// the same on every tab and the ones a newcomer needs.
+		lines = append(second(w), "")
+		lines = append(lines, keyTable(title, keys, w)...)
 	}
 	lines = append(lines, "", stMuted.Render("esc or ? closes this"))
+	return m.helpWindow(lines, w, rows)
+}
+
+// helpWindow is rows lines of the overlay from helpOff, which it keeps in
+// range; when the overlay is taller, ↑ ↓ markers say there is more.
+func (m *Model) helpWindow(lines []string, w, rows int) []string {
+	m.helpOff = max(0, min(m.helpOff, len(lines)-rows))
 	out := make([]string, 0, rows)
-	for _, l := range lines {
-		if len(out) == rows {
-			break
-		}
-		out = append(out, fit(l, w))
+	for i := m.helpOff; i < len(lines) && len(out) < rows; i++ {
+		out = append(out, fit(lines[i], w))
+	}
+	if m.helpOff > 0 {
+		out[0] = fit(stMuted.Render(fmt.Sprintf("↑ %d more (↑ k)", m.helpOff+1)), w)
+	}
+	if below := len(lines) - m.helpOff - rows; below > 0 {
+		out[rows-1] = fit(stMuted.Render(fmt.Sprintf("↓ %d more (↓ j)", below+1)), w)
 	}
 	for len(out) < rows {
 		out = append(out, spaces(w))

@@ -113,7 +113,7 @@ func (m *Model) hints() string {
 	case m.ext != nil:
 		return "↑↓ move  enter jump  esc close"
 	case m.help:
-		return "esc or ? close"
+		return "↑↓ scroll  esc or ? close"
 	case m.picker != nil:
 		return "enter choose  n new pack  esc cancel"
 	case m.bar:

@@ -1351,3 +1351,33 @@ func TestAddWithNoPackKeepsSearch(t *testing.T) {
 		t.Errorf("creating a pack from a keeps the results: active %q query %q hits %d", m.active, m.input.Value(), len(m.res.Hits))
 	}
 }
+
+func TestHelpScrollsWhenNarrow(t *testing.T) {
+	m, _ := newTestWith(t, packsSetup)
+	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	press(t, m, "2", "?")
+	v := view(m)
+	if !strings.Contains(v, "Moving around") || !strings.Contains(v, "↓") || !strings.Contains(v, "more") {
+		t.Fatalf("stacked, Moving around comes first and the rest scrolls:\n%s", v)
+	}
+	seen := map[string]bool{}
+	for range 40 {
+		v = view(m)
+		for _, want := range []string{"tab shift+tab", "1-4  [ ]", "?  q  ctrl+c", "open the selected item in the Catalog", "esc or ? closes this"} {
+			if strings.Contains(v, want) {
+				seen[want] = true
+			}
+		}
+		press(t, m, "j")
+	}
+	if len(seen) != 5 {
+		t.Errorf("reachable by scrolling: %v\n%s", seen, v)
+	}
+	if !strings.Contains(v, "↑") {
+		t.Errorf("scrolled down, an ↑ more marker shows:\n%s", v)
+	}
+	press(t, m, "esc", "?")
+	if m.helpOff != 0 {
+		t.Errorf("help reopens at the top: %d", m.helpOff)
+	}
+}

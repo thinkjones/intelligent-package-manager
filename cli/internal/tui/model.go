@@ -69,11 +69,12 @@ type Model struct {
 	picker   *picker
 	statusOK bool // status is a note, not an error
 
-	inst  *install     // the build or install output modal, while open
-	form  *installForm // the install form before it runs
-	ext   *extModal    // the e modal: external references
-	help  bool         // the ? overlay
-	plain bool         // NO_COLOR: draw without colour
+	inst    *install     // the build or install output modal, while open
+	form    *installForm // the install form before it runs
+	ext     *extModal    // the e modal: external references
+	help    bool         // the ? overlay
+	helpOff int          // the first line of the ? overlay shown, when it scrolls
+	plain   bool         // NO_COLOR: draw without colour
 }
 
 type keyMsg = tea.KeyPressMsg
@@ -189,8 +190,13 @@ func (m *Model) key(msg tea.KeyPressMsg) tea.Cmd {
 		return m.queryChanged()
 	}
 	if m.help {
-		if k == "esc" || k == "?" {
-			m.help = false
+		switch k {
+		case "esc", "?":
+			m.help, m.helpOff = false, 0
+		case "down", "j":
+			m.helpOff++
+		case "up", "k":
+			m.helpOff = max(0, m.helpOff-1)
 		}
 		if k == "q" {
 			return tea.Quit

@@ -209,6 +209,12 @@ func TestGoldenViews(t *testing.T) {
 			press(t, m, "?")
 			return m
 		},
+		"help-narrow": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, setup)
+			m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+			press(t, m, "2", "?", "j", "j")
+			return m
+		},
 		"catalog-bar": func(t *testing.T) *Model {
 			m, _ := newTestWith(t, setup)
 			return m
