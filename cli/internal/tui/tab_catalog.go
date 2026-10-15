@@ -149,7 +149,10 @@ func (m *Model) catalogResultHints() []string {
 func (m *Model) countLine() string {
 	if len(m.res.Hits) == 0 {
 		if strings.TrimSpace(m.input.Value()) == "" {
-			return "type to search"
+			if m.focus == focusSearch {
+				return "type to search"
+			}
+			return "press / to search"
 		}
 		return "no matches"
 	}
