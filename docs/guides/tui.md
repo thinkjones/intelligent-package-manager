@@ -83,7 +83,7 @@ Search every artifact in the catalog, see where each lives, and collect into the
 | `SCORE` | the search score |
 | `DESCRIPTION` | its description |
 
-In a narrow terminal columns drop out: the repo, `↗N`, stars and description go first. A name starting `↗` is an external entry (see below). The panel below the results is the tree: the artifact in context, from its repo down to its parent, its siblings and its children. Every node shows a one-line description, lined up in one column; the current node has an arrow to its description, which runs to three lines. When an artifact belongs to more than one plugin, `also in:` lists the others. Long lists scroll, with `↑ N more` / `↓ N more` rows. The line under the tree is the active pack: its name, item count, `• not built` once you've changed it since the last build, and its items.
+In a narrow terminal (under 100 columns) columns drop out: the repo, `↗N`, stars and description go first. A name starting `↗` is an external entry (see below). The panel below the results is the tree: the artifact in context, from its repo down to its parent, its siblings and its children. Every node shows a one-line description, lined up in one column; the current node has an arrow to its description, which runs to three lines. When an artifact belongs to more than one plugin, `also in:` lists the others. Long lists scroll, with `↑ N more` / `↓ N more` rows. The line under the tree is the active pack: its name, item count, `• not built` once you've changed it since the last build, and its items.
 
 | Key | Does |
 | --- | --- |
@@ -133,7 +133,7 @@ Every pack of the scope, with what has been built and installed.
 | `NAME` | the pack |
 | `SCOPE` | `project` or `global` |
 | `ITEMS` | how many items it holds |
-| `BUILT` | `fresh` (`.ipm/` matches the pack), `stale` (the pack changed since the last build) or `never` |
+| `BUILT` | `fresh` (`.ipm/` matches the pack), `stale` (something in the scope changed since the last build: the stamp covers every pack of the scope, so one changed pack makes all of them stale) or `never` |
 | `INSTALLED TO` | where its recorded installs went |
 
 The stats strip counts packs, how many are fresh and stale, and how many installs are recorded. The detail pane lists the pack's description and items.
@@ -167,8 +167,8 @@ The stats strip counts installs and, per target, how many. The detail pane shows
 | Key | Does |
 | --- | --- |
 | `↑` `↓`, `j` `k` | move through the installs |
-| `enter`, `i` | reinstall the selected install: it runs at once in the output modal, ending with `✓ installed <pack> (<target> …)` |
-| `a` | a new install of the selected row's pack; with no row selected, of the only pack, or the form asks which pack when there are several |
+| `enter`, `i` | reinstall the selected install: the install form opens at its confirm step with the exact commands; `y` runs them in the output modal, ending with `✓ installed <pack> (<target> …)`, and `esc` cancels. A reinstall the installer refuses shows why in the form |
+| `a` | a new install: the form goes straight to the target when there is only one pack; with several it asks which pack first, with the selected row's pack highlighted |
 | `g` | include your global installs, when you started in a project |
 
 Like global packs, global installs listed from a project are read-only: `enter`, `i` and `a` on one say `global pack — open ipm tui -g to change it`.
@@ -177,10 +177,10 @@ Like global packs, global installs listed from a project are read-only: `enter`,
 
 `i` on Packs, or `a` on Installs, opens the form in place of the tab. Each step shows its keys at the bottom; `enter` goes on, `esc` cancels.
 
-1. **Pack** (only from `a` with several packs and no row selected): pick one of the scope's packs.
+1. **Pack** (only from `a` with several packs): pick one of the scope's packs.
 2. **Target:** `claude` (Claude Code, as a plugin) or `gascity` (a Gas City pack folder).
 3. **For `claude`, the scope:** **user** (every project, just you), **project** (a folder, shared through its `.claude/settings.json`) or **local** (a folder, just you). For project and local, then the folder (`~` works). The defaults are those of `ipm install claude`.
-4. **For `gascity`, the parent folder and the folder name** (the name defaults to the pack's). A name or folder `ipm install gascity` refuses is shown in red and the form returns to the folder.
+4. **For `gascity`, the parent folder and the folder name** (the name defaults to the pack's). A name or folder `ipm install gascity` refuses (a bad name, a missing parent, a folder that holds the project or ipm's home, or one ipm didn't write) is shown in red and the form returns to the folder, before anything runs.
 5. **Confirm:** the exact commands it will run, then `y` to install:
 
    ```text
@@ -191,7 +191,7 @@ Like global packs, global installs listed from a project are read-only: `enter`,
    y install · esc cancel
    ```
 
-The output streams into the modal and ends with `✓ installed csharp-sdlc (claude project /work)`, or an error. While a build or install runs, other build and install keys say `busy — wait for the current run to finish`; the modal closes with `esc` or `enter` when it is done. The Packs and Installs tabs reload as the run finishes.
+The output streams into the modal and ends with `✓ installed csharp-sdlc (claude project /work)`, or an error. While a build, install or sync runs, every key except `ctrl+c` is ignored and says `busy — wait for the current run to finish`; once it is done `esc` or `enter` closes the modal. `ctrl+c` while it runs asks `press ctrl+c again to abandon the run and quit`, and a second `ctrl+c` quits, abandoning the run; after it is done `ctrl+c` and `q` quit at once. The Packs and Installs tabs reload as the run finishes.
 
 An install builds first when `.ipm/` is out of date, so Claude Code gets the current pack. Installing again adds the marketplace again (Claude Code accepts that), refreshes it, and updates the plugin instead of installing it. If Claude Code already has a marketplace of the same name from another folder, two projects in folders with the same name, the install stops rather than repoint it. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
 
