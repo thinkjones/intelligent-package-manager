@@ -170,7 +170,7 @@ func (m *Model) newInstall() {
 	}
 	switch len(m.packs) {
 	case 0:
-		m.status = "no pack to install — create one from the Catalog (p, then n)"
+		m.status = "no pack to install — create one on the Packs tab (n)"
 	case 1:
 		m.openInstallForm(m.packs[0].Name, false)
 	default:
@@ -207,9 +207,9 @@ func (m *Model) installsStats() string {
 // installsHints are the Installs footer's keys, before help and quit.
 func (m *Model) installsHints() []string {
 	if m.ins.filter.typing {
-		return []string{"type to filter", "enter keep", "esc clear"}
+		return []string{"type to filter", "enter/tab keep", "esc clear"}
 	}
-	return []string{"↑↓ move", "enter reinstall", "a new", "g global", "/ filter", "1-4 tabs"}
+	return []string{"↑↓ move", "enter reinstall", "a new", "g global", "/ filter", "esc tab bar"}
 }
 
 // installsBody is the table of installs, with the selected one's detail

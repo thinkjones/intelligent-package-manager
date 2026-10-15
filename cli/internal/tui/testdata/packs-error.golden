@@ -27,4 +27,4 @@ CATALOG (0)  PACKS (…)  INSTALLS (…)  MARKETPLACE (…)
 │                                                                                                                      │
 ╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
                                                                                                                         
-↑↓ packs  enter items  b build  i install  g global  / filter  1-4 tabs  ? help  q quit                                 
+↑↓ packs  enter items  n new  b build  i install  g global  / filter  esc tab bar  ? help  q quit                       

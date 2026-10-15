@@ -6,15 +6,15 @@ CATALOG (0)  PACKS (3)  INSTALLS (…)  MARKETPLACE (…)
 │   NAME        SCOPE   ITEMS BUILT INSTALLED TO                       │
 │ ▶ csharp-sdlc project     3 fresh claude project, gascity kit        │
 │   docs        project     1 stale claude user                        │
-│   empty       project     0 never                                    │
+╰──────────────────────────────────────────────────────────────────────╯
+╭─ csharp-sdlc (3) ────────────────────────────────────────────────────╮
+│ C# lifecycle                                                         │
 │                                                                      │
-│                                                                      │
-│                                                                      │
-│                                                                      │
-│                                                                      │
-│                                                                      │
-│                                                                      │
-│                                                                      │
+│ ▾ o/r                                                                │
+│     skill tdd                                                        │
+│ ▾ wshobson/agents                                                    │
+│     agent csharp-pro                                                 │
+│ ▾ anthropics/claude-plugins-official                                 │
 ╰──────────────────────────────────────────────────────────────────────╯
                                                                         
-↑↓ packs  enter items  b build  i install  g global  ? help  q quit     
+↑↓ packs  enter items  n new  b build  i install  ? help  q quit        

@@ -24,11 +24,13 @@ const (
 // searchTick fires debounce after a keystroke; only the latest one searches.
 type searchTick struct{ seq int }
 
-// searchDone carries a search's results back; stale ones are dropped.
+// searchDone carries a search's results back; stale ones are dropped. note
+// is a status to show with them.
 type searchDone struct {
-	seq int
-	res Results
-	err error
+	seq  int
+	res  Results
+	err  error
+	note string
 }
 
 // Model is the TUI's state. It implements tea.Model.
@@ -55,6 +57,7 @@ type Model struct {
 	tree      treeView
 	treeSel   int      // the selected row among tree.selectable() in tree mode, or backRow
 	backStack []string // external entries jumped from, newest last
+	reveal    string   // the item c opened from Packs: the tree goes to it when the search returns
 
 	pk       packsTab    // the Packs tab
 	ins      installsTab // the Installs tab
@@ -127,10 +130,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		if msg.err != nil {
-			m.status = msg.err.Error()
+			m.status, m.reveal = msg.err.Error(), ""
 			return m, nil
 		}
 		m.res, m.sel, m.offset = msg.res, 0, 0
+		if msg.note != "" {
+			m.note("%s", msg.note)
+		}
+		if m.reveal != "" {
+			m.revealItem()
+			return m, nil
+		}
 		m.followSelection()
 		return m, nil
 	case installLine:
@@ -245,6 +255,7 @@ func (m *Model) setFocus(f focus) {
 // clears the results for an empty query.
 func (m *Model) queryChanged() tea.Cmd {
 	m.seq++
+	m.reveal = ""
 	if strings.TrimSpace(m.input.Value()) == "" {
 		m.res, m.sel, m.offset = Results{}, 0, 0
 		m.followSelection()
@@ -254,12 +265,31 @@ func (m *Model) queryChanged() tea.Cmd {
 	return tea.Tick(m.debounce, func(time.Time) tea.Msg { return searchTick{seq} })
 }
 
+// searchCmd runs the search box's query: a pack: token lists that pack's
+// items here, anything else goes to the Searcher with a repo: token as its
+// Repo filter.
 func (m *Model) searchCmd(seq int) tea.Cmd {
-	q, f, s := strings.TrimSpace(m.input.Value()), Filter{Type: typeFilters[m.filter]}, m.d.Searcher
+	text, repo, pack := searchQuery(m.input.Value())
+	f := Filter{Type: typeFilters[m.filter], Repo: repo}
+	if pack != "" {
+		res, note := m.packResults(pack, text, f)
+		return func() tea.Msg { return searchDone{seq: seq, res: res, note: note} }
+	}
+	s := m.d.Searcher
 	return func() tea.Msg {
-		res, err := s.Search(context.Background(), q, f)
+		res, err := s.Search(context.Background(), text, f)
 		return searchDone{seq: seq, res: res, err: err}
 	}
+}
+
+// runQuery puts q in the search box and searches at once, without the
+// debounce.
+func (m *Model) runQuery(q string) tea.Cmd {
+	m.input.SetValue(q)
+	m.input.CursorEnd()
+	m.seq++
+	m.reveal = ""
+	return m.searchCmd(m.seq)
 }
 
 // View draws the screen: the title line, tab bar and stats strip over the

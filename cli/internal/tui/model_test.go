@@ -130,6 +130,7 @@ type fakeCatalog struct {
 	details map[string]Node
 	asked   []string
 	err     error
+	errIDs  map[string]bool // the IDs whose Node fails
 	counts  map[string]int
 }
 
@@ -139,6 +140,9 @@ func (f *fakeCatalog) Node(id string) (Node, error) {
 	f.asked = append(f.asked, id)
 	if f.err != nil {
 		return Node{}, f.err
+	}
+	if f.errIDs[id] {
+		return Node{}, fmt.Errorf("no node %s", id)
 	}
 	if d, ok := f.details[id]; ok {
 		return d, nil
@@ -1221,5 +1225,129 @@ func TestSyncDoesNotClearDirty(t *testing.T) {
 	drain(t, m, m.startBuild())
 	if m.dirty {
 		t.Error("a successful build clears dirty")
+	}
+}
+
+func TestSearchQueryTokens(t *testing.T) {
+	for in, want := range map[string][3]string{
+		"tdd":                          {"tdd", "", ""},
+		"repo:o/r":                     {"", "o/r", ""},
+		"test repo:o/r first":          {"test first", "o/r", ""},
+		"pack:kit guard":               {"guard", "", "kit"},
+		"repo: pack:":                  {"repo: pack:", "", ""},
+		"  repo:a/b  repo:c/d  x ":     {"x", "c/d", ""},
+		"pack:kit repo:o/r tdd agents": {"tdd agents", "o/r", "kit"},
+	} {
+		text, repo, pack := searchQuery(in)
+		if got := [3]string{text, repo, pack}; got != want {
+			t.Errorf("searchQuery(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestRepoTokenFiltersSearch(t *testing.T) {
+	m, f := newTest(t)
+	f.s.results["guard"] = Results{Hits: hits("tdd-guard"), Found: 1}
+	typeText(t, m, "repo:o/r guard")
+	n := len(f.s.queries)
+	if f.s.queries[n-1] != "guard" || f.s.filters[n-1].Repo != "o/r" || len(m.res.Hits) != 1 {
+		t.Errorf("queries %q filters %v hits %d", f.s.queries, f.s.filters, len(m.res.Hits))
+	}
+	f.s.results[""] = Results{Hits: hits("a", "b"), Found: 2}
+	for range " guard" {
+		press(t, m, "backspace")
+	}
+	n = len(f.s.queries)
+	if m.input.Value() != "repo:o/r" || f.s.queries[n-1] != "" || f.s.filters[n-1].Repo != "o/r" || len(m.res.Hits) != 2 {
+		t.Errorf("a query of only a token still searches: %q %v hits %d", f.s.queries, f.s.filters, len(m.res.Hits))
+	}
+}
+
+// setQuery puts q in the search box at once, as a paste does, and runs it.
+func setQuery(t *testing.T, m *Model, q string) {
+	t.Helper()
+	press(t, m, "/")
+	m.input.SetValue(q)
+	drain(t, m, m.queryChanged())
+}
+
+func packTokenModel(t *testing.T) (*Model, fakes) {
+	t.Helper()
+	return newTestWith(t, func(f fakes) {
+		withPackRepos(f)
+		f.c.details["skill:o/r:skills/write"] = Node{ID: "skill:o/r:skills/write", Type: "skill", Name: "write", Repo: "o/r", Description: "Prose", Stars: 7}
+	})
+}
+
+func TestPackTokenListsPack(t *testing.T) {
+	m, f := packTokenModel(t)
+	setQuery(t, m, "pack:csharp-sdlc")
+	if len(f.s.queries) != 0 {
+		t.Errorf("pack: never asks the searcher: %v", f.s.queries)
+	}
+	var names []string
+	for _, h := range m.res.Hits {
+		names = append(names, h.Type+" "+h.Name+" "+h.Repo)
+	}
+	want := "skill tdd o/r,agent csharp-pro wshobson/agents,plugin stripe anthropics/claude-plugins-official"
+	if strings.Join(names, ",") != want || m.res.Found != 3 {
+		t.Errorf("hits %q found %d", names, m.res.Found)
+	}
+	typeText(t, m, " WSHOB")
+	if len(m.res.Hits) != 1 || m.res.Hits[0].Name != "csharp-pro" {
+		t.Errorf("text narrows by name, repo or description: %v", m.res.Hits)
+	}
+	setQuery(t, m, "pack:csharp-sdlc first")
+	if len(m.res.Hits) != 1 || m.res.Hits[0].Name != "tdd" {
+		t.Errorf("description matches: %v", m.res.Hits)
+	}
+	m.filter = 2 // agent
+	setQuery(t, m, "pack:csharp-sdlc")
+	if len(m.res.Hits) != 1 || m.res.Hits[0].Type != "agent" {
+		t.Errorf("the type filter applies: %v", m.res.Hits)
+	}
+}
+
+func TestPackTokenUnknownPack(t *testing.T) {
+	m, f := packTokenModel(t)
+	setQuery(t, m, "pack:nope")
+	if len(m.res.Hits) != 0 || m.status != "no pack nope" || len(f.s.queries) != 0 {
+		t.Errorf("hits %v status %q queries %v", m.res.Hits, m.status, f.s.queries)
+	}
+}
+
+func TestPickerChoiceListsPack(t *testing.T) {
+	m, f := packTokenModel(t)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "p", "down", "enter")
+	if m.active != "docs" || m.input.Value() != "pack:docs" {
+		t.Fatalf("active %q query %q", m.active, m.input.Value())
+	}
+	if len(m.res.Hits) != 1 || m.res.Hits[0].Name != "write" || m.res.Hits[0].Stars != 7 {
+		t.Errorf("the pack's items: %+v", m.res.Hits)
+	}
+	press(t, m, "p", "n")
+	for _, r := range "kit" {
+		press(t, m, string(r))
+	}
+	press(t, m, "enter", "enter")
+	if m.active != "kit" || m.input.Value() != "pack:kit" || len(m.res.Hits) != 0 {
+		t.Errorf("a new pack is listed too: active %q query %q hits %v", m.active, m.input.Value(), m.res.Hits)
+	}
+	if f.p.calls[len(f.p.calls)-1] != `create kit ""` {
+		t.Errorf("calls %v", f.p.calls)
+	}
+}
+
+func TestAddWithNoPackKeepsSearch(t *testing.T) {
+	m, _ := newTest(t)
+	typeText(t, m, "tdd")
+	press(t, m, "down", "a")
+	for _, r := range "kit" {
+		press(t, m, string(r))
+	}
+	press(t, m, "enter", "enter")
+	if m.active != "kit" || m.input.Value() != "tdd" || len(m.res.Hits) != 2 {
+		t.Errorf("creating a pack from a keeps the results: active %q query %q hits %d", m.active, m.input.Value(), len(m.res.Hits))
 	}
 }

@@ -251,12 +251,12 @@ func (m *Model) marketplaceStats() string {
 // marketHints are the Marketplace footer's keys, before help and quit.
 func (m *Model) marketHints() []string {
 	if m.mk.filter.typing {
-		return []string{"type to filter", "enter keep", "esc clear"}
+		return []string{"type to filter", "enter/tab keep", "esc clear"}
 	}
 	if !m.mk.loaded || m.mk.err != nil {
-		return []string{"s sync", "1-4 tabs"}
+		return []string{"s sync", "esc tab bar"}
 	}
-	return []string{"↑↓ move", "space follow", "s sync", "/ filter", "1-4 tabs"}
+	return []string{"↑↓ move", "space follow", "s sync", "/ filter", "esc tab bar"}
 }
 
 // marketRow is a row of the table: a list's divider or a repo.

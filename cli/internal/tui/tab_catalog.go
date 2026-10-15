@@ -31,6 +31,7 @@ func (m *Model) catalogKey(msg tea.KeyPressMsg) tea.Cmd {
 			return nil
 		case "p":
 			m.openPicker(false)
+			m.picker.list = true
 			return nil
 		case "e":
 			m.openExternal()
@@ -131,9 +132,9 @@ func (m *Model) catalogStats() string {
 func (m *Model) catalogHints() string {
 	switch m.focus {
 	case focusSearch:
-		return "type to search  ↓/esc results  ctrl+c quit"
+		return "type to search  ↓/tab/esc results  ctrl+c quit"
 	case focusTree:
-		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  tab/esc back  ? help"
+		return "↑↓ siblings  ←→ parent/child  enter follow  a add  d remove  esc back  tab tab bar  ? help"
 	case focusTray:
 		return "←→ items  d remove  esc back"
 	}
@@ -143,7 +144,7 @@ func (m *Model) catalogHints() string {
 // catalogResultHints are the Catalog footer's middle hints with the results
 // focused.
 func (m *Model) catalogResultHints() []string {
-	return []string{"/ search", "1-4 tabs", "↑↓ results", "←→ tree", "tab tree mode", "a add", "t tray", "p packs", "f type"}
+	return []string{"/ search", "↑↓ results", "←→ tree", "enter tree mode", "tab pane", "esc tab bar", "a add", "t tray", "p packs", "f type"}
 }
 
 // countLine is the Catalog's status line: how many results, and the path to
@@ -391,4 +392,79 @@ func (m *Model) breadcrumb(w int) string {
 		parts[0] = stMuted.Render("…")
 	}
 	return strings.Join(parts, sep)
+}
+
+// searchQuery splits the search box into its free text and its repo:owner/repo
+// and pack:name tokens, which may sit anywhere among the words; the last of
+// each kind wins. A token with nothing after the colon is text.
+func searchQuery(s string) (text, repo, pack string) {
+	var words []string
+	for _, w := range strings.Fields(s) {
+		switch {
+		case strings.HasPrefix(w, "repo:") && len(w) > len("repo:"):
+			repo = strings.TrimPrefix(w, "repo:")
+		case strings.HasPrefix(w, "pack:") && len(w) > len("pack:"):
+			pack = strings.TrimPrefix(w, "pack:")
+		default:
+			words = append(words, w)
+		}
+	}
+	return strings.Join(words, " "), repo, pack
+}
+
+// packResults are the items of the pack named name as hits, in the pack's
+// order, narrowed by f and by text (a substring of the name, repo or
+// description, ignoring case). note says when there is no such pack.
+func (m *Model) packResults(name, text string, f Filter) (res Results, note string) {
+	p := m.packNamed(name)
+	if p == nil {
+		return Results{}, "no pack " + name
+	}
+	q := strings.ToLower(text)
+	for _, id := range p.Items {
+		h := Hit{ID: id}
+		if n, err := m.d.Catalog.Node(id); err == nil {
+			h.Type, h.Name, h.Repo, h.Description, h.Stars = n.Type, n.Name, n.Repo, n.Description, n.Stars
+		} else {
+			h.Type, h.Name, _ = strings.Cut(itemLabel(id), " ")
+		}
+		switch {
+		case f.Type != "" && h.Type != f.Type:
+		case f.Repo != "" && !strings.EqualFold(h.Repo, f.Repo):
+		case q != "" && !strings.Contains(strings.ToLower(h.Name+"\n"+h.Repo+"\n"+h.Description), q):
+		default:
+			res.Hits = append(res.Hits, h)
+		}
+	}
+	res.Found = len(res.Hits)
+	return res, ""
+}
+
+// packNamed is the scope's pack called name, or a global one the Packs tab
+// lists; nil when there is none.
+func (m *Model) packNamed(name string) *Pack {
+	for _, ps := range [][]Pack{m.packs, m.pk.rows} {
+		for i := range ps {
+			if ps[i].Name == name {
+				return &ps[i]
+			}
+		}
+	}
+	return nil
+}
+
+// revealItem puts the results' cursor on the item c opened from Packs, and
+// the tree on it with focus, whether or not the search returned it.
+func (m *Model) revealItem() {
+	id := m.reveal
+	m.reveal = ""
+	m.backStack = nil
+	for i, h := range m.res.Hits {
+		if h.ID == id {
+			m.sel = i
+		}
+	}
+	m.setCursor(id)
+	m.setFocus(focusTree)
+	m.treeSel = m.tree.Cursor
 }

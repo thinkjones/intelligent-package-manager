@@ -20,7 +20,7 @@ func packsSetup(f fakes) {
 
 func packsModel(t *testing.T) (*Model, fakes) {
 	t.Helper()
-	m, f := newTestWith(t, packsSetup)
+	m, f := newTestWith(t, withPackRepos)
 	press(t, m, "2", "tab")
 	return m, f
 }
@@ -264,46 +264,137 @@ func TestPacksFirstVisitLoads(t *testing.T) {
 	}
 }
 
-func TestPacksNarrowHidesDetailBesideTable(t *testing.T) {
-	m, _ := packsModel(t)
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-	if strings.Contains(view(m), "C# lifecycle") {
-		t.Error("the detail pane hides below 100 columns")
-	}
-	press(t, m, "enter")
-	v := view(m)
-	if !m.pk.detail || strings.Contains(v, "NAME") || !strings.Contains(v, "csharp-sdlc (3)") || !strings.Contains(v, "▶ skill tdd") {
-		t.Fatalf("enter shows the item list at full width:\n%s", v)
-	}
-}
-
-func TestPacksNarrowRemoveItem(t *testing.T) {
+func TestPacksStackedAtMinimumSize(t *testing.T) {
 	m, f := packsModel(t)
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
+	m.Update(tea.WindowSizeMsg{Width: minWidth, Height: minHeight})
 	press(t, m, "enter", "down")
-	if !strings.Contains(view(m), "▶ agent csharp-pro") {
-		t.Fatalf("shown:\n%s", view(m))
+	v := view(m)
+	if !strings.Contains(v, "NAME") || !strings.Contains(v, "▶ agent csharp-pro") {
+		t.Fatalf("the table over the items:\n%s", v)
 	}
 	press(t, m, "x")
 	if got := f.p.calls; len(got) != 1 || !strings.HasPrefix(got[0], "remove csharp-sdlc agent:") {
-		t.Fatalf("calls %v", got)
-	}
-	press(t, m, "esc")
-	if m.pk.detail || !strings.Contains(view(m), "NAME") {
-		t.Errorf("esc returns to the table:\n%s", view(m))
+		t.Errorf("calls %v", got)
 	}
 }
 
-func TestPacksResizeKeepsItemListVisible(t *testing.T) {
-	m, _ := packsModel(t)
-	press(t, m, "enter", "down")
-	m.Update(tea.WindowSizeMsg{Width: 80, Height: 24})
-	if v := view(m); strings.Contains(v, "NAME") || !strings.Contains(v, "▶ agent csharp-pro") {
-		t.Errorf("after narrowing:\n%s", v)
+// withPackRepos puts packsSetup's items in the catalog: tdd in o/r,
+// csharp-pro in wshobson/agents, stripe in anthropics/claude-plugins-official.
+func withPackRepos(f fakes) {
+	packsSetup(f)
+	for _, n := range []Node{
+		{ID: tddID, Type: "skill", Name: "tdd", Repo: "o/r", Description: "Test first."},
+		{ID: "agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md", Type: "agent", Name: "csharp-pro", Repo: "wshobson/agents"},
+		{ID: "plugin:anthropics/claude-plugins-official#stripe", Type: "plugin", Name: "stripe", Repo: "anthropics/claude-plugins-official"},
+		{ID: "skill:o/r:skills/write", Type: "skill", Name: "write", Repo: "o/r"},
+		{ID: "skill:o/r:skills/mine", Type: "skill", Name: "mine", Repo: "o/r"},
+	} {
+		f.c.details[n.ID] = n
 	}
-	m.Update(tea.WindowSizeMsg{Width: 120, Height: 30})
-	if v := view(m); !strings.Contains(v, "NAME") || !strings.Contains(v, "▶ agent csharp-pro") {
-		t.Errorf("after widening:\n%s", v)
+}
+
+func TestPacksItemsTreeByRepo(t *testing.T) {
+	m, f := newTestWith(t, func(f fakes) {
+		withPackRepos(f)
+		f.p.packs[0].Items = append(f.p.packs[0].Items, "skill:o/r:skills/write")
+	})
+	press(t, m, "2", "tab", "enter")
+	var rows []string
+	for _, l := range panels(view(m))[1] {
+		l = strings.TrimSpace(strings.Trim(strings.TrimSpace(l), "│"))
+		if l != "" && !strings.HasPrefix(l, "╭") && !strings.HasPrefix(l, "╰") {
+			rows = append(rows, l)
+		}
+	}
+	want := []string{"C# lifecycle", "▾ o/r", "▶ skill tdd", "skill write", "▾ wshobson/agents", "agent csharp-pro", "▾ anthropics/claude-plugins-official", "plugin stripe"}
+	if strings.Join(rows, "|") != strings.Join(want, "|") {
+		t.Errorf("repos in order of their first item:\n got %q\nwant %q", rows, want)
+	}
+	press(t, m, "down", "down")
+	if v := view(m); !strings.Contains(v, "▶ agent csharp-pro") {
+		t.Errorf("the cursor skips repo rows:\n%s", v)
+	}
+	press(t, m, "down", "down", "x")
+	if got := f.p.calls; len(got) != 1 || got[0] != "remove csharp-sdlc plugin:anthropics/claude-plugins-official#stripe" {
+		t.Errorf("x removes the item under the cursor: %v", got)
+	}
+}
+
+func TestPacksItemsUnknownNode(t *testing.T) {
+	m, f := newTestWith(t, func(f fakes) {
+		withPackRepos(f)
+		f.c.errIDs = map[string]bool{"agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md": true}
+	})
+	press(t, m, "2", "tab", "enter", "down", "down")
+	v := view(m)
+	if !strings.Contains(v, "▾ ? unknown") || !strings.Contains(v, "▶ agent:wshobson/agents:plugins/jvm-languages/agents/csharp-pro.md") {
+		t.Errorf("an item the catalog can't read sits last, under ? unknown, by its ID:\n%s", v)
+	}
+	asked := len(f.c.asked)
+	view(m)
+	if len(f.c.asked) != asked {
+		t.Errorf("a redraw reads no node again: %d → %d", asked, len(f.c.asked))
+	}
+	press(t, m, "c")
+	if m.tab != tabPacks || !strings.Contains(m.status, "csharp-pro") {
+		t.Errorf("c on an unknown item stays with a note: tab %d status %q", m.tab, m.status)
+	}
+}
+
+func TestPacksNewPack(t *testing.T) {
+	m, f := newTestWith(t, withPackRepos)
+	press(t, m, "2", "tab", "n")
+	if m.picker == nil || !m.picker.creating {
+		t.Fatal("n opens the new pack form")
+	}
+	for _, r := range "kit" {
+		press(t, m, string(r))
+	}
+	press(t, m, "enter", "enter")
+	if f.p.calls[len(f.p.calls)-1] != `create kit ""` {
+		t.Fatalf("calls %v", f.p.calls)
+	}
+	if p := m.selectedPack(); p == nil || p.Name != "kit" || m.counts[tabPacks] != 4 || m.bar {
+		t.Errorf("the new pack is selected: %+v count %d bar %v", p, m.counts[tabPacks], m.bar)
+	}
+	press(t, m, "up", "up", "up", "tab", "n", "esc")
+	if m.picker != nil || !m.pk.detail {
+		t.Errorf("n works from the items pane too, esc cancels: picker %v detail %v", m.picker, m.pk.detail)
+	}
+}
+
+func TestPacksOpenInCatalog(t *testing.T) {
+	m, f := newTestWith(t, func(f fakes) {
+		withPackRepos(f)
+		withDetails(f)
+		f.s.results[""] = Results{Hits: hits("tdd-guard", "tdd"), Found: 2}
+	})
+	press(t, m, "2", "tab", "c")
+	if m.tab != tabPacks || !strings.Contains(m.status, "enter") {
+		t.Errorf("c needs the item list: tab %d status %q", m.tab, m.status)
+	}
+	press(t, m, "1")
+	m.filter = 2
+	press(t, m, "2", "tab", "enter", "c")
+	if m.tab != tabCatalog || m.input.Value() != "repo:o/r" || m.filter != 0 {
+		t.Fatalf("tab %d query %q filter %d", m.tab, m.input.Value(), m.filter)
+	}
+	if n := len(f.s.filters); n == 0 || f.s.filters[n-1].Repo != "o/r" || f.s.queries[n-1] != "" {
+		t.Fatalf("searched %v %v", f.s.queries, f.s.filters)
+	}
+	if m.sel != 1 || m.cursor != tddID || m.focus != focusTree || m.bar || m.treeSel != m.tree.Cursor {
+		t.Errorf("sel %d cursor %q focus %v bar %v treeSel %d", m.sel, m.cursor, m.focus, m.bar, m.treeSel)
+	}
+}
+
+func TestPacksOpenInCatalogBeyondResults(t *testing.T) {
+	m, _ := newTestWith(t, func(f fakes) {
+		withPackRepos(f)
+		f.s.results[""] = Results{Hits: hits("other"), Found: 80}
+	})
+	press(t, m, "2", "tab", "enter", "c")
+	if m.cursor != tddID || m.focus != focusTree || m.sel != 0 {
+		t.Errorf("an item past the results still opens in the tree: cursor %q focus %v sel %d", m.cursor, m.focus, m.sel)
 	}
 }
 
@@ -335,6 +426,15 @@ func TestGoldenPacks(t *testing.T) {
 			m, _ := packsModel(t)
 			m.Update(tea.WindowSizeMsg{Width: 72, Height: 20})
 			press(t, m, "enter", "down")
+			return m
+		},
+		"packs-tree": func(t *testing.T) *Model {
+			m, _ := newTestWith(t, func(f fakes) {
+				withPackRepos(f)
+				f.c.errIDs = map[string]bool{"skill:o/r:skills/gone": true}
+				f.p.packs[0].Items = append(f.p.packs[0].Items, "skill:o/r:skills/write", "skill:o/r:skills/gone")
+			})
+			press(t, m, "2", "tab", "enter", "down", "down")
 			return m
 		},
 		"packs-error": func(t *testing.T) *Model {

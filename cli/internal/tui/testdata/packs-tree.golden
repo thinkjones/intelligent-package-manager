@@ -1,0 +1,30 @@
+ipm  project /work                                                                                              ● hybrid
+CATALOG (0)  PACKS (3)  INSTALLS (…)  MARKETPLACE (…)                                                                   
+─────────────━━━━━━━━━───────────────────────────────                                                                   
+3 packs · 1 fresh · 1 stale · 3 installs                                                                                
+╭─ packs ──────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│   NAME        SCOPE   ITEMS BUILT INSTALLED TO                                                                       │
+│ ▶ csharp-sdlc project     5 fresh claude project, gascity kit                                                        │
+│   docs        project     1 stale claude user                                                                        │
+│   empty       project     0 never                                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+╭─ csharp-sdlc (5) ────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ C# lifecycle                                                                                                         │
+│                                                                                                                      │
+│ ▾ o/r                                                                                                                │
+│     skill tdd                                                                                                        │
+│     skill write                                                                                                      │
+│ ▾ wshobson/agents                                                                                                    │
+│   ▶ agent csharp-pro                                                                                                 │
+│ ▾ anthropics/claude-plugins-official                                                                                 │
+│     plugin stripe                                                                                                    │
+│ ▾ ? unknown                                                                                                          │
+│     skill:o/r:skills/gone                                                                                            │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+                                                                                                                        
+↑↓ items  x remove  c catalog  n new  esc back  ? help  q quit                                                          

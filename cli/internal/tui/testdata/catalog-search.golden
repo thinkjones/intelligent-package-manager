@@ -27,4 +27,4 @@ skill 1,204 · agent 312 · command 98 · plugin 410
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                        
 2 of 100  o/r › p › tdd                                                                             
-/ search  1-4 tabs  ↑↓ results  ←→ tree  tab tree mode  a add  t tray  p packs  ? help  q quit      
+/ search  ↑↓ results  ←→ tree  enter tree mode  tab pane  esc tab bar  a add  t tray  ? help  q quit
