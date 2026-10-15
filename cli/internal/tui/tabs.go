@@ -89,6 +89,8 @@ func (m *Model) statsStrip(w int) string {
 // hints is the footer for the active tab.
 func (m *Model) hints() string {
 	switch {
+	case m.inst != nil && m.inst.done:
+		return "esc close"
 	case m.inst != nil:
 		return "esc close (when finished)"
 	case m.form != nil && m.form.step == formConfirm:

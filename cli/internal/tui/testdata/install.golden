@@ -27,4 +27,4 @@ skill 1,204 · agent 312 · command 98 · plugin 410
 ─ csharp-sdlc (3) · project /work ──────────────────────────────────────────────────────────────────────────────────────
 skill tdd · agent csharp-pro · plugin stripe                                                                            
 2 of 100  o/r › p › tdd                                                                                                 
-esc close (when finished)                                                                                               
+esc close                                                                                                               

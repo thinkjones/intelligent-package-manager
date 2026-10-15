@@ -46,6 +46,9 @@ func TestInstallFormClaudeFlow(t *testing.T) {
 			t.Errorf("modal lacks %q:\n%s", want, v)
 		}
 	}
+	if foot := strings.Split(strings.TrimRight(view(m), "\n "), "\n"); strings.TrimSpace(foot[len(foot)-1]) != "esc close" {
+		t.Errorf("a finished run's footer: %q", foot[len(foot)-1])
+	}
 	if m.inst.kind != runInstall || m.inst.title != "install" || strings.Join(f.in.installed, ";") != "kit project /work" {
 		t.Errorf("title %q installed %v", m.inst.title, f.in.installed)
 	}
