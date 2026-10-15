@@ -65,7 +65,7 @@ Below 60×15 the TUI asks you to enlarge the terminal; in a short terminal the C
 | `?` | every key of the active tab; `esc` or `?` closes it |
 | `q`, `ctrl+c` | quit (`ctrl+c` quits even while typing) |
 
-While a text input has focus (the Catalog's search box, a tab's filter, a field of a form), every printable key types into it and `esc` leaves it. So in the Catalog's search box `1`, `q` and `/` are part of the query: press `esc`, `↓` or `tab` to move to the results, and the other keys work.
+While a text input has focus (the Catalog's search box, a tab's filter, a field of a form), every printable key types into it and `esc` leaves it. `ipm tui` opens on the Catalog with the results focused, so the tab keys work at once; press `/` to search. In the search box `1`, `q` and `/` are part of the query: press `esc`, `↓` or `tab` to move to the results, and the other keys work.
 
 On Packs, Installs and Marketplace, `/` filters the rows by a case-insensitive substring of their visible column text. `enter` keeps the filter and returns to the rows; `esc` clears it.
 
@@ -87,9 +87,8 @@ In a narrow terminal (under 100 columns) columns drop out: the repo, `↗N`, sta
 
 | Key | Does |
 | --- | --- |
-| typing | search; results refresh as you type |
+| `/`, then typing | search; results refresh as you type |
 | `↓`, `tab`, `esc` (search box) | focus the results |
-| `/` | focus the search box |
 | `↑` `↓`, `j` `k` | move through results; the tree follows |
 | `←` `→`, `h` `l` | move the tree to the parent / first child, without changing the result |
 | `tab`, `enter` | tree mode |

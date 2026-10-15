@@ -90,9 +90,8 @@ func New(d Deps) *Model {
 	st.Cursor.Blink = false
 	in.SetStyles(st)
 	in.Prompt = ""
-	in.Placeholder = "type to search"
-	in.Focus()
-	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}}
+	in.Placeholder = "press / to search"
+	m := &Model{d: d, input: in, width: 120, height: 30, debounce: 150 * time.Millisecond, chosen: map[string]string{}, focus: focusResults}
 	m.pk.filter = newFilterBox()
 	m.ins.filter = newFilterBox()
 	m.mk.filter = newFilterBox()

@@ -3,7 +3,7 @@ server off: keyword search only — run `ipm catalog serve` and `ipm catalog reb
 CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)                                                               
 ━━━━━━━━━━━━━━━──────────────────────────────────────────                                                               
 skill 1,204 · agent 312 · command 98 · plugin 410                                                                       
-╭─ search: tdd             ────────────────────────────────────────────────────────────────────────────────────────────╮
+╭─ search: tdd                ─────────────────────────────────────────────────────────────────────────────────────────╮
 │   TYPE   ✓ NAME       REPO  ↗      ★ SCORE DESCRIPTION                                                               │
 │ ▶ skill  ✓ tdd        o/r  ↗3 ★31.2k    50 Test-driven development: write the failing test first, then the code tha… │
 │   skill    tdd-guard  o/r       ★842    50                                                                           │

@@ -141,7 +141,7 @@ func (m *Model) catalogHints() string {
 // catalogResultHints are the Catalog footer's middle hints with the results
 // focused.
 func (m *Model) catalogResultHints() []string {
-	return []string{"↑↓ results", "←→ tree", "tab tree mode", "a add", "t tray", "p packs", "f type", "1-4 tabs"}
+	return []string{"/ search", "1-4 tabs", "↑↓ results", "←→ tree", "tab tree mode", "a add", "t tray", "p packs", "f type"}
 }
 
 // countLine is the Catalog's status line: how many results, and the path to

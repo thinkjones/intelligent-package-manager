@@ -84,8 +84,18 @@ func press(t *testing.T, m *Model, keys ...string) (quit bool) {
 // typeText types s into whatever has focus.
 func typeText(t *testing.T, m *Model, s string) {
 	t.Helper()
+	searchFocus(t, m)
 	for _, r := range s {
 		press(t, m, string(r))
+	}
+}
+
+// searchFocus presses / when the Catalog results have focus, as a person
+// does before typing a query; anywhere else it does nothing.
+func searchFocus(t *testing.T, m *Model) {
+	t.Helper()
+	if m.tab == tabCatalog && m.focus == focusResults && m.inst == nil && m.form == nil && m.picker == nil && !m.help {
+		press(t, m, "/")
 	}
 }
 
@@ -353,6 +363,7 @@ func newTestWith(t *testing.T, setup func(fakes)) (*Model, fakes) {
 
 func TestTypingSearches(t *testing.T) {
 	m, f := newTest(t)
+	press(t, m, "/")
 	typeText(t, m, "tdd")
 	if len(f.s.queries) == 0 || f.s.queries[len(f.s.queries)-1] != "tdd" {
 		t.Fatalf("queries %v", f.s.queries)
@@ -362,6 +373,22 @@ func TestTypingSearches(t *testing.T) {
 	}
 	if !strings.Contains(view(m), "2 of 100") {
 		t.Errorf("want the count in the view:\n%s", view(m))
+	}
+}
+
+// TestOpensOnResults: ipm tui opens with the results focused, so the tab
+// keys work at once and / focuses the search box.
+func TestOpensOnResults(t *testing.T) {
+	m, f := newTest(t)
+	press(t, m, "2")
+	if m.tab != tabPacks {
+		t.Fatalf("2 on launch: tab %v, want Packs", m.tab)
+	}
+	press(t, m, "1")
+	press(t, m, "/")
+	typeText(t, m, "tdd")
+	if m.focus != focusSearch || len(f.s.queries) == 0 || f.s.queries[len(f.s.queries)-1] != "tdd" {
+		t.Errorf("/ then typing: focus %v queries %v", m.focus, f.s.queries)
 	}
 }
 
@@ -388,6 +415,7 @@ func TestEmptyQueryClears(t *testing.T) {
 
 func TestSearchErrorKeepsResults(t *testing.T) {
 	m, f := newTest(t)
+	press(t, m, "/")
 	typeText(t, m, "tdd")
 	f.s.errs["tddx"] = errors.New("search server timed out")
 	typeText(t, m, "x")
@@ -403,6 +431,7 @@ func TestSearchErrorKeepsResults(t *testing.T) {
 
 func TestTypeFilterCycles(t *testing.T) {
 	m, f := newTest(t)
+	press(t, m, "/")
 	typeText(t, m, "tdd")
 	press(t, m, "down")
 	var got []string
@@ -448,6 +477,7 @@ func TestQuit(t *testing.T) {
 		t.Error("ctrl+c should quit")
 	}
 	m, _ = newTest(t)
+	press(t, m, "/")
 	if press(t, m, "q") || m.input.Value() != "q" {
 		t.Error("q in the search box is a letter")
 	}
