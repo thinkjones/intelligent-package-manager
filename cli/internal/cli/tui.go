@@ -143,6 +143,13 @@ func (s *tuiSearcher) Search(_ context.Context, q string, f tui.Filter) (tui.Res
 	if f.Type != "" {
 		query.Types = []string{f.Type}
 	}
+	if f.Repo != "" {
+		query.Repos = []string{f.Repo}
+	}
+	if strings.TrimSpace(q) == "" {
+		// Typesense's "every document", narrowed by the filters.
+		query.Text = "*"
+	}
 	res, err := client.Search(search.Collection, query.Params())
 	if err != nil {
 		return tui.Results{}, tsError(err)
@@ -196,7 +203,9 @@ func (s *tuiSearcher) local(q string, f tui.Filter) (tui.Results, error) {
 // localSearch ranks catalog records by the query's words, ignoring case: 4
 // for each word in the name, 3 in the repo, 3 in an owning plugin's name, 2
 // in the description and 2 in the tags. Ties go to the repo more other repos
-// use, then to more stars, then to the ID. It returns the best 50.
+// use, then to more stars, then to the ID. It returns the best 50. A Repo
+// filter keeps that repo's records, ignoring case; with it, an empty query
+// matches all of them.
 func localSearch(records []map[string]any, stars func(repo string) (int, bool), usedBy func(repo string) int, q string, f tui.Filter) tui.Results {
 	terms := strings.Fields(strings.ToLower(q))
 	pluginNames := map[string]string{}
@@ -216,6 +225,9 @@ func localSearch(records []map[string]any, stars func(repo string) (int, bool), 
 		}
 		name, desc := strings.ToLower(str(r, "name")), strings.ToLower(str(r, "description"))
 		repo := strings.ToLower(str(r, "repo"))
+		if f.Repo != "" && repo != strings.ToLower(f.Repo) {
+			continue
+		}
 		tags := strings.ToLower(strings.Join(strList(r["tags"]), " "))
 		var owners []string
 		for _, p := range strList(r["plugins"]) {
@@ -233,7 +245,7 @@ func localSearch(records []map[string]any, stars func(repo string) (int, bool), 
 				}
 			}
 		}
-		if score == 0 {
+		if score == 0 && (len(terms) > 0 || f.Repo == "") {
 			continue
 		}
 		hit := tui.Hit{ID: str(r, "id"), Type: str(r, "type"), Name: str(r, "name"), Repo: str(r, "repo"), Description: str(r, "description")}
