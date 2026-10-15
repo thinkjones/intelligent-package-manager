@@ -15,7 +15,8 @@ import (
 )
 
 // newInstallGascityCmd is ipm install gascity: in.Path is the folder the pack
-// folder goes in, in.Name the pack folder's name.
+// folder goes in (empty is the scope's .ipm/.gascity), in.Name the pack
+// folder's name.
 func newInstallGascityCmd(sys System) *cobra.Command {
 	var o installOpts
 	var in project.Install
@@ -49,7 +50,7 @@ func newInstallGascityCmd(sys System) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVarP(&in.Path, "dir", "C", "", "the folder to write the pack folder into (default: the working directory)")
+	f.StringVarP(&in.Path, "dir", "C", "", "an existing folder to write the pack folder into (default: .ipm/.gascity in the project, or in $IPM_HOME/global with -g)")
 	f.StringVar(&in.Name, "name", "", "the pack folder's name (default: the pack's name)")
 	f.BoolVarP(&o.Global, "global", "g", false, "install a pack from your user scope ($IPM_HOME/global)")
 	f.BoolVar(&o.Force, "force", false, "replace a folder that ipm did not write")
@@ -74,7 +75,7 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 	if !assemble.ValidGasName(name) {
 		return "", usagef("install gascity: --name %q must start with a letter or digit and use only letters, digits, '_' and '-'", name)
 	}
-	dir, err := gascityDir(in.Path, workDir(sys, scope), sys.Getenv("HOME"))
+	dir, isDefault, err := gascityFolder(sys, scope, in.Path)
 	if err != nil {
 		return "", err
 	}
@@ -122,6 +123,11 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 		}
 		return desc, nil
 	}
+	if isDefault {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "", err
+		}
+	}
 	if _, err := assemble.WriteGascity(files, dir, name, o.Force); err != nil {
 		return "", err
 	}
@@ -130,6 +136,24 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 	}
 	fmt.Fprintf(out, "Import it into a city's pack.toml or city.toml:\n  [imports.%s]\n  source = %q\n", name, folder)
 	return desc, nil
+}
+
+// gascityDefault is the folder ipm install gascity writes into without -C.
+func gascityDefault(scope project.Scope) string {
+	return filepath.Join(scope.IPMDir(), ".gascity")
+}
+
+// gascityFolder is the folder to write the pack folder into: p as gascityDir
+// makes it, or the scope's default folder when p is empty or names it.
+// isDefault reports the latter: that folder need not exist yet, and an
+// install creates it.
+func gascityFolder(sys System, scope project.Scope, p string) (dir string, isDefault bool, err error) {
+	def := gascityDefault(scope)
+	if strings.TrimSpace(p) == "" || filepath.Clean(p) == def {
+		return def, true, nil
+	}
+	dir, err = gascityDir(p, workDir(sys, scope), sys.Getenv("HOME"))
+	return dir, false, err
 }
 
 // gascityDir makes the folder to write into absolute: empty is cwd, a leading

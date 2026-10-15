@@ -106,19 +106,114 @@ func TestInstallGascityName(t *testing.T) {
 	}
 }
 
-func TestInstallGascityDefaultsToWorkingDirectory(t *testing.T) {
+func TestInstallGascityDefaultsToIPMFolder(t *testing.T) {
 	f, root, _ := gascityFake(t)
-	tmp := filepath.Join(root, "sub")
-	os.MkdirAll(tmp, 0o755)
-	f.cwd = tmp
+	sub := filepath.Join(root, "sub")
+	os.MkdirAll(sub, 0o755)
+	f.cwd = sub
+	dir := filepath.Join(root, ".ipm", ".gascity")
 	if err := f.run("install", "gascity"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if _, err := os.Stat(filepath.Join(tmp, "kit", "pack.toml")); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, "kit", "pack.toml")); err != nil {
 		t.Error(err)
 	}
-	if err := f.run("install", "gascity", "-C", filepath.Join(tmp, "nope")); err == nil || !strings.Contains(err.Error(), "is not a folder") {
+	if _, err := os.Stat(filepath.Join(sub, "kit")); err == nil {
+		t.Error("wrote into the working directory")
+	}
+	out := f.out.String()
+	for _, want := range []string{"✓ installed kit (gascity " + filepath.Join(dir, "kit") + ")", "source = \"" + filepath.Join(dir, "kit") + "\"\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	data, _ := os.ReadFile(filepath.Join(root, project.File))
+	if !strings.Contains(string(data), "[[packs.kit.installs]]\ntarget = \"gascity\"\npath = \".ipm/.gascity\"\nname = \"kit\"\n") {
+		t.Errorf("ipm.toml:\n%s", data)
+	}
+
+	// --name with the default folder
+	if err := f.run("install", "gascity", "kit", "--name", "team_kit"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "team_kit", "pack.toml")); err != nil {
+		t.Error(err)
+	}
+
+	// -C still needs an existing folder
+	if err := f.run("install", "gascity", "-C", filepath.Join(sub, "nope")); err == nil || !strings.Contains(err.Error(), "is not a folder") {
 		t.Errorf("got %v", err)
+	}
+
+	// a replay recreates the default folder when it is gone
+	if err := os.RemoveAll(dir); err != nil {
+		t.Fatal(err)
+	}
+	f.out.Reset()
+	if err := f.run("install"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	for _, name := range []string{"kit", "team_kit"} {
+		if _, err := os.Stat(filepath.Join(dir, name, "pack.toml")); err != nil {
+			t.Errorf("not redone: %v\n%s", err, f.out.String())
+		}
+	}
+}
+
+func TestInstallGascityGlobalDefault(t *testing.T) {
+	f, _, _ := gascityFake(t)
+	if err := f.run("pack", "-g", "new", "gk"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("install", "gascity", "-g", "gk"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	scope, _ := currentScope(f.system(), true)
+	dir := filepath.Join(f.env["IPM_HOME"], "global", ".ipm", ".gascity")
+	if _, err := os.Stat(filepath.Join(dir, "gk", "pack.toml")); err != nil {
+		t.Error(err)
+	}
+	got, err := loadInstalls(f.system(), scope)
+	want := []installRecord{{"gk", project.Install{Target: "gascity", Path: dir, Name: "gk"}}}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("got %+v %v", got, err)
+	}
+}
+
+func TestInstallGascityDryRunDefaultCreatesNothing(t *testing.T) {
+	f, root, _ := gascityFake(t)
+	dir := filepath.Join(root, ".ipm", ".gascity")
+	if err := f.run("install", "gascity", "kit", "--dry-run"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	out := f.out.String()
+	for _, want := range []string{"would write " + filepath.Join(dir, "kit") + "\n", "  pack.toml\n", "  skills/s1/SKILL.md\n"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output lacks %q:\n%s", want, out)
+		}
+	}
+	if _, err := os.Stat(dir); err == nil {
+		t.Error("a dry run created .ipm/.gascity")
+	}
+}
+
+func TestPackBuildKeepsGascityFolder(t *testing.T) {
+	f, root, _ := gascityFake(t)
+	if err := f.run("install", "gascity", "kit"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	pack := filepath.Join(root, ".ipm", ".gascity", "kit", "pack.toml")
+	before, err := os.ReadFile(pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"pack", "build"}, {"pack", "build", "--update"}} {
+		if err := f.run(args...); err != nil {
+			t.Fatalf("%v\n%s", err, f.out.String())
+		}
+		if after, err := os.ReadFile(pack); err != nil || string(after) != string(before) {
+			t.Errorf("%v changed %s: %v", args, pack, err)
+		}
 	}
 }
 
