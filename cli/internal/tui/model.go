@@ -285,6 +285,9 @@ func (m *Model) searchCmd(seq int) tea.Cmd {
 // runQuery puts q in the search box and searches at once, without the
 // debounce.
 func (m *Model) runQuery(q string) tea.Cmd {
+	// Widen the box first: at the empty box's placeholder width the input
+	// would scroll q and show only its end.
+	m.input.SetWidth(max(m.width, lipglossWidth(q)+1))
 	m.input.SetValue(q)
 	m.input.CursorEnd()
 	m.seq++

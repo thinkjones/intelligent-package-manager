@@ -467,3 +467,12 @@ func TestPacksSlashLeavesItemList(t *testing.T) {
 		t.Errorf("detail %v typing %v", m.pk.detail, m.pk.filter.typing)
 	}
 }
+
+func TestRunQueryShowsTheWholeQuery(t *testing.T) {
+	m, _ := newTest(t)
+	view(m) // the empty box is as wide as its placeholder
+	m.runQuery("repo:someone/a-long-repo-name")
+	if v := view(m); !strings.Contains(v, "search: repo:someone/a-long-repo-name") {
+		t.Errorf("the box scrolled the query:\n%s", v)
+	}
+}
