@@ -227,7 +227,7 @@ ipm pack install claude|gascity [pack] …      (same as ipm install claude|gasc
 
 | Subcommand | Does |
 | --- | --- |
-| `new` | Create a pack. Creates `ipm.toml` in the current folder if no folder above has one. |
+| `new` | Create a pack. Creates `ipm.toml` in the current folder if no folder above has one. The name must be kebab-case (lowercase letters, digits and single hyphens, as `claude plugin validate --strict` wants) and not one Claude Code reserves; otherwise it is a usage error (exit 2) that suggests the kebab form, e.g. `my-pack` for `my.pack`. |
 | `add` | Add catalog items. Every ID is checked first; if any is unknown or can't be picked, nothing is added. Duplicates are ignored. |
 | `remove` | Remove items. |
 | `list` | Every pack in the scope: name, item count, description. |

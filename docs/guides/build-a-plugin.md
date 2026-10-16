@@ -75,7 +75,7 @@ items = [
 
 ### Pack names
 
-Pack names start with a letter or digit and use letters, digits, `.`, `_` and `-`. Names Claude Code reserves for Anthropic (`claude-…`, `anthropic-…`, and `official` next to claude or anthropic) are refused.
+Pack names are kebab-case: lowercase letters, digits and single hyphens, such as `csharp-sdlc`, which `claude plugin validate --strict` wants of a plugin name; `ipm pack new` suggests the kebab form of a name it refuses. Names Claude Code reserves for Anthropic (`claude-…`, `anthropic-…`, and `official` next to claude or anthropic) are refused.
 
 ## 3. Build it
 

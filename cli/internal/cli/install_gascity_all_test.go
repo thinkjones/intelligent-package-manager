@@ -439,9 +439,10 @@ func TestInstallGascityRefusesOtherScopesFolder(t *testing.T) {
 
 func TestInstallGascityAllInvalidFolderName(t *testing.T) {
 	f, root, _ := gascityFake(t)
-	if err := f.run("pack", "new", "my.pack"); err != nil {
-		t.Fatal(err)
-	}
+	// ipm pack new refuses a dotted name, but a hand-edited ipm.toml can
+	// hold one.
+	data, _ := os.ReadFile(filepath.Join(root, project.File))
+	write(t, filepath.Join(root, project.File), string(data)+"\n[packs.\"my.pack\"]\ndescription = \"d\"\nitems = []\n")
 	if err := f.run("pack", "build"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}

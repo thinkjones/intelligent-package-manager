@@ -1211,9 +1211,25 @@ func TestPackNewAddShow(t *testing.T) {
 func TestPackNewRefusesReservedNames(t *testing.T) {
 	f, _ := packFake(t)
 	for _, n := range []string{"claude-tools", "official-claude", "bad name"} {
-		if err := f.run("pack", "new", n); err == nil {
-			t.Errorf("%q accepted", n)
+		var usage *UsageError
+		if err := f.run("pack", "new", n); !errors.As(err, &usage) {
+			t.Errorf("%q: %v", n, err)
 		}
+	}
+}
+
+// claude plugin validate --strict wants kebab-case plugin names.
+func TestPackNewRefusesNonKebabNames(t *testing.T) {
+	f, root := packFake(t)
+	for n, hint := range map[string]string{"my.pack": `like "my-pack"`, "My_Pack": `like "my-pack"`, "kit-": `like "kit"`} {
+		var usage *UsageError
+		err := f.run("pack", "new", n)
+		if !errors.As(err, &usage) || !strings.Contains(err.Error(), "lowercase letters, digits and single hyphens") || !strings.Contains(err.Error(), hint) {
+			t.Errorf("%q: %v", n, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, project.File)); !os.IsNotExist(err) {
+		t.Error("a refused name writes nothing")
 	}
 }
 

@@ -101,10 +101,16 @@ func packNew(sys System, scope project.Scope, name, description string) error {
 }
 
 // createPack adds an empty pack to the scope's ipm.toml, with the default
-// description when none is given. ipm pack new and the TUI share it.
+// description when none is given. ipm pack new and the TUI share it. A name
+// that isn't kebab-case (which claude plugin validate --strict wants) is a
+// usage error; ipm.toml can still hold other valid names by hand.
 func createPack(scope project.Scope, name, description string) error {
-	if !pack.ValidName(name) || pack.Reserved(name) {
-		return fmt.Errorf("%q can't be a pack name: use letters, digits, '.', '_' and '-', and avoid names Claude Code reserves (claude-…, anthropic-…, \"official\" beside claude or anthropic)", name)
+	if !pack.Kebab(name) || pack.Reserved(name) {
+		like := ""
+		if k := pack.KebabOf(name); k != "" && k != name && !pack.Reserved(k) {
+			like = fmt.Sprintf(", like %q", k)
+		}
+		return usagef("%q can't be a pack name: use lowercase letters, digits and single hyphens%s, and avoid names Claude Code reserves (claude-…, anthropic-…, \"official\" beside claude or anthropic)", name, like)
 	}
 	packs, err := project.LoadPacks(scope.Root)
 	if err != nil {

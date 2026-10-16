@@ -19,6 +19,21 @@ var nameRE = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 // ValidName reports whether s is usable as a plugin or marketplace name.
 func ValidName(s string) bool { return nameRE.MatchString(s) }
 
+var (
+	kebabRE  = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+	nonKebab = regexp.MustCompile(`[^a-z0-9]+`)
+)
+
+// Kebab reports whether s is kebab-case: lowercase letters and digits in
+// words joined by single hyphens. claude plugin validate --strict wants
+// plugin names so, and ipm pack new refuses any other.
+func Kebab(s string) bool { return kebabRE.MatchString(s) }
+
+// KebabOf is s turned kebab-case, or "" when nothing usable is left.
+func KebabOf(s string) string {
+	return strings.Trim(nonKebab.ReplaceAllString(strings.ToLower(s), "-"), "-")
+}
+
 // Reserved reports whether Claude Code refuses s as a third-party plugin
 // name because it passes as one of Anthropic's own (`claude plugin validate`
 // fails it). Case and separators are ignored, as Claude Code does.

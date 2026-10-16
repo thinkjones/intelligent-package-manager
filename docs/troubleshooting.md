@@ -86,7 +86,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `no item … in the catalog — find IDs with ipm search` | The ID is mistyped, or its repo isn't one of your sources. `ipm marketplace add` it, then `ipm catalog sync`. |
 | `… comes only with its plugin: ipm pack add …` | Hooks, MCP servers and inline commands come with their plugin. Run the command it prints. |
 | `… is a repo …`, `… is a marketplace …` | Pick the items it holds; `ipm show tree <id>` lists them. |
-| `… can't be a pack name …` | Use letters, digits, `.`, `_` and `-`, starting with a letter or digit, and avoid `claude-…`, `anthropic-…` and `official`. |
+| `… can't be a pack name …` | `ipm pack new` (and the TUI) take kebab-case names only, which `claude plugin validate --strict` wants: lowercase letters, digits and single hyphens, such as `my-pack` (the message suggests one). Avoid `claude-…`, `anthropic-…` and `official`. A usage error, exit 2. |
 | `pack … already exists`, `no pack …` | `ipm pack list` shows the packs in this scope. Packs in your user scope need `-g`. |
 
 ## Build
@@ -141,7 +141,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | --- | --- |
 | `<path> exists and was not written by ipm — use --force to replace it` | The folder exists, isn't empty, and its `pack.toml` doesn't start with ipm's header line. Pick another `--name` or `-C`, or add `--force` to replace it (everything in it is deleted). A folder ipm wrote itself is replaced without `--force`. |
 | `<path> holds pack <other> (project)` (or `(global)`) `— use --name to pick another folder, or --force to replace it` | A recorded install of another pack, or of the same pack from the other scope, wrote that folder: often a user-scope pack (`-g`) with the same name as a project pack, both writing to `.ipm/.gascity`. Add `--name` to give one a different folder. Or add `--force` to take the folder over: ipm replaces it and removes the other pack's install record, printing `replaced <other> (…)'s install at <path>`. In the TUI the message ends `— run ipm install gascity with --name or --force to change it`, since the form has neither. |
-| `pack name "<pack>" isn't a valid Gas City folder name — install it alone with --name` | `ipm install gascity` without a pack names each folder after its pack, and a Gas City folder name can't hold a `.`. Install that pack on its own with a folder name: `ipm install gascity <pack> --name <name>`. |
+| `pack name "<pack>" isn't a valid Gas City folder name — install it alone with --name` | `ipm install gascity` without a pack names each folder after its pack, and a Gas City folder name can't hold a `.` (only a hand-edited `ipm.toml` can name a pack so). Install that pack on its own with a folder name: `ipm install gascity <pack> --name <name>`. |
 | `refusing to replace <path>: it holds the project` (or `… ipm's home`) | The pack folder would be, or contain, your project or `$IPM_HOME`; `--force` doesn't override this. Pick another `-C` or `--name`. |
 | `--dry-run needs a current build — run ipm pack build first` | `--dry-run` writes nothing, so it won't build. Run `ipm pack build`, then repeat. |
 | `skipped <id>: external plugin — its files live in another repo; add its skills and agents directly` | A plugin whose files are in another repo can't be written. `ipm pack add` its skills and agents, and remove the plugin. |
