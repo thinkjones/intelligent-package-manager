@@ -96,20 +96,7 @@ func recordInstall(sys System, scope project.Scope, pack string, in project.Inst
 			return err
 		}
 		recs = slices.DeleteFunc(recs, func(r installRecord) bool { return r.Pack == pack && sameInstall(r.Install, in) })
-		recs = append(recs, installRecord{pack, in})
-		sortInstalls(recs)
-		raw := make([]installJSON, len(recs))
-		for i, r := range recs {
-			raw[i] = installJSON{r.Pack, r.Target, r.Path, r.Scope, r.Name}
-		}
-		data, err := json.MarshalIndent(raw, "", "  ")
-		if err != nil {
-			return err
-		}
-		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-			return err
-		}
-		return os.WriteFile(path, append(data, '\n'), 0o644)
+		return writeGlobalInstalls(path, append(recs, installRecord{pack, in}))
 	}
 	in.Path = relativeTo(scope.Root, in.Path)
 	_, err := editPack(scope, pack, func(p *project.Pack) error {
@@ -123,6 +110,45 @@ func recordInstall(sys System, scope project.Scope, pack string, in project.Inst
 		return nil
 	})
 	return err
+}
+
+// forgetInstall removes rec, as loadInstalls lists it, from scope's records.
+func forgetInstall(sys System, scope project.Scope, rec installRecord) error {
+	if scope.Global {
+		path, err := globalInstallsPath(sys)
+		if err != nil {
+			return err
+		}
+		recs, err := readGlobalInstalls(path)
+		if err != nil {
+			return err
+		}
+		return writeGlobalInstalls(path, slices.DeleteFunc(recs, func(r installRecord) bool { return r.Pack == rec.Pack && sameInstall(r.Install, rec.Install) }))
+	}
+	in := rec.Install
+	in.Path = relativeTo(scope.Root, in.Path)
+	_, err := editPack(scope, rec.Pack, func(p *project.Pack) error {
+		p.Installs = slices.DeleteFunc(p.Installs, func(i project.Install) bool { return sameInstall(i, in) })
+		return nil
+	})
+	return err
+}
+
+// writeGlobalInstalls writes recs, sorted, to installs.json at path.
+func writeGlobalInstalls(path string, recs []installRecord) error {
+	sortInstalls(recs)
+	raw := make([]installJSON, len(recs))
+	for i, r := range recs {
+		raw[i] = installJSON{r.Pack, r.Target, r.Path, r.Scope, r.Name}
+	}
+	data, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, append(data, '\n'), 0o644)
 }
 
 // loadInstalls lists every recorded install in scope, sorted by pack, target,

@@ -135,6 +135,7 @@ func installAllGascity(sys System, scope project.Scope, in project.Install, o in
 type gascityTarget struct {
 	dir, name string
 	create    bool
+	clashes   []gascityClash // replaced with --force
 }
 
 // gascityPlace is where pack's folder goes, refusing a folder that holds the
@@ -154,8 +155,14 @@ func gascityPlace(sys System, scope project.Scope, pack string, in project.Insta
 	if err := gascityRefusal(sys, scope, filepath.Join(dir, name)); err != nil {
 		return gascityTarget{}, err
 	}
-	err = gascityClash(sys, scope, pack, filepath.Join(dir, name), o.Force)
-	if err == nil {
+	folder := filepath.Join(dir, name)
+	clashes, err := gascityClashes(sys, scope, pack, folder)
+	if err != nil {
+		return gascityTarget{}, err
+	}
+	if len(clashes) > 0 && !o.Force {
+		err = fmt.Errorf("%s holds pack %s — use --name to pick another folder, or --force to replace it", folder, clashes[0])
+	} else {
 		err = assemble.CheckGascityTarget(dir, name, o.Force)
 	}
 	if err != nil {
@@ -164,23 +171,32 @@ func gascityPlace(sys System, scope project.Scope, pack string, in project.Insta
 		}
 		return gascityTarget{}, err
 	}
-	return gascityTarget{dir, name, create}, nil
+	return gascityTarget{dir, name, create, clashes}, nil
 }
 
-// gascityClash refuses, unless force, an existing pack folder that a recorded
-// install of another pack, or of the same pack from the other scope, wrote:
-// the records are the local project's ipm.toml and $IPM_HOME/installs.json.
-func gascityClash(sys System, scope project.Scope, pack, folder string, force bool) error {
-	if force {
-		return nil
+// gascityClash is a recorded install of another pack, or of the same pack
+// from the other scope, in a pack folder: scope holds the record.
+type gascityClash struct {
+	scope project.Scope
+	rec   installRecord
+}
+
+func (c gascityClash) String() string {
+	label := "project"
+	if c.scope.Global {
+		label = "global"
 	}
-	if _, err := os.Stat(folder); err != nil {
-		return nil
-	}
+	return c.rec.Pack + " (" + label + ")"
+}
+
+// gascityClashes are the recorded installs that put another pack in folder,
+// from the local project's ipm.toml and $IPM_HOME/installs.json.
+func gascityClashes(sys System, scope project.Scope, pack, folder string) ([]gascityClash, error) {
+	var out []gascityClash
 	for _, s := range []project.Scope{{Root: localRoot(sys, scope)}, {Root: scope.Root, Global: true}} {
 		recs, err := loadInstalls(sys, s)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, r := range recs {
 			if r.Target != "gascity" || r.Pack == pack && s.Global == scope.Global {
@@ -190,17 +206,12 @@ func gascityClash(sys System, scope project.Scope, pack, folder string, force bo
 			if name == "" {
 				name = r.Pack
 			}
-			if realPath(filepath.Join(r.Path, name)) != realPath(folder) {
-				continue
+			if realPath(filepath.Join(r.Path, name)) == realPath(folder) {
+				out = append(out, gascityClash{s, r})
 			}
-			label := "project"
-			if s.Global {
-				label = "global"
-			}
-			return fmt.Errorf("%s holds pack %s (%s) — use --name to pick another folder, or --force to replace it", folder, r.Pack, label)
 		}
 	}
-	return nil
+	return out, nil
 }
 
 // gascityBuild makes sure scope's build is current: with o.DryRun it only
@@ -240,6 +251,9 @@ func writeGascityPack(sys System, scope project.Scope, pack string, t gascityTar
 	folder := filepath.Join(t.dir, t.name)
 	desc := pack + " (gascity " + folder + ")"
 	if o.DryRun {
+		for _, c := range t.clashes {
+			fmt.Fprintf(out, "would replace %s's install at %s\n", c, folder)
+		}
 		fmt.Fprintf(out, "would write %s\n", folder)
 		for _, f := range files {
 			fmt.Fprintf(out, "  %s\n", f.Path)
@@ -256,6 +270,12 @@ func writeGascityPack(sys System, scope project.Scope, pack string, t gascityTar
 	}
 	if _, err := assemble.WriteGascity(files, t.dir, t.name, o.Force); err != nil {
 		return "", err
+	}
+	for _, c := range t.clashes {
+		if err := forgetInstall(sys, c.scope, c.rec); err != nil {
+			return "", err
+		}
+		fmt.Fprintf(out, "replaced %s's install at %s\n", c, folder)
 	}
 	if err := recordInstall(sys, scope, pack, project.Install{Target: "gascity", Path: t.dir, Name: t.name}); err != nil {
 		return "", err

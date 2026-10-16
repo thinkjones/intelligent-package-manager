@@ -511,8 +511,12 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 		if err := gascityRefusal(in.sys, scope, folder); err != nil {
 			return t, nil, err
 		}
-		if err := gascityClash(in.sys, scope, pack, folder, false); err != nil {
+		clashes, err := gascityClashes(in.sys, scope, pack, folder)
+		if err != nil {
 			return t, nil, err
+		}
+		if len(clashes) > 0 {
+			return t, nil, fmt.Errorf("%s holds pack %s — use --name to pick another folder, or --force to replace it", folder, clashes[0])
 		}
 		if err := assemble.CheckGascityTarget(dir, name, false); err != nil {
 			return t, nil, err
