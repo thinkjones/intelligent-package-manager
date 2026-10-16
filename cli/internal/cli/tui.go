@@ -516,7 +516,7 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 			return t, nil, err
 		}
 		if len(clashes) > 0 {
-			return t, nil, fmt.Errorf("%s holds pack %s — use --name to pick another folder, or --force to replace it", folder, clashes[0])
+			return t, nil, fmt.Errorf("%s holds pack %s — run ipm install gascity with --name or --force to change it", folder, clashes[0])
 		}
 		if err := assemble.CheckGascityTarget(dir, name, false); err != nil {
 			return t, nil, err

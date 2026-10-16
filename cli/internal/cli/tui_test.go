@@ -368,7 +368,7 @@ func TestTuiInstallerPlanRefusesAnotherPacksFolder(t *testing.T) {
 	f, _, folder := clashFake(t)
 	in := tuiInstaller{sys: f.system(), scope: scopeOf(t, f, false)}
 	_, _, err := in.Plan("kit", tui.Target{Kind: "gascity", Name: "kit", Global: true})
-	if err == nil || !strings.Contains(err.Error(), folder+" holds pack kit (project)") {
+	if err == nil || err.Error() != folder+" holds pack kit (project) — run ipm install gascity with --name or --force to change it" {
 		t.Errorf("got %v", err)
 	}
 }

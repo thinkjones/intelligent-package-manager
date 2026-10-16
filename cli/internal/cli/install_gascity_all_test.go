@@ -307,8 +307,25 @@ func TestInstallGascityRefusesAnotherPacksFolder(t *testing.T) {
 	if err := f.run("install", "gascity", "kit"); err != nil {
 		t.Errorf("reinstall: %v", err)
 	}
+	// Records the takeover must keep: kit in Claude Code and in another folder.
+	scope := scopeOf(t, f, false)
+	keepDir := t.TempDir()
+	for _, in := range []project.Install{{Target: "claude", Scope: "project", Path: root}, {Target: "gascity", Path: keepDir, Name: "kit"}} {
+		if err := recordInstall(f.system(), scope, "kit", in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	keep := []string{
+		"[[packs.kit.installs]]\ntarget = \"claude\"\npath = \".\"\nscope = \"project\"\n",
+		"[[packs.kit.installs]]\ntarget = \"gascity\"\npath = \"" + keepDir + "\"\nname = \"kit\"\n",
+	}
 	// A dry run with --force only says what it would replace.
 	before, _ := os.ReadFile(filepath.Join(root, project.File))
+	for _, k := range keep {
+		if !strings.Contains(string(before), k) {
+			t.Fatalf("seeded record %q not in ipm.toml:\n%s", k, before)
+		}
+	}
 	f.out.Reset()
 	if err := f.run("install", "gascity", "other", "--name", "kit", "--force", "--dry-run"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
@@ -328,12 +345,20 @@ func TestInstallGascityRefusesAnotherPacksFolder(t *testing.T) {
 		t.Errorf("output:\n%s", f.out.String())
 	}
 	data, _ := os.ReadFile(filepath.Join(root, project.File))
-	if strings.Contains(string(data), "[[packs.kit.installs]]") || !strings.Contains(string(data), "[[packs.other.installs]]\ntarget = \"gascity\"\npath = \".ipm/.gascity\"\nname = \"kit\"\n") {
+	for _, k := range keep {
+		if !strings.Contains(string(data), k) {
+			t.Errorf("the takeover lost %q:\n%s", k, data)
+		}
+	}
+	if strings.Count(string(data), "path = \".ipm/.gascity\"") != 1 || !strings.Contains(string(data), "[[packs.other.installs]]\ntarget = \"gascity\"\npath = \".ipm/.gascity\"\nname = \"kit\"\n") {
 		t.Errorf("ipm.toml:\n%s", data)
 	}
-	// A replay no longer fights itself.
-	if err := f.run("install"); err != nil {
-		t.Errorf("replay: %v\n%s", err, f.out.String())
+	// A replay no longer fights itself (the seeded claude record fails here:
+	// there is no claude).
+	f.out.Reset()
+	f.run("install")
+	if out := f.out.String(); strings.Contains(out, "holds pack") || !strings.Contains(out, "✓ installed other (gascity "+folder+")") {
+		t.Errorf("replay:\n%s", out)
 	}
 	// Nor does a record whose folder is gone: it still clashes.
 	if err := os.RemoveAll(folder); err != nil {
@@ -345,11 +370,32 @@ func TestInstallGascityRefusesAnotherPacksFolder(t *testing.T) {
 }
 
 func TestInstallGascityForceTakesOverGlobalRecord(t *testing.T) {
-	f, _, folder := clashFake(t)
+	f, root, folder := clashFake(t)
+	// A record the takeovers must keep: kit in Claude Code's user scope.
+	gscope := scopeOf(t, f, true)
+	if err := recordInstall(f.system(), gscope, "kit", project.Install{Target: "claude", Scope: "user"}); err != nil {
+		t.Fatal(err)
+	}
+	keep := installRecord{"kit", project.Install{Target: "claude", Scope: "user"}}
+	installsJSON := filepath.Join(f.env["IPM_HOME"], installsFile)
+	if err := f.run("pack", "build", "-g"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	beforeJSON, _ := os.ReadFile(installsJSON)
+	beforeTOML, _ := os.ReadFile(filepath.Join(root, project.File))
+	if err := f.run("install", "gascity", "-g", "kit", "--force", "--dry-run"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	afterJSON, _ := os.ReadFile(installsJSON)
+	afterTOML, _ := os.ReadFile(filepath.Join(root, project.File))
+	if string(afterJSON) != string(beforeJSON) || string(afterTOML) != string(beforeTOML) {
+		t.Errorf("a dry run changed the records:\n%s\n%s", afterJSON, afterTOML)
+	}
+	f.out.Reset()
 	if err := f.run("install", "gascity", "-g", "kit", "--force"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if !strings.Contains(f.out.String(), "replaced kit (project)'s install at "+folder+"\n") {
+	if n := strings.Count(f.out.String(), "replaced kit (project)'s install at "+folder+"\n"); n != 1 {
 		t.Errorf("output:\n%s", f.out.String())
 	}
 	if recs, _ := loadInstalls(f.system(), scopeOf(t, f, false)); len(recs) != 0 {
@@ -363,7 +409,7 @@ func TestInstallGascityForceTakesOverGlobalRecord(t *testing.T) {
 	if !strings.Contains(f.out.String(), "replaced kit (global)'s install at "+folder+"\n") {
 		t.Errorf("output:\n%s", f.out.String())
 	}
-	if recs, _ := loadInstalls(f.system(), scopeOf(t, f, true)); len(recs) != 0 {
+	if recs, _ := loadInstalls(f.system(), gscope); !reflect.DeepEqual(recs, []installRecord{keep}) {
 		t.Errorf("global records %+v", recs)
 	}
 }
@@ -388,5 +434,89 @@ func TestInstallGascityRefusesOtherScopesFolder(t *testing.T) {
 	want = filepath.Join(filepath.Dir(folder), "gk") + " holds pack kit (global) — use --name to pick another folder, or --force to replace it"
 	if err := f.run("install", "gascity", "kit", "--name", "gk"); err == nil || err.Error() != want {
 		t.Errorf("got %v", err)
+	}
+}
+
+func TestInstallGascityAllInvalidFolderName(t *testing.T) {
+	f, root, _ := gascityFake(t)
+	// ipm pack new writes a dotted name unquoted, which ipm.toml can't load,
+	// so the pack is added by hand.
+	data, _ := os.ReadFile(filepath.Join(root, project.File))
+	write(t, filepath.Join(root, project.File), string(data)+"\n[packs.\"my.pack\"]\nitems = []\n")
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	err := f.run("install", "gascity")
+	var exit *ExitError
+	if !errors.As(err, &exit) || !strings.Contains(f.out.String(), "✗ my.pack: pack name \"my.pack\" isn't a valid Gas City folder name — install it alone with --name\n") {
+		t.Errorf("got %v\n%s", err, f.out.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ipm", ".gascity", "kit", "pack.toml")); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestInstallGascityAllBadDirFailsBeforeBuild(t *testing.T) {
+	f, root, tmp := twoPacksFake(t)
+	os.Remove(filepath.Join(root, ".ipm", project.StampFile))
+	missing := filepath.Join(tmp, "missing")
+	err := f.run("install", "gascity", "-C", missing)
+	var exit *ExitError
+	if err == nil || errors.As(err, &exit) || err.Error() != missing+" is not a folder" {
+		t.Errorf("got %v\n%s", err, f.out.String())
+	}
+	if pnpmCalls(f) != 0 || strings.Contains(f.out.String(), "✗") {
+		t.Errorf("%d pnpm calls\n%s", pnpmCalls(f), f.out.String())
+	}
+}
+
+func TestReplayGlobalGascityOutsideProject(t *testing.T) {
+	f, _, tmp := globalPacksFake(t)
+	f.cwd = tmp
+	if err := f.run("install", "gascity", "-g", "gk"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	dir := filepath.Join(tmp, ".ipm", ".gascity")
+	if err := os.RemoveAll(filepath.Join(tmp, ".ipm")); err != nil {
+		t.Fatal(err)
+	}
+	f.cwd = t.TempDir()
+	if err := f.run("install", "-g"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if _, err := os.Stat(filepath.Join(dir, "gk", "pack.toml")); err != nil {
+		t.Errorf("not redone: %v\n%s", err, f.out.String())
+	}
+}
+
+func TestInstallGascityClashInAnotherProject(t *testing.T) {
+	f, root, folder := clashFake(t)
+	f.cwd = t.TempDir()
+	want := folder + " holds pack kit (project) — use --name to pick another folder, or --force to replace it"
+	if err := f.run("install", "gascity", "-g", "kit", "-C", filepath.Join(root, ".ipm", ".gascity")); err == nil || err.Error() != want {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestInstallGascityTakeoverRecordsBeforeWriting(t *testing.T) {
+	f, root, _ := clashFake(t)
+	if err := f.run("pack", "new", "other"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(root, ".ipm", ".gascity")
+	if err := os.Chmod(dir, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(dir, 0o755) })
+	if err := f.run("install", "gascity", "other", "--name", "kit", "--force"); err == nil {
+		t.Fatal("writing into a read-only folder should fail")
+	}
+	got, err := loadInstalls(f.system(), scopeOf(t, f, false))
+	want := []installRecord{{"other", project.Install{Target: "gascity", Path: dir, Name: "kit"}}}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("records %+v %v", got, err)
 	}
 }
