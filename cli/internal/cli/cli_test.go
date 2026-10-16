@@ -211,10 +211,16 @@ func TestDoctorRows(t *testing.T) {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	out := f.out.String()
-	for _, want := range []string{"✓ home", "✓ cache", "✓ pnpm", "12.10.1", "✓ sources", "1 synced", "✓ catalog", "! docker", "! typesense", "! claude", "0 problem(s)"} {
+	for _, want := range []string{"✓ home", "✓ cache", "✓ pnpm", "12.10.1", "✓ sources", "1 synced", "✓ pinned", "none yet", "✓ catalog", "! docker", "! typesense", "! claude", "0 problem(s)"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor missing %q:\n%s", want, out)
 		}
+	}
+	sources.AddPins(filepath.Join(f.env["IPM_HOME"], "pinned"), map[string]string{"o--r--bbbbbbbbbbbb": "github:o/r#" + strings.Repeat("b", 40)})
+	f.out.Reset()
+	f.run("doctor")
+	if want := "1 commit(s), in " + filepath.Join(f.env["IPM_HOME"], "pinned"); !strings.Contains(f.out.String(), want) {
+		t.Errorf("doctor missing %q:\n%s", want, f.out.String())
 	}
 	f = newFake(checkout(t))
 	var exit *ExitError
@@ -1274,9 +1280,17 @@ func TestPackWalksUpToProject(t *testing.T) {
 	}
 }
 
+// installSHA is the commit installFake's catalog pins o/r at.
+const installSHA = "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+
+// pinnedRepo is where the pin store holds repo alias at commit sha.
+func pinnedRepo(f *fake, alias, sha string) string {
+	return filepath.Join(f.env["IPM_HOME"], "pinned", "node_modules", alias+"--"+sha[:12])
+}
+
 // installFake is a project with a pack holding a skill, an agent and an
 // external plugin, pnpm 12 on PATH (doing nothing) and the picked repo
-// already in .ipm/node_modules.
+// already fetched into the pin store.
 func installFake(t *testing.T) (*fake, string) {
 	t.Helper()
 	f, root := packFake(t)
@@ -1284,8 +1298,8 @@ func installFake(t *testing.T) (*fake, string) {
 	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
 	f.results["git conf"] = result{"Ada\n", nil}
 	write(t, filepath.Join(cacheOf(root), "catalog", "agents.jsonl"), `{"id":"agent:o/r:p/agents/rev.md","type":"agent","name":"reviewer","repo":"o/r","commit":"c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1","path":"p/agents/rev.md","plugins":["plugin:o/r:p"]}`+"\n")
-	write(t, filepath.Join(root, ".ipm", "node_modules", "o--r", "p", "skills", "s1", "SKILL.md"), "---\nname: s1\n---\n")
-	write(t, filepath.Join(root, ".ipm", "node_modules", "o--r", "p", "agents", "rev.md"), "---\nname: reviewer\n---\n")
+	write(t, filepath.Join(pinnedRepo(f, "o--r", installSHA), "p", "skills", "s1", "SKILL.md"), "---\nname: s1\n---\n")
+	write(t, filepath.Join(pinnedRepo(f, "o--r", installSHA), "p", "agents", "rev.md"), "---\nname: reviewer\n---\n")
 	if err := f.run("pack", "new", "kit", "--description", "My kit"); err != nil {
 		t.Fatal(err)
 	}
@@ -1301,7 +1315,7 @@ func TestPackBuildBuildsPlugin(t *testing.T) {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	ipm := filepath.Join(root, ".ipm")
-	for _, rel := range []string{"plugins/kit/skills/s1/SKILL.md", "plugins/kit/agents/reviewer.md", "ipm.lock", ".pnpmfile.cjs", "package.json"} {
+	for _, rel := range []string{"plugins/kit/skills/s1/SKILL.md", "plugins/kit/agents/reviewer.md", "ipm.lock"} {
 		if _, err := os.Stat(filepath.Join(ipm, rel)); err != nil {
 			t.Errorf("missing %s", rel)
 		}
@@ -1319,21 +1333,122 @@ func TestPackBuildBuildsPlugin(t *testing.T) {
 		t.Errorf("marketplace.json:\n%s", mp)
 	}
 	gi, _ := os.ReadFile(filepath.Join(ipm, ".gitignore"))
-	if string(gi) != "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n.gascity/\n" {
+	if string(gi) != "build.stamp\nplugins/\nplugins.tmp/\n.gascity/\n" {
 		t.Errorf(".gitignore %q", gi)
-	}
-	if got := callWith(f, "pnpm install"); !strings.Contains(got, "--dir "+ipm) {
-		t.Errorf("pnpm call %q", got)
-	}
-	pkg, _ := os.ReadFile(filepath.Join(ipm, "package.json"))
-	if !strings.Contains(string(pkg), `"o--r": "github:o/r#c1c1`) {
-		t.Errorf("package.json:\n%s", pkg)
 	}
 	if !strings.Contains(f.out.String(), "plugin:o/r#e is not pinned upstream") {
 		t.Errorf("want the unpinned warning:\n%s", f.out.String())
 	}
 	if !strings.Contains(f.out.String(), "claude plugin marketplace add "+ipm) || !strings.Contains(f.out.String(), "ipm install claude") {
 		t.Errorf("hints:\n%s", f.out.String())
+	}
+}
+
+// sameFile reports whether a and b are hard links to one file.
+func sameFile(t *testing.T, a, b string) bool {
+	t.Helper()
+	ia, err := os.Stat(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ib, err := os.Stat(b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return os.SameFile(ia, ib)
+}
+
+// syncedInstallFake is installFake with o/r synced as a source at the
+// commit the catalog pins, and no pin store.
+func syncedInstallFake(t *testing.T) (*fake, string) {
+	t.Helper()
+	f, root := installFake(t)
+	os.RemoveAll(filepath.Join(f.env["IPM_HOME"], "pinned"))
+	withSources(t, f, map[string]map[string]string{"o/r": {"p/skills/s1/SKILL.md": "---\nname: s1\n---\n", "p/agents/rev.md": "---\nname: reviewer\n---\n"}})
+	for _, name := range []string{"skills.jsonl", "agents.jsonl", "plugins.jsonl", "repos.jsonl"} {
+		p := filepath.Join(cacheOf(root), "catalog", name)
+		data, _ := os.ReadFile(p)
+		os.WriteFile(p, []byte(strings.ReplaceAll(string(data), installSHA, strings.Repeat("a", 40))), 0o644) // withSources' commit
+	}
+	return f, root
+}
+
+func TestPackBuildReadsSyncedSources(t *testing.T) {
+	f, root := syncedInstallFake(t)
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if c := callWith(f, "pnpm install"); c != "" {
+		t.Errorf("pnpm ran: %q", c)
+	}
+	ipm := filepath.Join(root, ".ipm")
+	for _, rel := range []string{"node_modules", "package.json", "pnpm-lock.yaml", ".pnpmfile.cjs"} {
+		if _, err := os.Stat(filepath.Join(ipm, rel)); !os.IsNotExist(err) {
+			t.Errorf("%s in .ipm: %v", rel, err)
+		}
+	}
+	src := filepath.Join(f.env["IPM_HOME"], "sources", "node_modules", "o--r", "p", "agents", "rev.md")
+	if !sameFile(t, src, filepath.Join(ipm, "plugins", "kit", "agents", "reviewer.md")) {
+		t.Error("plugin files must be hard links to the synced source")
+	}
+	if _, err := os.Stat(filepath.Join(f.env["IPM_HOME"], "pinned")); !os.IsNotExist(err) {
+		t.Errorf("the pin store is not needed: %v", err)
+	}
+}
+
+func TestPackBuildFetchesIntoThePinStore(t *testing.T) {
+	f, root := installFake(t)
+	os.RemoveAll(filepath.Join(f.env["IPM_HOME"], "pinned"))
+	if err := f.run("pack", "build"); err == nil {
+		t.Fatal("pnpm installed nothing: want a failure")
+	}
+	pinned := filepath.Join(f.env["IPM_HOME"], "pinned")
+	if c := callWith(f, "pnpm install"); !strings.Contains(c, "--dir "+pinned) {
+		t.Errorf("pnpm call %q", c)
+	}
+	pkg, _ := os.ReadFile(filepath.Join(pinned, "package.json"))
+	if !strings.Contains(string(pkg), `"o--r--c1c1c1c1c1c1": "github:o/r#`+installSHA+`"`) {
+		t.Errorf("package.json:\n%s", pkg)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ipm")); !os.IsNotExist(err) {
+		t.Errorf("a failed fetch writes nothing in .ipm: %v", err)
+	}
+
+	// pnpm fetched it; a second project with the same pin runs no pnpm
+	write(t, filepath.Join(pinnedRepo(f, "o--r", installSHA), "p", "skills", "s1", "SKILL.md"), "---\nname: s1\n---\n")
+	write(t, filepath.Join(pinnedRepo(f, "o--r", installSHA), "p", "agents", "rev.md"), "---\nname: reviewer\n---\n")
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	other := filepath.Join(filepath.Dir(root), "other")
+	os.MkdirAll(other, 0o755)
+	data, _ := os.ReadFile(filepath.Join(root, project.File))
+	write(t, filepath.Join(other, project.File), string(data))
+	f.cwd, f.calls = other, nil
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if c := callWith(f, "pnpm install"); c != "" {
+		t.Errorf("pnpm ran for a pin already fetched: %q", c)
+	}
+	if !sameFile(t, filepath.Join(pinnedRepo(f, "o--r", installSHA), "p", "agents", "rev.md"), filepath.Join(other, ".ipm", "plugins", "kit", "agents", "reviewer.md")) {
+		t.Error("plugin files must be hard links into the pin store")
+	}
+}
+
+func TestPackBuildRemovesOldPnpmFiles(t *testing.T) {
+	f, root := installFake(t)
+	ipm := filepath.Join(root, ".ipm")
+	for _, rel := range []string{"package.json", "pnpm-lock.yaml", ".pnpmfile.cjs", "node_modules/o--r/x.md"} {
+		write(t, filepath.Join(ipm, rel), "old")
+	}
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	for _, rel := range []string{"package.json", "pnpm-lock.yaml", ".pnpmfile.cjs", "node_modules"} {
+		if _, err := os.Stat(filepath.Join(ipm, rel)); !os.IsNotExist(err) {
+			t.Errorf("%s left in .ipm: %v", rel, err)
+		}
 	}
 }
 
@@ -1408,7 +1523,7 @@ func TestPackBuildIsDeterministic(t *testing.T) {
 	snap := func() map[string]string {
 		m := map[string]string{}
 		filepath.WalkDir(filepath.Join(root, ".ipm"), func(p string, d os.DirEntry, err error) error {
-			if err == nil && !d.IsDir() && !strings.Contains(p, "node_modules") {
+			if err == nil && !d.IsDir() {
 				b, _ := os.ReadFile(p)
 				m[p] = string(b)
 			}
@@ -1451,7 +1566,6 @@ func TestPackBuildGlobal(t *testing.T) {
 	f, _ := installFake(t)
 	f.run("pack", "-g", "new", "mine")
 	f.run("pack", "-g", "add", "mine", "agent:o/r:p/agents/rev.md")
-	write(t, filepath.Join(f.env["IPM_HOME"], "global", ".ipm", "node_modules", "o--r", "p", "agents", "rev.md"), "x")
 	if err := f.run("pack", "build", "-g"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
@@ -1467,7 +1581,7 @@ func TestPackBuildFailureKeepsPreviousBuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	lockBefore, _ := os.ReadFile(filepath.Join(root, ".ipm", "ipm.lock"))
-	os.RemoveAll(filepath.Join(root, ".ipm", "node_modules", "o--r")) // placement will fail
+	os.RemoveAll(filepath.Join(pinnedRepo(f, "o--r", installSHA), "p")) // placement will fail
 	packs, _ := project.LoadPacks(root)
 	packs[0].Description = "changed"
 	project.SavePacks(root, packs)
@@ -1938,11 +2052,11 @@ func TestInstallClaudeBuildsWhenStale(t *testing.T) {
 	var order []string
 	for _, c := range f.calls {
 		switch {
-		case strings.HasPrefix(c, "pnpm install"), strings.HasPrefix(c, "claude plugin marketplace add"), strings.HasPrefix(c, "claude plugin install"):
+		case c == "git config user.name", strings.HasPrefix(c, "claude plugin marketplace add"), strings.HasPrefix(c, "claude plugin install"):
 			order = append(order, strings.Join(strings.Fields(c)[:3], " "))
 		}
 	}
-	if strings.Join(order, ";") != "pnpm install --no-frozen-lockfile;claude plugin marketplace;claude plugin install" {
+	if strings.Join(order, ";") != "git config user.name;claude plugin marketplace;claude plugin install" {
 		t.Errorf("order %v", order)
 	}
 	out := f.out.String()

@@ -14,7 +14,6 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/assemble"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/marketplace"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
-	"github.com/thinkjones/intelligent-package-manager/cli/internal/sources"
 
 	"github.com/spf13/cobra"
 )
@@ -131,30 +130,21 @@ func build(sys System, global, update, noValidate, hints bool) error {
 		fmt.Fprintf(sys.Stdout, "%s %s\n", warn, w)
 	}
 
-	root, err := sources.WriteProject(dir, plan.Repos)
+	repos, err := repoFolders(sys, plan.Repos)
 	if err != nil {
 		return err
 	}
-	hooks, err := writePnpmfile(dir, root)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(project.StampFile+"\nnode_modules/\nplugins/\nplugins.tmp/\n.gascity/\n"), 0o644); err != nil {
-		return err
-	}
-	if len(plan.Repos) > 0 {
-		pn, err := findPnpm(sys)
-		if err != nil {
+	// Builds before the pin store fetched repos into .ipm itself.
+	for _, old := range []string{"package.json", "pnpm-lock.yaml", ".pnpmfile.cjs", "node_modules"} {
+		if err := os.RemoveAll(filepath.Join(dir, old)); err != nil {
 			return err
 		}
-		args := []string{"install", "--no-frozen-lockfile", "--ignore-scripts", "--config.ignore-pnpmfile=false", "--config.pnpmfile=" + hooks,
-			"--store-dir", p.Store(), "--dir", dir}
-		fmt.Fprintf(sys.Stdout, "%s %s\n", pn, strings.Join(args, " "))
-		if out, err := sys.Output(dir, pn.name, append(append([]string{}, pn.prefix...), args...)...); err != nil {
-			fmt.Fprintln(sys.Stdout, strings.TrimSpace(out))
-			fmt.Fprintf(sys.Stdout, "%s pnpm failed\n", bad)
-			return &ExitError{Code: 1}
-		}
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(project.StampFile+"\nplugins/\nplugins.tmp/\n.gascity/\n"), 0o644); err != nil {
+		return err
 	}
 
 	owner := "ipm"
@@ -175,7 +165,7 @@ func build(sys System, global, update, noValidate, hints bool) error {
 			pp.Description = defaultDescription(pp.Name)
 		}
 		pluginDir := filepath.Join(staging, pp.Name)
-		if err := assemble.Place(pp, filepath.Join(dir, "node_modules"), pluginDir, os.Link); err != nil {
+		if err := assemble.Place(pp, repos, pluginDir, os.Link); err != nil {
 			return err
 		}
 		var pj pluginJSON

@@ -261,7 +261,13 @@ func writeGascityPack(sys System, scope project.Scope, pack string, t gascityTar
 	if err != nil {
 		return "", err
 	}
-	files, warns, err := assemble.RenderGascity(plan, filepath.Join(scope.IPMDir(), "node_modules"))
+	fetch := sys
+	fetch.Stdout = out
+	repos, err := repoFolders(fetch, plan.Repos())
+	if err != nil {
+		return "", err
+	}
+	files, warns, err := assemble.RenderGascity(plan, repos)
 	if err != nil {
 		return "", err
 	}

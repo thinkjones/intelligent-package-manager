@@ -12,11 +12,11 @@ import (
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/project"
 )
 
-// pnpmCalls counts the pnpm commands f ran.
-func pnpmCalls(f *fake) int {
+// builds counts the pack builds f ran.
+func builds(f *fake) int {
 	n := 0
 	for _, c := range f.calls {
-		if strings.HasPrefix(c, "pnpm ") {
+		if c == "git config user.name" { // each build asks once, for the plugin's author
 			n++
 		}
 	}
@@ -39,8 +39,8 @@ func TestInstallClaudeSkipsCurrentBuild(t *testing.T) {
 	if err := f.run("install", "claude", "kit"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if !strings.Contains(f.out.String(), "build is current") || pnpmCalls(f) != 0 {
-		t.Errorf("a current build is not rebuilt: %d pnpm calls\n%s", pnpmCalls(f), f.out.String())
+	if !strings.Contains(f.out.String(), "build is current") || builds(f) != 0 {
+		t.Errorf("a current build is not rebuilt: %d builds\n%s", builds(f), f.out.String())
 	}
 }
 
@@ -49,8 +49,8 @@ func TestInstallClaudeUpdateRebuilds(t *testing.T) {
 	if err := f.run("install", "claude", "kit", "--update"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if strings.Contains(f.out.String(), "build is current") || pnpmCalls(f) == 0 {
-		t.Errorf("--update rebuilds: %d pnpm calls\n%s", pnpmCalls(f), f.out.String())
+	if strings.Contains(f.out.String(), "build is current") || builds(f) == 0 {
+		t.Errorf("--update rebuilds: %d builds\n%s", builds(f), f.out.String())
 	}
 }
 
@@ -69,8 +69,8 @@ func TestInstallClaudeDryRun(t *testing.T) {
 	if !strings.Contains(out, "$ claude plugin marketplace add "+filepath.Join(root, ".ipm")) || !strings.Contains(out, "$ claude plugin install kit@work-ipm --scope project") {
 		t.Errorf("output:\n%s", out)
 	}
-	if runs := claudeRuns(f); len(runs) != 0 || pnpmCalls(f) != 0 {
-		t.Errorf("a dry run runs nothing: %v, %d pnpm calls", runs, pnpmCalls(f))
+	if runs := claudeRuns(f); len(runs) != 0 || builds(f) != 0 {
+		t.Errorf("a dry run runs nothing: %v, %d builds", runs, builds(f))
 	}
 	for _, rel := range []string{"plugins", ".claude-plugin", project.StampFile} {
 		if _, err := os.Stat(filepath.Join(root, ".ipm", rel)); err == nil {
@@ -102,7 +102,6 @@ func TestInstallClaudeRecordsGlobal(t *testing.T) {
 		t.Fatal(err)
 	}
 	scope, _ := currentScope(f.system(), true)
-	write(t, filepath.Join(scope.IPMDir(), "node_modules", "o--r", "p", "skills", "s1", "SKILL.md"), "---\nname: s1\n---\n")
 	if err := f.run("install", "claude", "-g", "gk"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
@@ -206,8 +205,8 @@ func TestBareInstallUnknownTargetRunsNothing(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), `kit → zed `+root+`: unknown target "zed"`) || !strings.Contains(err.Error(), "nothing was installed") {
 		t.Errorf("got %v", err)
 	}
-	if runs := claudeRuns(f); len(runs) != 0 || pnpmCalls(f) != 0 {
-		t.Errorf("an unknown target runs nothing: %v, %d pnpm calls", runs, pnpmCalls(f))
+	if runs := claudeRuns(f); len(runs) != 0 || builds(f) != 0 {
+		t.Errorf("an unknown target runs nothing: %v, %d builds", runs, builds(f))
 	}
 }
 

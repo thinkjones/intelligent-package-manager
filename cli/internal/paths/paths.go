@@ -12,7 +12,8 @@ import (
 
 // Paths are ipm's two roots.
 type Paths struct {
-	// Home holds what you'd lose: sources (package.json, lock) and the store.
+	// Home holds what you'd lose: sources (package.json, lock), the pin store
+	// and pnpm's store.
 	Home string
 	// Cache holds what ipm can rebuild: the catalog and search data.
 	Cache string
@@ -23,6 +24,10 @@ func (p Paths) Sources() string { return filepath.Join(p.Home, "sources") }
 
 // Store is pnpm's content-addressable store, dedicated to ipm.
 func (p Paths) Store() string { return filepath.Join(p.Home, "store") }
+
+// Pinned is the pin store: one pnpm project holding every repo a pack build
+// needed at a commit the sources were not at, shared by every project.
+func (p Paths) Pinned() string { return filepath.Join(p.Home, "pinned") }
 
 // Catalog is where `ipm catalog rebuild` and `ipm marketplace stats` write.
 func (p Paths) Catalog() string { return filepath.Join(p.Cache, "catalog") }

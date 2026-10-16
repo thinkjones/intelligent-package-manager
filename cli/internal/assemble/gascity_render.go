@@ -60,9 +60,10 @@ func encodeTOML(v any) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// RenderGascity reads every entry from nodeModules and returns the folder's
-// files sorted by Path, with pack.toml first, plus warnings in entry order.
-func RenderGascity(gp GascityPlan, nodeModules string) ([]GasFile, []string, error) {
+// RenderGascity reads every entry from its repo's folder in repos (alias →
+// folder, as Place takes) and returns the folder's files sorted by Path, with
+// pack.toml first, plus warnings in entry order.
+func RenderGascity(gp GascityPlan, repos map[string]string) ([]GasFile, []string, error) {
 	var warns []string
 	manifest, err := gasPackToml(gp)
 	if err != nil {
@@ -70,7 +71,7 @@ func RenderGascity(gp GascityPlan, nodeModules string) ([]GasFile, []string, err
 	}
 	files := []GasFile{{Path: "pack.toml", Data: manifest, Mode: 0o644}}
 	for _, e := range gp.Entries {
-		src, err := source(nodeModules, Placed{Alias: e.Alias, From: e.From, Item: e.Item})
+		src, err := source(repos, Placed{Alias: e.Alias, From: e.From, Item: e.Item})
 		if err != nil {
 			return nil, nil, err
 		}

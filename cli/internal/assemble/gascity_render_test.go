@@ -72,7 +72,7 @@ const rendMCP = `{"notes": {"command": "node", "args": ["a.js"], "env": {"K": "v
 
 func TestRenderGascityGolden(t *testing.T) {
 	nm, plan := rendRepo(t, rendMCP)
-	files, warns, err := RenderGascity(plan, nm)
+	files, warns, err := RenderGascity(plan, folders(nm))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -132,11 +132,11 @@ func TestRenderGascityGolden(t *testing.T) {
 
 func TestRenderGascityDeterministic(t *testing.T) {
 	nm, plan := rendRepo(t, rendMCP)
-	a, wa, err := RenderGascity(plan, nm)
+	a, wa, err := RenderGascity(plan, folders(nm))
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, wb, _ := RenderGascity(plan, nm)
+	b, wb, _ := RenderGascity(plan, folders(nm))
 	if !reflect.DeepEqual(a, b) || !reflect.DeepEqual(wa, wb) {
 		t.Error("two renders differ")
 	}
@@ -144,7 +144,7 @@ func TestRenderGascityDeterministic(t *testing.T) {
 
 func TestRenderGascityPluginRoot(t *testing.T) {
 	nm, plan := rendRepo(t, `{"notes": {"command": "node", "args": ["${CLAUDE_PLUGIN_ROOT}/server.js"], "cwd": "/x"}, "web": {"url": "https://x.test"}}`)
-	_, warns, err := RenderGascity(plan, nm)
+	_, warns, err := RenderGascity(plan, folders(nm))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +160,7 @@ func TestRenderGascityPluginJSONServers(t *testing.T) {
 	writeFile(t, filepath.Join(nm, "o--r"), "plugins/tools/.claude-plugin/plugin.json", `{"name": "tools", "mcpServers": {"notes": {"command": "run"}}}`, 0o644)
 	plan.Entries = plan.Entries[2:3]
 	plan.Entries[0].From = "plugins/tools/.claude-plugin/plugin.json"
-	files, _, err := RenderGascity(plan, nm)
+	files, _, err := RenderGascity(plan, folders(nm))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestRenderGascityPluginJSONServers(t *testing.T) {
 func TestRenderGascityModelInherit(t *testing.T) {
 	nm, plan := rendRepo(t, rendMCP)
 	writeFile(t, filepath.Join(nm, "o--r"), "agents/rev.md", "---\nname: R\nmodel: inherit\n---\nbody\n", 0o644)
-	files, _, err := RenderGascity(plan, nm)
+	files, _, err := RenderGascity(plan, folders(nm))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,7 +194,7 @@ func TestRenderGascitySymlinkEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Walk the resolved skill folder: the link is skipped, not followed.
-	files, _, err := RenderGascity(plan, nm)
+	files, _, err := RenderGascity(plan, folders(nm))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestRenderGascitySymlinkEscape(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan.Entries[0].From = "skills/evil"
-	_, _, err = RenderGascity(plan, nm)
+	_, _, err = RenderGascity(plan, folders(nm))
 	if err == nil || !strings.Contains(err.Error(), "leads outside its repo") {
 		t.Errorf("got %v", err)
 	}
@@ -216,12 +216,12 @@ func TestRenderGascitySymlinkEscape(t *testing.T) {
 
 func TestRenderGascityBadServer(t *testing.T) {
 	nm, plan := rendRepo(t, `{"notes": {"args": ["a"]}, "web": {"url": "https://x.test"}}`)
-	_, _, err := RenderGascity(plan, nm)
+	_, _, err := RenderGascity(plan, folders(nm))
 	if err == nil || !strings.Contains(err.Error(), "notes") || !strings.Contains(err.Error(), rendNotes) {
 		t.Errorf("got %v", err)
 	}
 	plan.Entries[2].Server = "missing"
-	_, _, err = RenderGascity(plan, nm)
+	_, _, err = RenderGascity(plan, folders(nm))
 	if err == nil || !strings.Contains(err.Error(), rendNotes) {
 		t.Errorf("got %v", err)
 	}
@@ -232,7 +232,7 @@ func TestRenderGascityMCPServersArray(t *testing.T) {
 	writeFile(t, filepath.Join(nm, "o--r"), "plugins/tools/.claude-plugin/plugin.json", `{"name": "tools", "mcpServers": [{"other": {"command": "x"}}, {"notes": {"command": "run"}}]}`, 0o644)
 	plan.Entries = plan.Entries[2:3]
 	plan.Entries[0].From = "plugins/tools/.claude-plugin/plugin.json"
-	files, _, err := RenderGascity(plan, nm)
+	files, _, err := RenderGascity(plan, folders(nm))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +247,7 @@ func TestRenderGascityMCPServersArray(t *testing.T) {
 func TestRenderGascityBadAgentFrontmatter(t *testing.T) {
 	nm, plan := rendRepo(t, rendMCP)
 	writeFile(t, filepath.Join(nm, "o--r"), "agents/rev.md", "---\nname: [oops\n---\nDo the thing.\n", 0o644)
-	files, warns, err := RenderGascity(plan, nm)
+	files, warns, err := RenderGascity(plan, folders(nm))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,5 +263,12 @@ func TestRenderGascityBadAgentFrontmatter(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(warns, "\n"), "agents/reviewer: frontmatter is not valid YAML — wrote the body only") {
 		t.Errorf("warns %q", warns)
+	}
+}
+
+func TestGascityPlanRepos(t *testing.T) {
+	_, plan := rendRepo(t, rendMCP)
+	if got := plan.Repos(); !reflect.DeepEqual(got, map[string]string{"o--r": "github:o/r#" + shaA}) {
+		t.Errorf("repos %v", got)
 	}
 }

@@ -19,7 +19,7 @@ const (
 func newDoctorCmd(sys System) *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
-		Short: "check home, pnpm, sources, catalog and search — exits 1 on problems",
+		Short: "check home, pnpm, sources, pin store, catalog and search — exits 1 on problems",
 		Args:  noArgs,
 		RunE:  func(*cobra.Command, []string) error { return doctor(sys) },
 	}
@@ -72,6 +72,14 @@ func doctor(sys System) error {
 		} else {
 			row(ok, "sources", fmt.Sprintf("%d synced, in %s", len(srcs), p.Sources()))
 		}
+	}
+
+	if pins, err := sources.Load(p.Pinned()); err != nil {
+		row(warn, "pinned", err.Error())
+	} else if len(pins) == 0 {
+		row(ok, "pinned", "none yet — pack builds fetch here the commits your sources aren't at")
+	} else {
+		row(ok, "pinned", fmt.Sprintf("%d commit(s), in %s", len(pins), p.Pinned()))
 	}
 
 	records := 0

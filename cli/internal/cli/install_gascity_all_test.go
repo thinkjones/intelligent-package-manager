@@ -70,14 +70,14 @@ func TestInstallGascityAllBuildsOnce(t *testing.T) {
 	if err := f.run("pack", "build"); err != nil {
 		t.Fatal(err)
 	}
-	one := pnpmCalls(f)
+	one := builds(f)
 	os.Remove(stamp)
 	f.calls = nil
 	if err := f.run("install", "gascity"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if one == 0 || pnpmCalls(f) != one {
-		t.Errorf("%d pnpm calls, one build makes %d", pnpmCalls(f), one)
+	if one == 0 || builds(f) != one {
+		t.Errorf("%d builds, want %d", builds(f), one)
 	}
 }
 
@@ -464,8 +464,8 @@ func TestInstallGascityAllBadDirFailsBeforeBuild(t *testing.T) {
 	if err == nil || errors.As(err, &exit) || err.Error() != missing+" is not a folder" {
 		t.Errorf("got %v\n%s", err, f.out.String())
 	}
-	if pnpmCalls(f) != 0 || strings.Contains(f.out.String(), "✗") {
-		t.Errorf("%d pnpm calls\n%s", pnpmCalls(f), f.out.String())
+	if builds(f) != 0 || strings.Contains(f.out.String(), "✗") {
+		t.Errorf("%d builds\n%s", builds(f), f.out.String())
 	}
 }
 

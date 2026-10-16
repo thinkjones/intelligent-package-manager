@@ -200,18 +200,36 @@ func TestAddSkippingExisting(t *testing.T) {
 	}
 }
 
-func TestWriteProject(t *testing.T) {
+func TestAddPinsKeepsEarlierPins(t *testing.T) {
 	dir := t.TempDir()
-	root, err := WriteProject(dir, map[string]string{"o--r": "github:o/r#" + strings.Repeat("a", 40)})
+	root, err := AddPins(dir, map[string]string{"o--r--aaaaaaaaaaaa": "github:o/r#" + strings.Repeat("a", 40)})
 	if err != nil || !strings.HasPrefix(root, rootPrefix) {
 		t.Fatalf("%q %v", root, err)
 	}
-	again, _ := WriteProject(dir, map[string]string{"x--y": "github:x/y#" + strings.Repeat("b", 40)})
+	again, _ := AddPins(dir, map[string]string{"x--y--bbbbbbbbbbbb": "github:x/y#" + strings.Repeat("b", 40)})
 	if again != root {
 		t.Errorf("root name must be kept: %q → %q", root, again)
 	}
 	got, _ := Load(dir)
-	if len(got) != 1 || got[0].Alias != "x--y" {
-		t.Errorf("deps must be replaced: %+v", got)
+	if len(got) != 2 || got[0].Alias != "o--r--aaaaaaaaaaaa" || got[1].Alias != "x--y--bbbbbbbbbbbb" {
+		t.Errorf("pins must be kept: %+v", got)
+	}
+}
+
+func TestInstalledSkipsUnsyncedSources(t *testing.T) {
+	dir := synced(t)
+	Add(dir, []string{"new/one"})
+	os.RemoveAll(filepath.Join(dir, "node_modules", "obra--superpowers"))
+	cos, err := Installed(dir)
+	if err != nil || len(cos) != 1 || cos[0].Alias != "anthropics--skills" || cos[0].Commit != "683bc88e56f3e09ba94f7055977f3d3aa499f202" {
+		t.Errorf("%+v %v", cos, err)
+	}
+	if cos, err := Installed(t.TempDir()); err != nil || len(cos) != 0 {
+		t.Errorf("no sources: %+v %v", cos, err)
+	}
+	Add(dir, []string{"o/r"})
+	os.Remove(filepath.Join(dir, "pnpm-lock.yaml"))
+	if cos, err := Installed(dir); err != nil || len(cos) != 0 {
+		t.Errorf("no lock: %+v %v", cos, err)
 	}
 }

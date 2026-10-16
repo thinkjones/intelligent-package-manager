@@ -338,24 +338,35 @@ func Synced(dir string) (followed, synced int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	versions, _ := lockedVersions(dir, srcs)
-	for _, s := range srcs {
-		if _, err := checkoutOf(dir, s, versions); err == nil {
-			synced++
-		}
-	}
-	return len(srcs), synced, nil
+	installed, err := Installed(dir)
+	return len(srcs), len(installed), err
 }
 
-// WriteProject writes dir/package.json for a project's .ipm folder: deps as
-// given (alias → pinned spec), replacing any before, under the existing root
-// name or a new unguessable one. It returns the root name.
-func WriteProject(dir string, deps map[string]string) (string, error) {
+// Installed is every source pnpm has installed and pinned, skipping the rest
+// (Checkouts fails on them).
+func Installed(dir string) ([]Checkout, error) {
+	srcs, err := Load(dir)
+	if err != nil {
+		return nil, err
+	}
+	versions, _ := lockedVersions(dir, srcs)
+	var out []Checkout
+	for _, s := range srcs {
+		if c, err := checkoutOf(dir, s, versions); err == nil {
+			out = append(out, c)
+		}
+	}
+	return out, nil
+}
+
+// AddPins adds deps (alias → spec pinned to a commit) to dir/package.json,
+// keeping the pins already there, under the existing root name or a new
+// unguessable one. It returns the root name.
+func AddPins(dir string, deps map[string]string) (string, error) {
 	pj, err := read(dir)
 	if err != nil {
 		return "", err
 	}
-	pj.Dependencies = map[string]string{}
 	for a, spec := range deps {
 		pj.Dependencies[a] = spec
 	}
