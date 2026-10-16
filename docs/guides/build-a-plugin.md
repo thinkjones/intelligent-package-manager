@@ -95,7 +95,7 @@ Or wire it yourself:
 `ipm pack build`:
 
 1. resolves every item to a repo, path and commit;
-2. has pnpm fetch those commits into `.ipm/node_modules` (with `--ignore-scripts`);
+2. finds each repo at its commit in your home: your synced source when it is at that commit (no download), else the shared pin store `$IPM_HOME/pinned`, which pnpm fills (with `--ignore-scripts`) the first time any project needs that commit;
 3. places the picked files in `.ipm/plugins/csharp-sdlc/` (skills in `skills/`, agents in `agents/`, commands in `commands/`) with a `plugin.json` recording where each came from;
 4. writes the marketplace `.ipm/.claude-plugin/marketplace.json`, named `<project folder>-ipm`, listing `csharp-sdlc` and its dependency `csharp-sdlc-stripe`;
 5. records every pin in `.ipm/ipm.lock`;
@@ -168,7 +168,7 @@ ipm pack build --update   # re-pin every item to your current catalog
 
 ## Don't edit the built files
 
-Files in `.ipm/plugins/` are hard links to pnpm's copies: editing one changes pnpm's copy too, and the next `ipm pack build` rebuilds the folder anyway. To change an item, change it upstream, or fork it into a repo of your own, add that as a source and pick from it.
+Files in `.ipm/plugins/` are hard links to the repos in your home (`$IPM_HOME/sources` or `$IPM_HOME/pinned`): editing one changes that copy too, and every other project built from it, and the next `ipm pack build` rebuilds the folder anyway. To change an item, change it upstream, or fork it into a repo of your own, add that as a source and pick from it.
 
 ## Packs for every project
 

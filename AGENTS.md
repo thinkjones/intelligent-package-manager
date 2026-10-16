@@ -22,6 +22,7 @@ Router for agents working in [thinkjones/intelligent-package-manager](https://gi
 | Path | What it is |
 | --- | --- |
 | `$IPM_HOME/sources/` | Your repos of interest as a pnpm project: `package.json` (one git dependency per repo, alias `owner--repo`), `pnpm-lock.yaml` (pinned commits), `node_modules/<alias>/` (the installed repos), `.pnpmfile.cjs` (generated). |
+| `$IPM_HOME/pinned/` | The pin store: one pnpm project, shared by every project, holding each repo a pack build needed at a commit the sources aren't at (`package.json` keys `<alias>--<sha12>`, `node_modules/`, `.pnpmfile.cjs`, `.lock`). Pins are added, never removed. |
 | `$IPM_HOME/store/` | ipm's dedicated pnpm store. |
 | `$IPM_HOME/global/` | User scope (`-g`): `ipm.toml` and `.ipm/`, laid out as in a project. |
 | `$IPM_HOME/installs.json` | Where user-scope packs are installed (`ipm install -g`): a sorted JSON array. A project's installs are in its `ipm.toml`. |
@@ -36,9 +37,8 @@ In a project (the nearest ancestor of the working directory holding `ipm.toml`):
 | `ipm.toml` | Packs: `[packs.<name>]` with `description`, `items` (catalog IDs) and `[[packs.<name>.installs]]` (where the pack is installed, written by `ipm install`). Edited with `ipm pack`. Committed. |
 | `.ipm/ipm.lock` | Every picked item resolved to repo, path and commit. Generated, committed. |
 | `.ipm/build.stamp` | A hash of the packs, the lock and the ipm version: `ipm install` skips a build while it matches. Generated, gitignored by the generated `.ipm/.gitignore` (it describes the ignored `plugins/` and changes with the ipm version). |
-| `.ipm/package.json`, `.ipm/pnpm-lock.yaml`, `.ipm/.pnpmfile.cjs` | One pnpm dependency per source repo, pinned to a commit. Generated, committed. |
 | `.ipm/.claude-plugin/marketplace.json` | The marketplace listing each pack and its whole-plugin dependencies. Generated, committed. |
-| `.ipm/plugins/<pack>/`, `.ipm/node_modules/` | Built plugins (hard links into pnpm's files) and pnpm's output. Gitignored by the generated `.ipm/.gitignore`. |
+| `.ipm/plugins/<pack>/` | Built plugins (hard links into `$IPM_HOME/sources` or `$IPM_HOME/pinned`). Gitignored by the generated `.ipm/.gitignore`. A project holds no pnpm project; `ipm pack build` removes the `package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs` and `node_modules/` older builds wrote to `.ipm/`. |
 | `.ipm/.gascity/<name>/` | Gas City pack folders that `ipm install gascity` writes by default, user-scope packs (`-g`) included; `ipm pack build` leaves them alone. Gitignored by the generated `.ipm/.gitignore`; `ipm install` rewrites them from the records. |
 
 Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.local/share/ipm` on Linux, `%LOCALAPPDATA%\ipm` on Windows; `IPM_CACHE_DIR` is `~/Library/Caches/ipm` on macOS, `$XDG_CACHE_HOME/ipm` or `~/.cache/ipm` on Linux.
