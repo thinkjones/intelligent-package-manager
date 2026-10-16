@@ -137,3 +137,31 @@ func TestRepoFoldersLocksThePinStore(t *testing.T) {
 		t.Errorf("pnpm ran %d times, want 1", installs)
 	}
 }
+
+// A pin pnpm can't fetch (a commit force-pushed away) must not stay in the
+// pin store, or every later fetch would fail on it.
+func TestRepoFoldersFailedFetchRestoresPackageJSON(t *testing.T) {
+	f := pinnedFake(t)
+	pinned := filepath.Join(f.env["IPM_HOME"], "pinned")
+	pkg := filepath.Join(pinned, "package.json")
+	f.results["pnpm inst"] = result{"ERR_PNPM_FETCH_404", errors.New("exit 1")}
+	repoFolders(f.system(), map[string]string{"o--r": "github:o/r#" + shaOfB})
+	if _, err := os.Stat(pkg); !os.IsNotExist(err) {
+		t.Errorf("a first failed fetch leaves no package.json: %v", err)
+	}
+
+	f.results["pnpm inst"] = result{}
+	repoFolders(f.system(), map[string]string{"x--y": "github:x/y#" + shaOfA})
+	before, _ := os.ReadFile(pkg)
+	f.results["pnpm inst"] = result{"ERR_PNPM_FETCH_404", errors.New("exit 1")}
+	repoFolders(f.system(), map[string]string{"o--r": "github:o/r#" + shaOfB})
+	if after, _ := os.ReadFile(pkg); string(after) != string(before) {
+		t.Errorf("package.json changed:\n%s\nwant:\n%s", after, before)
+	}
+
+	f.results["pnpm inst"] = result{}
+	repoFolders(f.system(), map[string]string{"z--z": "github:z/z#" + shaOfA})
+	if data, _ := os.ReadFile(pkg); strings.Contains(string(data), "o--r--") || !strings.Contains(string(data), "z--z--") {
+		t.Errorf("a later fetch must not carry the bad pin:\n%s", data)
+	}
+}

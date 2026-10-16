@@ -1436,6 +1436,38 @@ func TestPackBuildFetchesIntoThePinStore(t *testing.T) {
 	}
 }
 
+func TestPackBuildPnpmFailureKeepsDotIPM(t *testing.T) {
+	f, root := installFake(t)
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatal(err)
+	}
+	ipm := filepath.Join(root, ".ipm")
+	for _, rel := range []string{"package.json", "pnpm-lock.yaml", ".pnpmfile.cjs", "node_modules/o--r/x.md"} {
+		write(t, filepath.Join(ipm, rel), "old")
+	}
+	snap := func() map[string]string {
+		m := map[string]string{}
+		filepath.WalkDir(ipm, func(p string, d os.DirEntry, err error) error {
+			if err == nil && !d.IsDir() {
+				b, _ := os.ReadFile(p)
+				m[p] = string(b)
+			}
+			return nil
+		})
+		return m
+	}
+	before := snap()
+	os.RemoveAll(filepath.Join(f.env["IPM_HOME"], "pinned"))
+	f.results["pnpm inst"] = result{"ERR_PNPM_FETCH_404", errors.New("exit 1")}
+	var exit *ExitError
+	if err := f.run("pack", "build"); !errors.As(err, &exit) {
+		t.Fatalf("got %v\n%s", err, f.out.String())
+	}
+	if after := snap(); !reflect.DeepEqual(before, after) {
+		t.Errorf("a failed fetch changed .ipm:\nbefore %v\nafter  %v", before, after)
+	}
+}
+
 func TestPackBuildRemovesOldPnpmFiles(t *testing.T) {
 	f, root := installFake(t)
 	ipm := filepath.Join(root, ".ipm")

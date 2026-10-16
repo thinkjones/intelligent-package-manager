@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -64,6 +65,8 @@ func repoFolders(sys System, repos map[string]string) (map[string]string, error)
 		}
 		return m
 	}
+	// Unlocked: a pin pnpm has installed is never removed, so when every pin
+	// is already there no build can be changing them.
 	if len(missing()) > 0 {
 		if err := os.MkdirAll(store, 0o755); err != nil {
 			return nil, err
@@ -92,11 +95,24 @@ func repoFolders(sys System, repos map[string]string) (map[string]string, error)
 
 // fetchPins adds pins (key → spec) to the pin store's package.json, keeping
 // the ones there, and has pnpm install them with the hooks and flags
-// ipm catalog sync uses.
+// ipm catalog sync uses. If pnpm fails, package.json goes back to what it
+// was, so a pin pnpm can't fetch doesn't break every later fetch.
 func fetchPins(sys System, dir, pnpmStore string, pins map[string]string) error {
 	pn, err := findPnpm(sys)
 	if err != nil {
 		return err
+	}
+	pkg := filepath.Join(dir, "package.json")
+	before, err := os.ReadFile(pkg)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	had := err == nil
+	restore := func() error {
+		if !had {
+			return os.Remove(pkg)
+		}
+		return os.WriteFile(pkg, before, 0o644)
 	}
 	root, err := sources.AddPins(dir, pins)
 	if err != nil {
@@ -118,6 +134,9 @@ func fetchPins(sys System, dir, pnpmStore string, pins map[string]string) error 
 	if out, err := sys.Output(dir, pn.name, append(append([]string{}, pn.prefix...), args...)...); err != nil {
 		fmt.Fprintln(sys.Stdout, strings.TrimSpace(out))
 		fmt.Fprintf(sys.Stdout, "%s pnpm failed\n", bad)
+		if err := restore(); err != nil {
+			return fmt.Errorf("pnpm failed, and %s could not be restored: %v", pkg, err)
+		}
 		return &ExitError{Code: 1}
 	}
 	return nil
