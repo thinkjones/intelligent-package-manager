@@ -71,10 +71,10 @@ func TestServeLoadSearch(t *testing.T) {
 		}
 		return string(out)
 	}
-	run("source", "add", "file://"+upstream)
-	run("sync")
-	run("serve")
-	run("load")
+	run("marketplace", "add", "file://"+upstream)
+	run("catalog", "sync")
+	run("catalog", "serve")
+	run("catalog", "rebuild")
 	for _, args := range [][]string{{"search", "one", "--keyword", "--json"}, {"search", "tests before code", "--json"}} {
 		if out := run(args...); !strings.Contains(out, "skills/one") {
 			t.Errorf("ipm %v should find skills/one:\n%s", args, out)
