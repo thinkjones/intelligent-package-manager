@@ -187,9 +187,49 @@ func TestTuiInstallerPlanGascity(t *testing.T) {
 	if _, _, err := in.Plan("kit", tui.Target{Kind: "gascity", Path: tmp, Name: "kit"}); err != nil {
 		t.Errorf("planning over a folder ipm wrote should pass: %v", err)
 	}
+}
+
+func TestTuiInstallerGascityDefault(t *testing.T) {
+	f, _, _ := gascityFake(t)
+	scope := scopeOf(t, f, false)
+	in := tuiInstaller{sys: f.system(), scope: scope}
+	def := filepath.Join(scope.Root, ".ipm", ".gascity")
 	d := in.Default("kit", "gascity")
-	if d.Kind != "gascity" || d.Name != "kit" || d.Path != scopeOf(t, f, false).Root {
-		t.Errorf("default %+v", d)
+	if want := (tui.Target{Kind: "gascity", Path: def, Name: "kit"}); d != want {
+		t.Errorf("default %+v, want %+v", d, want)
+	}
+	for _, path := range []string{"", def} {
+		got, plan, err := in.Plan("kit", tui.Target{Kind: "gascity", Path: path, Name: "kit"})
+		if err != nil || !reflect.DeepEqual(plan, []string{"ipm install gascity kit"}) || got.Path != def || got.Name != "kit" {
+			t.Errorf("%q: plan %v %+v %v", path, plan, got, err)
+		}
+	}
+	if _, err := os.Stat(def); err == nil {
+		t.Error("Plan created the default folder")
+	}
+	_, plan, err := in.Plan("kit", tui.Target{Kind: "gascity", Name: "team", Global: false})
+	if err != nil || !reflect.DeepEqual(plan, []string{"ipm install gascity kit --name team"}) {
+		t.Errorf("named plan %v %v", plan, err)
+	}
+
+	// in the user scope
+	if err := f.run("pack", "-g", "new", "gk"); err != nil {
+		t.Fatal(err)
+	}
+	gdef := filepath.Join(f.env["IPM_HOME"], "global", ".ipm", ".gascity")
+	got, plan, err := in.Plan("gk", tui.Target{Kind: "gascity", Name: "gk", Global: true})
+	if err != nil || !reflect.DeepEqual(plan, []string{"ipm install gascity gk -g"}) || got.Path != gdef {
+		t.Errorf("global plan %v %+v %v", plan, got, err)
+	}
+	gin := tuiInstaller{sys: f.system(), scope: scopeOf(t, f, true)}
+	if d := gin.Default("gk", "gascity"); d.Path != gdef || !d.Global {
+		t.Errorf("global default %+v", d)
+	}
+	if err := in.Install(context.Background(), "kit", tui.Target{Kind: "gascity", Path: def, Name: "kit"}, io.Discard); err != nil {
+		t.Fatalf("install: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(def, "kit", "pack.toml")); err != nil {
+		t.Error(err)
 	}
 }
 

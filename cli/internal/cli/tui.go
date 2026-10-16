@@ -461,7 +461,7 @@ func (in tuiInstaller) scopeFor(global bool) (project.Scope, error) {
 
 func (in tuiInstaller) Default(pack, kind string) tui.Target {
 	if kind == "gascity" {
-		return tui.Target{Kind: kind, Path: workDir(in.sys, in.scope), Name: pack, Global: in.scope.Global}
+		return tui.Target{Kind: kind, Path: gascityDefault(in.scope), Name: pack, Global: in.scope.Global}
 	}
 	t := claudeDefaults(in.scope, claudeTarget{})
 	return tui.Target{Kind: "claude", Scope: t.Scope, Path: t.Path, Global: in.scope.Global}
@@ -502,7 +502,7 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 		if !assemble.ValidGasName(name) {
 			return t, nil, fmt.Errorf("folder name %q must start with a letter or digit and use only letters, digits, '_' and '-'", name)
 		}
-		dir, err := gascityDir(t.Path, workDir(in.sys, scope), in.sys.Getenv("HOME"))
+		dir, isDefault, err := gascityFolder(in.sys, scope, t.Path)
 		if err != nil {
 			return t, nil, err
 		}
@@ -513,7 +513,14 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 		if err := assemble.CheckGascityTarget(dir, name, false); err != nil {
 			return t, nil, err
 		}
-		line := "ipm install gascity " + shellQuote(pack) + " -C " + shellQuote(dir) + " --name " + shellQuote(name)
+		// The command line names the folder only when it is not the default,
+		// and the name only when it differs from the pack's or -C is given.
+		line := "ipm install gascity " + shellQuote(pack)
+		if !isDefault {
+			line += " -C " + shellQuote(dir) + " --name " + shellQuote(name)
+		} else if name != pack {
+			line += " --name " + shellQuote(name)
+		}
 		if t.Global {
 			line += " -g"
 		}

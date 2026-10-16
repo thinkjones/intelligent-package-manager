@@ -112,8 +112,10 @@ func TestGoldenViews(t *testing.T) {
 			return m
 		},
 		"install-form-gascity": func(t *testing.T) *Model {
-			m, _ := newTestWith(t, setup)
-			press(t, m, "2", "tab", "i", "down", "enter", "enter")
+			m, f := newTestWith(t, setup)
+			f.in.cleaned = &Target{Kind: "gascity", Path: "/work/.ipm/.gascity", Name: "csharp-sdlc"}
+			f.in.plan = []string{"ipm install gascity csharp-sdlc"}
+			press(t, m, "2", "tab", "i", "down", "enter")
 			return m
 		},
 		"install-form-confirm": func(t *testing.T) *Model {

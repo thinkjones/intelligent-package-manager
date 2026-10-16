@@ -17,8 +17,7 @@ const (
 	formPack   formStep = iota // which pack, when none was preset
 	formTarget                 // claude or gascity
 	formScope                  // claude: user, project or local
-	formFolder                 // claude: the project folder; gascity: the parent folder
-	formName                   // gascity: the pack folder's name
+	formFolder                 // claude: the project folder
 	formConfirm
 )
 
@@ -36,16 +35,15 @@ var targetHelp = map[string]string{
 }
 
 // installForm is the install form before it runs: pick a target, where it
-// goes, then confirm the commands.
+// goes (claude only: gascity goes to its default folder), then confirm the
+// commands.
 type installForm struct {
 	pack    string
 	global  bool     // the pack is of the user scope, installed from a project
 	packs   []string // the choices of the pack step
 	step    formStep
 	sel     int
-	kind    string
 	folder  textinput.Model
-	name    textinput.Model
 	target  Target
 	plan    []string
 	err     string // why the last plan was refused
@@ -59,7 +57,7 @@ func (m *Model) openInstallForm(pack string, global bool) {
 	if m.refuseBusy() {
 		return
 	}
-	m.form = &installForm{pack: pack, global: global, step: formTarget, folder: newInput("folder"), name: newInput("name"), targets: m.d.Installer.Targets()}
+	m.form = &installForm{pack: pack, global: global, step: formTarget, folder: newInput("folder"), targets: m.d.Installer.Targets()}
 }
 
 // openInstallPicker starts an install that first asks which pack, with preset
@@ -116,27 +114,20 @@ func (m *Model) formKey(msg keyMsg) tea.Cmd {
 			}
 		}
 	case formFolder:
-		switch {
-		case k == "enter" && f.kind == "gascity":
-			f.step = formName
-			f.folder.Blur()
-			f.name.Focus()
-		case k == "enter":
+		if k == "enter" {
 			m.planForm(Target{Kind: "claude", Scope: claudeScopes[f.sel][0], Path: f.folder.Value(), Global: f.global})
-		default:
+		} else {
 			f.folder, _ = f.folder.Update(msg)
 		}
-	case formName:
-		if k == "enter" {
-			m.planForm(Target{Kind: "gascity", Path: f.folder.Value(), Name: f.name.Value(), Global: f.global})
-			return nil
-		}
-		f.name, _ = f.name.Update(msg)
 	case formConfirm:
 		if k == "y" && !f.refused {
-			pack, t := f.pack, f.target
+			pack, t, command := f.pack, f.target, installCommand(f.pack, f.target)
+			if t.Kind == "gascity" && len(f.plan) == 1 {
+				// Its plan is the one command the user confirmed.
+				command = f.plan[0]
+			}
 			m.form = nil
-			return m.runInstall(pack, t)
+			return m.runInstall(pack, t, command)
 		}
 	}
 	return nil
@@ -157,21 +148,22 @@ func (f *installForm) move(k string, n int) bool {
 }
 
 // chooseKind takes the target kind and opens its first step, prefilled from
-// the installer's default.
+// the installer's default. Gascity has no steps: it plans the default name
+// with no folder, which the installer reads as the default folder of the
+// pack's own scope, and goes to confirm.
 func (m *Model) chooseKind(kind string) {
 	f := m.form
 	def := m.d.Installer.Default(f.pack, kind)
-	f.kind, f.sel = kind, 0
-	f.folder.SetValue(def.Path)
 	if kind == "gascity" {
-		f.name.SetValue(def.Name)
-		if def.Name == "" {
-			f.name.SetValue(f.pack)
+		name := def.Name
+		if name == "" {
+			name = f.pack
 		}
-		f.step = formFolder
-		f.folder.Focus()
+		m.planForm(Target{Kind: "gascity", Name: name, Global: f.global})
 		return
 	}
+	f.sel = 0
+	f.folder.SetValue(def.Path)
 	for i, s := range claudeScopes {
 		if s[0] == def.Scope {
 			f.sel = i
@@ -187,24 +179,17 @@ func (m *Model) planForm(t Target) {
 	cleaned, plan, err := m.d.Installer.Plan(f.pack, t)
 	if err != nil {
 		f.err = err.Error()
-		if t.Kind == "gascity" {
-			// The error may be about either input; the folder is the one
-			// people mistype, and enter carries the name along.
-			f.step = formFolder
-			f.name.Blur()
-			f.folder.Focus()
-		}
 		return
 	}
 	f.target, f.plan, f.step = cleaned, plan, formConfirm
 }
 
-// runInstall installs pack at t in the output modal.
-func (m *Model) runInstall(pack string, t Target) tea.Cmd {
+// runInstall installs pack at t in the output modal, titled with command.
+func (m *Model) runInstall(pack string, t Target, command string) tea.Cmd {
 	if m.refuseBusy() {
 		return nil
 	}
-	return m.stream(runInstall, "install", installCommand(pack, t), "✓ installed "+pack+" ("+describe(t)+")", func(w io.Writer) error {
+	return m.stream(runInstall, "install", command, "✓ installed "+pack+" ("+describe(t)+")", func(w io.Writer) error {
 		return m.d.Installer.Install(context.Background(), pack, t, w)
 	})
 }
@@ -313,16 +298,8 @@ func (m *Model) formLines(w, rows int) []string {
 		list("Install "+f.pack+" to Claude Code", names, func(n string) string { return help[n] })
 	case formFolder:
 		label, head := "folder  ", "Install "+f.pack+" to Claude Code — "+claudeScopes[f.sel][0]+" scope"
-		if f.kind == "gascity" {
-			label, head = "parent folder  ", "Install "+f.pack+" as a Gas City pack folder"
-		}
 		fitInput(&f.folder, max(10, w-lipgloss.Width(label)-1))
 		lines = append(lines, stTitle.Render(head), "", stMuted.Render(label)+f.folder.View())
-	case formName:
-		fitInput(&f.name, max(10, w-len("name           ")-1))
-		lines = append(lines, stTitle.Render("Install "+f.pack+" as a Gas City pack folder"), "",
-			stMuted.Render("parent folder  ")+stText.Render(f.folder.Value()),
-			stMuted.Render("name           ")+f.name.View())
 	case formConfirm:
 		head := "Install " + f.pack + " to "
 		if f.refused {

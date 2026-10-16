@@ -211,7 +211,7 @@ Like global packs, global installs listed from a project are read-only: `enter`,
 1. **Pack** (only from `a` with several packs): pick one of the scope's packs.
 2. **Target:** `claude` (Claude Code, as a plugin) or `gascity` (a Gas City pack folder).
 3. **For `claude`, the scope:** **user** (every project, just you), **project** (a folder, shared through its `.claude/settings.json`) or **local** (a folder, just you). For project and local, then the folder (`~` works). The defaults are those of `ipm install claude`.
-4. **For `gascity`, the parent folder and the folder name** (the name defaults to the pack's). A name or folder `ipm install gascity` refuses (a bad name, a missing parent, a folder that holds the project or ipm's home, or one ipm didn't write) is shown in red and the form returns to the folder, before anything runs.
+4. **For `gascity`, nothing more:** the form goes straight to confirm, writing to `.ipm/.gascity/<pack>` (in `$IPM_HOME/global` for a global pack) as `ipm install gascity <pack>` does. If `ipm install gascity` would refuse it (say a folder ipm didn't write is in the way), the reason shows in red on the target step, before anything runs; pick another target or `esc` to cancel, and use `ipm install gascity -C` or `--name` from the command line for another folder.
 5. **Confirm:** the exact commands it will run, then `y` to install:
 
    ```text

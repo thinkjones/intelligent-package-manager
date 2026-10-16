@@ -31,7 +31,7 @@ The source code of `ipm`, a Go CLI (`cli/`) that keeps a per-user list of repos 
 | Add or remove catalog items in a pack; list packs; show a pack's items and installs | `ipm pack add <pack> <id>…`, `ipm pack remove <pack> <id>…`, `ipm pack list`, `ipm pack show <pack>` |
 | Build every pack into a plugin and marketplace under `.ipm/` (writes `.ipm/build.stamp`), then validate | `ipm pack build [-g] [--update] [--no-validate]` |
 | Build when stale, install a pack into Claude Code (user, project or local scope) and record the install | `ipm install claude [pack] [-s\|--scope] [-p\|--path] [-g] [--update] [--dry-run]` |
-| Write a pack as a Gas City pack folder (`<dir>/<name>`), build first if stale, and print the import snippet; records the install, never edits a city | `ipm install gascity [pack] [-C <dir>] [--name <name>] [-g] [--force] [--dry-run] [--update]` |
+| Write a pack as a Gas City pack folder (`<dir>/<name>`; `<dir>` defaults to the scope's `.ipm/.gascity`), build first if stale, and print the import snippet; records the install, never edits a city | `ipm install gascity [pack] [-C <dir>] [--name <name>] [-g] [--force] [--dry-run] [--update]` |
 | Reinstall every recorded install (`ipm.toml`, or `$IPM_HOME/installs.json` with `-g`) | `ipm install [-g]` |
 | Four tabs in one screen (Bubble Tea): search and collect, packs (build, install), installs, marketplace (follow repos, sync) | `ipm tui [-g]` |
 | Check home, cache, pnpm, sources, catalog, docker, typesense, claude | `ipm doctor` |

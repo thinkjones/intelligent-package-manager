@@ -278,11 +278,11 @@ The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (
 
 #### `ipm install gascity`
 
-`ipm install gascity` writes `pack` as a [Gas City](https://github.com/gastownhall/gascity) pack folder, `<DIR>/<NAME>`, that a city can import. `pack` may be left out when the scope has only one. Like `install claude` it builds first unless the build is current. It reads no Gas City config and edits no city: it writes the folder, records the install and prints how to import it. `ipm pack install gascity` is the same command.
+`ipm install gascity` writes `pack` as a [Gas City](https://github.com/gastownhall/gascity) pack folder, `<DIR>/<NAME>`, that a city can import. Without `-C`, `DIR` is `.ipm/.gascity` in the project, or `$IPM_HOME/global/.ipm/.gascity` with `-g`, created when missing (and added to `.ipm/.gitignore` if that file lacks it); `ipm pack build` leaves it alone and git-ignores it. `pack` may be left out when the scope has only one. Like `install claude` it builds first unless the build is current. It reads no Gas City config and edits no city: it writes the folder, records the install and prints how to import it. `ipm pack install gascity` is the same command.
 
 | Flag | Does |
 | --- | --- |
-| `-C`, `--dir DIR` | The folder to write the pack folder into; it must exist. Default: the working directory. `~` and relative paths work. |
+| `-C`, `--dir DIR` | The folder to write the pack folder into; it must exist. Default: `.ipm/.gascity` in the project, or in `$IPM_HOME/global` with `-g` (ipm creates it; a dry run doesn't). `~` and relative paths work. |
 | `--name NAME` | The pack folder's name. Default: the pack's name. It must start with a letter or digit and use only letters, digits, `_` and `-`, else a usage error (exit 2). |
 | `-g`, `--global` | Install a pack from your user scope. |
 | `--force` | Replace a folder that ipm did not write. |

@@ -21,9 +21,10 @@ Commit a pack so everyone on the project builds the same plugin, at the same com
 | `.ipm/ipm.lock` | Yes | Every item resolved to a repo, path and commit |
 | `.ipm/package.json`, `.ipm/pnpm-lock.yaml`, `.ipm/.pnpmfile.cjs` | Yes | pnpm's pins for the repos the items come from |
 | `.ipm/.claude-plugin/marketplace.json` | Yes | The marketplace Claude Code reads |
-| `.ipm/.gitignore` | Yes | Keeps the next two rows out |
+| `.ipm/.gitignore` | Yes | Keeps the next three rows out |
 | `.ipm/build.stamp` | No | A hash of the packs, the lock and the ipm version that describes your local `.ipm/plugins/`; it changes with the ipm version, so each teammate keeps their own |
 | `.ipm/node_modules/`, `.ipm/plugins/` | No | Built by `ipm pack build` |
+| `.ipm/.gascity/` | No | Gas City pack folders written by `ipm install gascity`; a bare `ipm install` writes them again from the records in `ipm.toml` |
 
 `ipm pack build` writes `.ipm/.gitignore` for you.
 

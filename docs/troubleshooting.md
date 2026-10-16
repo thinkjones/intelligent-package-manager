@@ -143,7 +143,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `skipped <id>: external plugin — its files live in another repo; add its skills and agents directly` | A plugin whose files are in another repo can't be written. `ipm pack add` its skills and agents, and remove the plugin. |
 | `skipped <id>: its parts aren't recorded — run ipm pack build --update` | The lock was written before ipm recorded each plugin's parts. Run `ipm pack build --update`, then install again. |
 | `mcp/<name>: uses ${CLAUDE_PLUGIN_ROOT}, which Gas City does not set` | The MCP server points at files inside its Claude Code plugin. The server is still written, but its path won't resolve in a city. Don't edit the generated folder (ipm rewrites it): override the server in the city, where an MCP file of the same name in the city's own `mcp/` wins, or ask the plugin's authors for a server that doesn't need the plugin path. |
-| `… is not a folder` | The `-C` folder doesn't exist. Create it. |
+| `… is not a folder` | The `-C` folder doesn't exist. Create it, or leave out `-C` to write into `.ipm/.gascity`, which ipm creates. |
 | `install gascity: --name … must start with a letter or digit …` | Use letters, digits, `_` and `-`. |
 
 ## Claude Code

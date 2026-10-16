@@ -113,7 +113,7 @@ Every flag is in the [commands reference](https://thinkjones.github.io/intellige
 
 ## Limits
 
-- **`ipm` installs into Claude Code only on `ipm install claude`.** Building never touches your Claude Code configuration. `ipm install gascity` writes a Gas City pack folder where you point it and edits no city.
+- **`ipm` installs into Claude Code only on `ipm install claude`.** Building never touches your Claude Code configuration. `ipm install gascity` writes a Gas City pack folder in `.ipm/.gascity` (or where you point it with `-C`) and edits no city.
 - **Hooks and MCP servers come only with their whole plugin.** They (and inline commands) can't be picked on their own.
 - **Non-GitHub sources may lose files**, because pnpm applies npm's packing rules to them.
 - **No prebuilt binaries**: installing needs Go. Windows is untested.

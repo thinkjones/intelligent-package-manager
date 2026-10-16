@@ -243,6 +243,7 @@ type fakeInstaller struct {
 	err       error
 	installed []string
 	targets   []Target // every Target Install was given
+	planned   []Target // every Target Plan was given
 
 	installs       []Install // List's records
 	globalInstalls []Install // added when List is asked for global
@@ -264,6 +265,7 @@ func (f *fakeInstaller) List(global bool) ([]Install, error) {
 	return out, nil
 }
 func (f *fakeInstaller) Plan(pack string, t Target) (Target, []string, error) {
+	f.planned = append(f.planned, t)
 	if f.cleaned != nil {
 		t = *f.cleaned
 	}
