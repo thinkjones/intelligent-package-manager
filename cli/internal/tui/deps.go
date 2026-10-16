@@ -112,8 +112,8 @@ type Builder interface {
 
 // Target is where a pack is installed: Kind "claude" (Scope user, project or
 // local; Path the folder for project and local) or "gascity" (Path the parent
-// folder, empty for the scope's .ipm/.gascity; Name the pack folder). Global
-// installs a pack of the user scope.
+// folder, empty for the project's .ipm/.gascity, even for Global; Name the
+// pack folder). Global installs a pack of the user scope.
 type Target struct {
 	Kind, Scope, Path, Name string
 	Global                  bool

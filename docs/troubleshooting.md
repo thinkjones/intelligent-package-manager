@@ -145,6 +145,8 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `mcp/<name>: uses ${CLAUDE_PLUGIN_ROOT}, which Gas City does not set` | The MCP server points at files inside its Claude Code plugin. The server is still written, but its path won't resolve in a city. Don't edit the generated folder (ipm rewrites it): override the server in the city, where an MCP file of the same name in the city's own `mcp/` wins, or ask the plugin's authors for a server that doesn't need the plugin path. |
 | `… is not a folder` | The `-C` folder doesn't exist. Create it, or leave out `-C` to write into `.ipm/.gascity`, which ipm creates. |
 | `install gascity: --name … must start with a letter or digit …` | Use letters, digits, `_` and `-`. |
+| `install gascity: --name needs a pack — it names one pack folder` | Without a pack, `ipm install gascity` installs every pack, each in a folder of its own name. Name the pack to rename its folder: `ipm install gascity <pack> --name <name>`. |
+| `✗ N of M packs failed` | `ipm install gascity` without a pack installed the others; the `✗ <pack>: …` lines above say why each failed. Fix those and rerun. |
 
 ## Claude Code
 

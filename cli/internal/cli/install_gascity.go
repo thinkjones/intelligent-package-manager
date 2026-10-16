@@ -23,7 +23,7 @@ func newInstallGascityCmd(sys System) *cobra.Command {
 	var in project.Install
 	cmd := &cobra.Command{
 		Use:   "gascity [pack]",
-		Short: "write a pack as a Gas City pack folder, building it first if needed",
+		Short: "write a pack (every pack, without one) as a Gas City pack folder, building first if needed",
 		Args: func(c *cobra.Command, args []string) error {
 			if len(args) > 1 {
 				return usagef("install gascity: give at most one pack. Try `ipm help install gascity`.")
@@ -118,12 +118,14 @@ func installAllGascity(sys System, scope project.Scope, in project.Install, o in
 			fmt.Fprintf(out, "%s installed %s\n", ok, done)
 		}
 	}
-	if failed > 0 {
+	switch {
+	case failed > 0 && len(packs) > 1:
 		fmt.Fprintf(out, "%s %d of %d packs failed\n", bad, failed, len(packs))
-		return &ExitError{Code: 1}
-	}
-	if len(packs) > 1 && !o.DryRun {
+	case failed == 0 && len(packs) > 1 && !o.DryRun:
 		fmt.Fprintf(out, "%s installed %d packs\n", ok, len(packs))
+	}
+	if failed > 0 {
+		return &ExitError{Code: 1}
 	}
 	return nil
 }

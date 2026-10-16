@@ -104,7 +104,7 @@ The [build your own plugin](https://thinkjones.github.io/intelligent-package-man
 | `ipm pack new\|add\|remove\|list\|show` | Edit packs in `ipm.toml` (`-g` for your user scope) |
 | `ipm pack build [--update]` | Build every pack into a plugin and validate it |
 | `ipm install claude [pack] [--scope] [--path]` | Build when stale, then install a pack into Claude Code; bare `ipm install` replays recorded installs |
-| `ipm install gascity [pack] [-C DIR] [--name N]` | Build when stale, then write a pack as a Gas City pack folder and print how to import it |
+| `ipm install gascity [pack] [-C DIR] [--name N]` | Build when stale, then write a pack (every pack, without one) as a Gas City pack folder and print how to import it |
 | `ipm tui [-g]` | Four tabs: search and collect, packs, installs and the marketplace |
 | `ipm doctor` | Check everything `ipm` depends on |
 | `ipm uninstall [--purge]` | Remove `ipm` and its search container (`--purge` also deletes your data) |
