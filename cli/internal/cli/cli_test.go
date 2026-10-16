@@ -2401,3 +2401,28 @@ func TestRenamedCommands(t *testing.T) {
 		}
 	}
 }
+
+func TestPackNewDefaultsTheDescription(t *testing.T) {
+	f, root := packFake(t)
+	if err := f.run("pack", "new", "kit"); err != nil {
+		t.Fatal(err)
+	}
+	if packs, _ := project.LoadPacks(root); len(packs) != 1 || packs[0].Description != "ipm pack kit" {
+		t.Errorf("packs %+v", packs)
+	}
+}
+
+func TestPackBuildDefaultsAnEmptyDescription(t *testing.T) {
+	f, root := installFake(t)
+	packs, _ := project.LoadPacks(root)
+	packs[0].Description = ""
+	project.SavePacks(root, packs)
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	pj, _ := os.ReadFile(filepath.Join(root, ".ipm", "plugins", "kit", ".claude-plugin", "plugin.json"))
+	mp, _ := os.ReadFile(filepath.Join(root, ".ipm", ".claude-plugin", "marketplace.json"))
+	if !strings.Contains(string(pj), `"description": "ipm pack kit"`) || !strings.Contains(string(mp), `"description": "ipm pack kit"`) {
+		t.Errorf("plugin.json:\n%s\nmarketplace.json:\n%s", pj, mp)
+	}
+}

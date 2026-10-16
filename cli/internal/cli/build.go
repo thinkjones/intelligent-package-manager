@@ -171,6 +171,9 @@ func build(sys System, global, update, noValidate, hints bool) error {
 	var entries []any
 	var names []string
 	for _, pp := range plan.Packs {
+		if pp.Description == "" {
+			pp.Description = defaultDescription(pp.Name)
+		}
 		pluginDir := filepath.Join(staging, pp.Name)
 		if err := assemble.Place(pp, filepath.Join(dir, "node_modules"), pluginDir, os.Link); err != nil {
 			return err
