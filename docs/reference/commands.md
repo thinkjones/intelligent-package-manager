@@ -278,7 +278,7 @@ The commands it runs: `claude plugin marketplace add <project>/.ipm --scope S` (
 
 #### `ipm install gascity`
 
-`ipm install gascity` writes `pack` as a [Gas City](https://github.com/gastownhall/gascity) pack folder, `<DIR>/<NAME>`, that a city can import. Without `-C`, `DIR` is `.ipm/.gascity` in the project, or `$IPM_HOME/global/.ipm/.gascity` with `-g`, created when missing; `ipm pack build` leaves it alone. `pack` may be left out when the scope has only one. Like `install claude` it builds first unless the build is current. It reads no Gas City config and edits no city: it writes the folder, records the install and prints how to import it. `ipm pack install gascity` is the same command.
+`ipm install gascity` writes `pack` as a [Gas City](https://github.com/gastownhall/gascity) pack folder, `<DIR>/<NAME>`, that a city can import. Without `-C`, `DIR` is `.ipm/.gascity` in the project, or `$IPM_HOME/global/.ipm/.gascity` with `-g`, created when missing (and added to `.ipm/.gitignore` if that file lacks it); `ipm pack build` leaves it alone and git-ignores it. `pack` may be left out when the scope has only one. Like `install claude` it builds first unless the build is current. It reads no Gas City config and edits no city: it writes the folder, records the install and prints how to import it. `ipm pack install gascity` is the same command.
 
 | Flag | Does |
 | --- | --- |

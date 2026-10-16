@@ -187,6 +187,51 @@ func TestInstallGascityDefaultSpelledWithC(t *testing.T) {
 	}
 }
 
+func TestInstallGascityDefaultIgnoresFolder(t *testing.T) {
+	f, root, tmp := gascityFake(t)
+	gi := filepath.Join(root, ".ipm", ".gitignore")
+	const built = "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n.gascity/\n"
+	for _, tc := range []struct{ before, after string }{
+		{"build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n", "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n.gascity/\n"},
+		{"mine\nplugins/", "mine\nplugins/\n.gascity/\n"},
+		{"mine\n.gascity/\nmore\n", "mine\n.gascity/\nmore\n"},
+	} {
+		write(t, gi, tc.before)
+		if err := f.run("install", "gascity", "kit"); err != nil {
+			t.Fatalf("%v\n%s", err, f.out.String())
+		}
+		if data, _ := os.ReadFile(gi); string(data) != tc.after {
+			t.Errorf("%q: .gitignore became %q, want %q", tc.before, data, tc.after)
+		}
+	}
+
+	// Not with -C, and not when there is no .gitignore to add to.
+	write(t, gi, "mine\n")
+	if err := f.run("install", "gascity", "kit", "-C", tmp); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if data, _ := os.ReadFile(gi); string(data) != "mine\n" {
+		t.Errorf("-C changed .gitignore: %q", data)
+	}
+	if err := os.Remove(gi); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("install", "gascity", "kit"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if _, err := os.Stat(gi); err == nil {
+		t.Error("install created .gitignore")
+	}
+
+	// A build still writes its own.
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if data, _ := os.ReadFile(gi); string(data) != built {
+		t.Errorf("build wrote %q", data)
+	}
+}
+
 func TestInstallGascityGlobalDefault(t *testing.T) {
 	f, _, _ := gascityFake(t)
 	if err := f.run("pack", "-g", "new", "gk"); err != nil {

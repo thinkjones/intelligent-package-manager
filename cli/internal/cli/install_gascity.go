@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -127,6 +128,9 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return "", err
 		}
+		if err := ignoreGascity(scope.IPMDir()); err != nil {
+			return "", err
+		}
 	}
 	if _, err := assemble.WriteGascity(files, dir, name, o.Force); err != nil {
 		return "", err
@@ -141,6 +145,29 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 // gascityDefault is the folder ipm install gascity writes into without -C.
 func gascityDefault(scope project.Scope) string {
 	return filepath.Join(scope.IPMDir(), ".gascity")
+}
+
+// ignoreGascity adds .gascity/ to the .gitignore ipm pack build wrote in
+// ipmDir, which a build older than the default folder lacks. It keeps the rest
+// of the file and creates none: a build writes it.
+func ignoreGascity(ipmDir string) error {
+	path := filepath.Join(ipmDir, ".gitignore")
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == ".gascity/" {
+			return nil
+		}
+	}
+	if len(data) > 0 && !bytes.HasSuffix(data, []byte("\n")) {
+		data = append(data, '\n')
+	}
+	return os.WriteFile(path, append(data, ".gascity/\n"...), 0o644)
 }
 
 // gascityFolder is the folder to write the pack folder into: p as gascityDir
