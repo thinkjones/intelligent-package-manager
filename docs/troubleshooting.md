@@ -138,6 +138,8 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | Message | Cause and fix |
 | --- | --- |
 | `<path> exists and was not written by ipm — use --force to replace it` | The folder exists, isn't empty, and its `pack.toml` doesn't start with ipm's header line. Pick another `--name` or `-C`, or add `--force` to replace it (everything in it is deleted). A folder ipm wrote itself is replaced without `--force`. |
+| `<path> holds pack <other> (project)` (or `(global)`) `— use --name to pick another folder, or --force to replace it` | A recorded install of another pack, or of the same pack from the other scope, wrote that folder: often a user-scope pack (`-g`) with the same name as a project pack, both writing to `.ipm/.gascity`. Add `--name` to give one a different folder. Or add `--force` to take the folder over: ipm replaces it and removes the other pack's install record, printing `replaced <other> (…)'s install at <path>`. In the TUI the message ends `— run ipm install gascity with --name or --force to change it`, since the form has neither. |
+| `pack name "<pack>" isn't a valid Gas City folder name — install it alone with --name` | `ipm install gascity` without a pack names each folder after its pack, and a Gas City folder name can't hold a `.`. Install that pack on its own with a folder name: `ipm install gascity <pack> --name <name>`. |
 | `refusing to replace <path>: it holds the project` (or `… ipm's home`) | The pack folder would be, or contain, your project or `$IPM_HOME`; `--force` doesn't override this. Pick another `-C` or `--name`. |
 | `--dry-run needs a current build — run ipm pack build first` | `--dry-run` writes nothing, so it won't build. Run `ipm pack build`, then repeat. |
 | `skipped <id>: external plugin — its files live in another repo; add its skills and agents directly` | A plugin whose files are in another repo can't be written. `ipm pack add` its skills and agents, and remove the plugin. |
@@ -145,6 +147,8 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `mcp/<name>: uses ${CLAUDE_PLUGIN_ROOT}, which Gas City does not set` | The MCP server points at files inside its Claude Code plugin. The server is still written, but its path won't resolve in a city. Don't edit the generated folder (ipm rewrites it): override the server in the city, where an MCP file of the same name in the city's own `mcp/` wins, or ask the plugin's authors for a server that doesn't need the plugin path. |
 | `… is not a folder` | The `-C` folder doesn't exist. Create it, or leave out `-C` to write into `.ipm/.gascity`, which ipm creates. |
 | `install gascity: --name … must start with a letter or digit …` | Use letters, digits, `_` and `-`. |
+| `install gascity: --name needs a pack — it names one pack folder` | Without a pack, `ipm install gascity` installs every pack, each in a folder of its own name. Name the pack to rename its folder: `ipm install gascity <pack> --name <name>`. |
+| `✗ N of M packs failed` | `ipm install gascity` without a pack installed the others; the `✗ <pack>: …` lines above say why each failed. Fix those and rerun. |
 
 ## Claude Code
 

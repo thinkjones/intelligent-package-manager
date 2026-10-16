@@ -39,7 +39,7 @@ In a project (the nearest ancestor of the working directory holding `ipm.toml`):
 | `.ipm/package.json`, `.ipm/pnpm-lock.yaml`, `.ipm/.pnpmfile.cjs` | One pnpm dependency per source repo, pinned to a commit. Generated, committed. |
 | `.ipm/.claude-plugin/marketplace.json` | The marketplace listing each pack and its whole-plugin dependencies. Generated, committed. |
 | `.ipm/plugins/<pack>/`, `.ipm/node_modules/` | Built plugins (hard links into pnpm's files) and pnpm's output. Gitignored by the generated `.ipm/.gitignore`. |
-| `.ipm/.gascity/<name>/` | Gas City pack folders that `ipm install gascity` writes by default; `ipm pack build` leaves them alone. Gitignored by the generated `.ipm/.gitignore`; `ipm install` rewrites them from the records. |
+| `.ipm/.gascity/<name>/` | Gas City pack folders that `ipm install gascity` writes by default, user-scope packs (`-g`) included; `ipm pack build` leaves them alone. Gitignored by the generated `.ipm/.gitignore`; `ipm install` rewrites them from the records. |
 
 Defaults: `IPM_HOME` is `~/Library/ipm` on macOS, `$XDG_DATA_HOME/ipm` or `~/.local/share/ipm` on Linux, `%LOCALAPPDATA%\ipm` on Windows; `IPM_CACHE_DIR` is `~/Library/Caches/ipm` on macOS, `$XDG_CACHE_HOME/ipm` or `~/.cache/ipm` on Linux.
 

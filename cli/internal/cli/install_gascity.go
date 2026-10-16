@@ -16,14 +16,14 @@ import (
 )
 
 // newInstallGascityCmd is ipm install gascity: in.Path is the folder the pack
-// folder goes in (empty is the scope's .ipm/.gascity), in.Name the pack
-// folder's name.
+// folder goes in (empty is the local project's .ipm/.gascity), in.Name the
+// pack folder's name. Without a pack it installs every pack of the scope.
 func newInstallGascityCmd(sys System) *cobra.Command {
 	var o installOpts
 	var in project.Install
 	cmd := &cobra.Command{
 		Use:   "gascity [pack]",
-		Short: "write a pack as a Gas City pack folder, building it first if needed",
+		Short: "write a pack (every pack, without one) as a Gas City pack folder, building first if needed",
 		Args: func(c *cobra.Command, args []string) error {
 			if len(args) > 1 {
 				return usagef("install gascity: give at most one pack. Try `ipm help install gascity`.")
@@ -38,9 +38,15 @@ func newInstallGascityCmd(sys System) *cobra.Command {
 			if o.DryRun && o.Update {
 				return usagef("install gascity: --dry-run and --update can't be used together")
 			}
+			if pack == "" && in.Name != "" {
+				return usagef("install gascity: --name needs a pack — it names one pack folder")
+			}
 			scope, err := currentScope(sys, o.Global)
 			if err != nil {
 				return err
+			}
+			if pack == "" {
+				return installAllGascity(sys, scope, in, o, sys.Stdout)
 			}
 			done, err := installGascity(sys, scope, pack, in, o, sys.Stdout)
 			if err != nil || o.DryRun {
@@ -51,10 +57,10 @@ func newInstallGascityCmd(sys System) *cobra.Command {
 		},
 	}
 	f := cmd.Flags()
-	f.StringVarP(&in.Path, "dir", "C", "", "an existing folder to write the pack folder into (default: .ipm/.gascity in the project, or in $IPM_HOME/global with -g)")
+	f.StringVarP(&in.Path, "dir", "C", "", "the folder to write the pack folder into (default: ./.ipm/.gascity in the project)")
 	f.StringVar(&in.Name, "name", "", "the pack folder's name (default: the pack's name)")
-	f.BoolVarP(&o.Global, "global", "g", false, "install a pack from your user scope ($IPM_HOME/global)")
-	f.BoolVar(&o.Force, "force", false, "replace a folder that ipm did not write")
+	f.BoolVarP(&o.Global, "global", "g", false, "install packs from your user scope ($IPM_HOME/global) into the project")
+	f.BoolVar(&o.Force, "force", false, "replace a folder ipm did not write, or take over another pack's install folder")
 	f.BoolVar(&o.DryRun, "dry-run", false, "list the files that would be written, without writing or recording anything (needs a current build)")
 	f.BoolVar(&o.Update, "update", false, "re-pin every item to your current catalog and rebuild first")
 	return cmd
@@ -69,34 +75,180 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 	if err != nil {
 		return "", err
 	}
+	t, err := gascityPlace(sys, scope, pack, in, o, out)
+	if err != nil {
+		return "", err
+	}
+	if err := gascityBuild(sys, scope, o, out); err != nil {
+		return "", err
+	}
+	return writeGascityPack(sys, scope, pack, t, o, out)
+}
+
+// installAllGascity is ipm install gascity without a pack: every pack of
+// scope, in ipm.toml's order, each into <in.Path>/<its name>, after one
+// build. A failing pack doesn't stop the rest; the command then exits 1.
+func installAllGascity(sys System, scope project.Scope, in project.Install, o installOpts, out io.Writer) error {
+	packs, err := project.LoadPacks(scope.Root)
+	if err != nil {
+		return err
+	}
+	if len(packs) == 0 {
+		_, err := pickPack(scope, "gascity", "")
+		return err
+	}
+	if in.Path != "" {
+		if in.Path, _, err = gascityFolder(sys, scope, in.Path); err != nil {
+			return err
+		}
+	}
+	if err := gascityBuild(sys, scope, o, out); err != nil {
+		return err
+	}
+	failed := 0
+	for _, p := range packs {
+		done, err := func() (string, error) {
+			if !assemble.ValidGasName(p.Name) {
+				return "", fmt.Errorf("pack name %q isn't a valid Gas City folder name — install it alone with --name", p.Name)
+			}
+			t, err := gascityPlace(sys, scope, p.Name, in, o, out)
+			if err != nil {
+				return "", err
+			}
+			return writeGascityPack(sys, scope, p.Name, t, o, out)
+		}()
+		if err != nil {
+			failed++
+			fmt.Fprintf(out, "%s %s: %v\n", bad, p.Name, err)
+			continue
+		}
+		if !o.DryRun {
+			fmt.Fprintf(out, "%s installed %s\n", ok, done)
+		}
+	}
+	switch {
+	case failed > 0 && len(packs) > 1:
+		fmt.Fprintf(out, "%s %d of %d packs failed\n", bad, failed, len(packs))
+	case failed == 0 && len(packs) > 1 && !o.DryRun:
+		fmt.Fprintf(out, "%s installed %d packs\n", ok, len(packs))
+	}
+	if failed > 0 {
+		return &ExitError{Code: 1}
+	}
+	return nil
+}
+
+// gascityTarget is where a pack folder goes: <dir>/<name>, and whether dir is
+// a default folder an install creates.
+type gascityTarget struct {
+	dir, name string
+	create    bool
+	clashes   []gascityClash // replaced with --force
+}
+
+// gascityPlace is where pack's folder goes, refusing a folder that holds the
+// project or ipm's home, or one ipm did not write unless o.Force.
+func gascityPlace(sys System, scope project.Scope, pack string, in project.Install, o installOpts, out io.Writer) (gascityTarget, error) {
 	name := in.Name
 	if name == "" {
 		name = pack
 	}
 	if !assemble.ValidGasName(name) {
-		return "", usagef("install gascity: --name %q must start with a letter or digit and use only letters, digits, '_' and '-'", name)
+		return gascityTarget{}, usagef("install gascity: --name %q must start with a letter or digit and use only letters, digits, '_' and '-'", name)
 	}
-	dir, isDefault, err := gascityFolder(sys, scope, in.Path)
+	dir, create, err := gascityFolder(sys, scope, in.Path)
 	if err != nil {
-		return "", err
+		return gascityTarget{}, err
+	}
+	if err := gascityRefusal(sys, scope, filepath.Join(dir, name)); err != nil {
+		return gascityTarget{}, err
 	}
 	folder := filepath.Join(dir, name)
-	if err := gascityRefusal(sys, scope, folder); err != nil {
-		return "", err
+	clashes, err := gascityClashes(sys, scope, pack, folder)
+	if err != nil {
+		return gascityTarget{}, err
 	}
-	if err := assemble.CheckGascityTarget(dir, name, o.Force); err != nil {
+	if len(clashes) > 0 && !o.Force {
+		err = fmt.Errorf("%s holds pack %s — use --name to pick another folder, or --force to replace it", folder, clashes[0])
+	} else {
+		err = assemble.CheckGascityTarget(dir, name, o.Force)
+	}
+	if err != nil {
 		if o.DryRun {
 			fmt.Fprintf(out, "would refuse: %s\n", err)
 		}
-		return "", err
+		return gascityTarget{}, err
 	}
-	if o.DryRun {
-		if !buildCurrent(sys, scope) {
-			return "", errors.New("--dry-run needs a current build — run ipm pack build first")
+	return gascityTarget{dir, name, create, clashes}, nil
+}
+
+// gascityClash is a recorded install of another pack, or of the same pack
+// from the other scope, in a pack folder: scope holds the record.
+type gascityClash struct {
+	scope project.Scope
+	rec   installRecord
+}
+
+func (c gascityClash) String() string {
+	label := "project"
+	if c.scope.Global {
+		label = "global"
+	}
+	return c.rec.Pack + " (" + label + ")"
+}
+
+// gascityClashes are the recorded installs that put another pack in folder,
+// or the same pack from another scope: from the local project's ipm.toml,
+// $IPM_HOME/installs.json, and the ipm.toml of the project whose
+// .ipm/.gascity holds folder.
+func gascityClashes(sys System, scope project.Scope, pack, folder string) ([]gascityClash, error) {
+	scopes := []project.Scope{{Root: localRoot(sys, scope)}, {Root: scope.Root, Global: true}}
+	if dir := filepath.Dir(folder); isGascityDefault(dir) {
+		root := filepath.Dir(filepath.Dir(dir))
+		if _, err := os.Stat(filepath.Join(root, project.File)); err == nil && realPath(root) != realPath(scopes[0].Root) {
+			scopes = append(scopes, project.Scope{Root: root})
 		}
-	} else if err := ensureBuilt(sys, scope, o, out); err != nil {
-		return "", err
 	}
+	same := func(s project.Scope) bool {
+		return s.Global == scope.Global && (s.Global || realPath(s.Root) == realPath(scope.Root))
+	}
+	var out []gascityClash
+	for _, s := range scopes {
+		recs, err := loadInstalls(sys, s)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range recs {
+			if r.Target != "gascity" || r.Pack == pack && same(s) {
+				continue
+			}
+			name := r.Name
+			if name == "" {
+				name = r.Pack
+			}
+			if realPath(filepath.Join(r.Path, name)) == realPath(folder) {
+				out = append(out, gascityClash{s, r})
+			}
+		}
+	}
+	return out, nil
+}
+
+// gascityBuild makes sure scope's build is current: with o.DryRun it only
+// checks, otherwise it builds when stale or with o.Update.
+func gascityBuild(sys System, scope project.Scope, o installOpts, out io.Writer) error {
+	if !o.DryRun {
+		return ensureBuilt(sys, scope, o, out)
+	}
+	if !buildCurrent(sys, scope) {
+		return errors.New("--dry-run needs a current build — run ipm pack build first")
+	}
+	return nil
+}
+
+// writeGascityPack writes pack from scope's build to t, records the install
+// and prints how to import it; with o.DryRun it only lists the files.
+func writeGascityPack(sys System, scope project.Scope, pack string, t gascityTarget, o installOpts, out io.Writer) (string, error) {
 	packs, err := project.LoadPacks(scope.Root)
 	if err != nil {
 		return "", err
@@ -105,7 +257,7 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 	if err != nil {
 		return "", err
 	}
-	plan, err := assemble.PlanGascity(packs[findPack(packs, pack)], name, lock)
+	plan, err := assemble.PlanGascity(packs[findPack(packs, pack)], t.name, lock)
 	if err != nil {
 		return "", err
 	}
@@ -116,35 +268,81 @@ func installGascity(sys System, scope project.Scope, pack string, in project.Ins
 	for _, s := range append(append([]string{}, plan.Skips...), warns...) {
 		fmt.Fprintf(out, "%s %s\n", warn, s)
 	}
+	folder := filepath.Join(t.dir, t.name)
 	desc := pack + " (gascity " + folder + ")"
 	if o.DryRun {
+		for _, c := range t.clashes {
+			fmt.Fprintf(out, "would replace %s's install at %s\n", c, folder)
+		}
 		fmt.Fprintf(out, "would write %s\n", folder)
 		for _, f := range files {
 			fmt.Fprintf(out, "  %s\n", f.Path)
 		}
 		return desc, nil
 	}
-	if isDefault {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
+	if t.create {
+		if err := os.MkdirAll(t.dir, 0o755); err != nil {
 			return "", err
 		}
-		if err := ignoreGascity(scope.IPMDir()); err != nil {
+		if err := ignoreGascity(filepath.Dir(t.dir)); err != nil {
 			return "", err
 		}
 	}
-	if _, err := assemble.WriteGascity(files, dir, name, o.Force); err != nil {
+	// A takeover records first, so a failed write leaves the records naming
+	// the new pack and a replay finishes the job.
+	record := func() error {
+		return recordInstall(sys, scope, pack, project.Install{Target: "gascity", Path: t.dir, Name: t.name})
+	}
+	for _, c := range t.clashes {
+		if err := forgetInstall(sys, c.scope, c.rec); err != nil {
+			return "", err
+		}
+		fmt.Fprintf(out, "replaced %s's install at %s\n", c, folder)
+	}
+	if len(t.clashes) > 0 {
+		if err := record(); err != nil {
+			return "", err
+		}
+	}
+	if _, err := assemble.WriteGascity(files, t.dir, t.name, o.Force); err != nil {
 		return "", err
 	}
-	if err := recordInstall(sys, scope, pack, project.Install{Target: "gascity", Path: dir, Name: name}); err != nil {
-		return "", err
+	if len(t.clashes) == 0 {
+		if err := record(); err != nil {
+			return "", err
+		}
 	}
-	fmt.Fprintf(out, "Import it into a city's pack.toml or city.toml:\n  [imports.%s]\n  source = %q\n", name, folder)
+	fmt.Fprintf(out, "Import it into a city's pack.toml or city.toml:\n  [imports.%s]\n  source = %q\n", t.name, folder)
 	return desc, nil
 }
 
-// gascityDefault is the folder ipm install gascity writes into without -C.
-func gascityDefault(scope project.Scope) string {
-	return filepath.Join(scope.IPMDir(), ".gascity")
+// gascityDefault is the folder ipm install gascity writes into without -C:
+// the local project's .ipm/.gascity, for user-scope packs too.
+func gascityDefault(sys System, scope project.Scope) string {
+	return filepath.Join(localRoot(sys, scope), ".ipm", ".gascity")
+}
+
+// localRoot is the project ipm install gascity writes into: scope's, or for
+// the user scope the one the working directory is in, else the working
+// directory.
+func localRoot(sys System, scope project.Scope) string {
+	if !scope.Global {
+		return scope.Root
+	}
+	s, _, _ := project.Find(workDir(sys, scope), false, "")
+	return s.Root
+}
+
+// isGascityDefault reports whether dir is <root>/.ipm/.gascity for an
+// existing folder root: the default folder of an install from there, project
+// or not. A recorded install replays into it from anywhere.
+func isGascityDefault(dir string) bool {
+	ipm := filepath.Dir(dir)
+	if filepath.Base(dir) != ".gascity" || filepath.Base(ipm) != ".ipm" {
+		return false
+	}
+	info, err := os.Stat(filepath.Dir(ipm))
+	return err == nil && info.IsDir()
 }
 
 // ignoreGascity adds .gascity/ to the .gitignore ipm pack build wrote in
@@ -171,17 +369,22 @@ func ignoreGascity(ipmDir string) error {
 }
 
 // gascityFolder is the folder to write the pack folder into: p as gascityDir
-// makes it, or the scope's default folder when p is empty or names it, however
-// spelled. isDefault reports the latter: that folder need not exist yet, and
-// an install creates it.
-func gascityFolder(sys System, scope project.Scope, p string) (dir string, isDefault bool, err error) {
-	def := gascityDefault(scope)
+// makes it, or the default folder when p is empty or names it, however
+// spelled. create reports a default folder, the local one or another
+// project's .ipm/.gascity (as a replay names it): that folder need not exist
+// yet, and an install creates it.
+func gascityFolder(sys System, scope project.Scope, p string) (dir string, create bool, err error) {
+	def := gascityDefault(sys, scope)
 	if strings.TrimSpace(p) == "" {
 		return def, true, nil
 	}
 	cwd, home := workDir(sys, scope), sys.Getenv("HOME")
-	if abs := resolveDir(p, cwd, home); abs == def || realPath(abs) == realPath(def) {
+	abs := resolveDir(p, cwd, home)
+	if abs == def || realPath(abs) == realPath(def) {
 		return def, true, nil
+	}
+	if isGascityDefault(abs) {
+		return abs, true, nil
 	}
 	dir, err = gascityDir(p, cwd, home)
 	return dir, false, err
@@ -213,17 +416,22 @@ func gascityDir(p, cwd, home string) (string, error) {
 }
 
 // gascityRefusal refuses, even with --force, a pack folder that is or holds
-// the scope's root or ipm's home: replacing it would delete them.
+// the local project (see localRoot) or ipm's home: replacing it would delete
+// them.
 func gascityRefusal(sys System, scope project.Scope, folder string) error {
 	paths, err := ipmPaths(sys)
 	if err != nil {
 		return err
 	}
-	if !scope.Global && holds(folder, scope.Root) {
+	holdsProject := holds(folder, localRoot(sys, scope))
+	if !scope.Global && holdsProject {
 		return fmt.Errorf("refusing to replace %s: it holds the project", folder)
 	}
 	if holds(folder, paths.Home) {
 		return fmt.Errorf("refusing to replace %s: it holds ipm's home", folder)
+	}
+	if scope.Global && holdsProject {
+		return fmt.Errorf("refusing to replace %s: it holds the project", folder)
 	}
 	return nil
 }

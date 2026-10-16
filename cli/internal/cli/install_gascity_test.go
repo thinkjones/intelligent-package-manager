@@ -141,7 +141,7 @@ func TestInstallGascityDefaultsToIPMFolder(t *testing.T) {
 	}
 
 	// -C still needs an existing folder
-	if err := f.run("install", "gascity", "-C", filepath.Join(sub, "nope")); err == nil || !strings.Contains(err.Error(), "is not a folder") {
+	if err := f.run("install", "gascity", "kit", "-C", filepath.Join(sub, "nope")); err == nil || !strings.Contains(err.Error(), "is not a folder") {
 		t.Errorf("got %v", err)
 	}
 
@@ -229,26 +229,6 @@ func TestInstallGascityDefaultIgnoresFolder(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(gi); string(data) != built {
 		t.Errorf("build wrote %q", data)
-	}
-}
-
-func TestInstallGascityGlobalDefault(t *testing.T) {
-	f, _, _ := gascityFake(t)
-	if err := f.run("pack", "-g", "new", "gk"); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.run("install", "gascity", "-g", "gk"); err != nil {
-		t.Fatalf("%v\n%s", err, f.out.String())
-	}
-	scope, _ := currentScope(f.system(), true)
-	dir := filepath.Join(f.env["IPM_HOME"], "global", ".ipm", ".gascity")
-	if _, err := os.Stat(filepath.Join(dir, "gk", "pack.toml")); err != nil {
-		t.Error(err)
-	}
-	got, err := loadInstalls(f.system(), scope)
-	want := []installRecord{{"gk", project.Install{Target: "gascity", Path: dir, Name: "gk"}}}
-	if err != nil || !reflect.DeepEqual(got, want) {
-		t.Errorf("got %+v %v", got, err)
 	}
 }
 
@@ -385,15 +365,6 @@ func TestInstallTargetsHelp(t *testing.T) {
 	f, _ := claudeFake(t)
 	err := f.run("install", "bogus")
 	if err == nil || !strings.Contains(err.Error(), "claude or gascity") {
-		t.Errorf("got %v", err)
-	}
-}
-
-func TestInstallGascityPackRequired(t *testing.T) {
-	f, _, _ := gascityFake(t)
-	f.run("pack", "new", "second")
-	var usage *UsageError
-	if err := f.run("install", "gascity"); !errors.As(err, &usage) || !strings.Contains(err.Error(), "install gascity: name a pack") {
 		t.Errorf("got %v", err)
 	}
 }

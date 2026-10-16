@@ -461,7 +461,7 @@ func (in tuiInstaller) scopeFor(global bool) (project.Scope, error) {
 
 func (in tuiInstaller) Default(pack, kind string) tui.Target {
 	if kind == "gascity" {
-		return tui.Target{Kind: kind, Path: gascityDefault(in.scope), Name: pack, Global: in.scope.Global}
+		return tui.Target{Kind: kind, Path: gascityDefault(in.sys, in.scope), Name: pack, Global: in.scope.Global}
 	}
 	t := claudeDefaults(in.scope, claudeTarget{})
 	return tui.Target{Kind: "claude", Scope: t.Scope, Path: t.Path, Global: in.scope.Global}
@@ -502,13 +502,21 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 		if !assemble.ValidGasName(name) {
 			return t, nil, fmt.Errorf("folder name %q must start with a letter or digit and use only letters, digits, '_' and '-'", name)
 		}
-		dir, isDefault, err := gascityFolder(in.sys, scope, t.Path)
+		dir, _, err := gascityFolder(in.sys, scope, t.Path)
 		if err != nil {
 			return t, nil, err
 		}
+		isDefault := dir == gascityDefault(in.sys, scope)
 		folder := filepath.Join(dir, name)
 		if err := gascityRefusal(in.sys, scope, folder); err != nil {
 			return t, nil, err
+		}
+		clashes, err := gascityClashes(in.sys, scope, pack, folder)
+		if err != nil {
+			return t, nil, err
+		}
+		if len(clashes) > 0 {
+			return t, nil, fmt.Errorf("%s holds pack %s — run ipm install gascity with --name or --force to change it", folder, clashes[0])
 		}
 		if err := assemble.CheckGascityTarget(dir, name, false); err != nil {
 			return t, nil, err

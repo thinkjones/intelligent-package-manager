@@ -96,7 +96,7 @@ path = ".ipm/.gascity"
 name = "csharp-sdlc"
 ```
 
-The pack folder is `<path>/<name>`. A `gascity` record in `installs.json` has the same `target`, `path` and `name`, with an absolute `path`. Installing the same pack to the same folder and name again replaces its record.
+The pack folder is `<path>/<name>`. A `gascity` record in `installs.json` has the same `target`, `path` and `name`, with an absolute `path`: the project's `.ipm/.gascity` by default, since `ipm install gascity -g` writes user-scope packs into the project it runs in. Installing the same pack to the same folder and name again replaces its record.
 
 ## `.ipm/ipm.lock`
 
