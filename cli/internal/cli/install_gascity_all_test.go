@@ -268,3 +268,76 @@ func TestGascityRefusalGlobalLocalProject(t *testing.T) {
 		t.Errorf("got %v", err)
 	}
 }
+
+// clashFake is gascityFake with kit installed into the project's default
+// folder and a user-scope pack also called kit.
+func clashFake(t *testing.T) (*fake, string, string) {
+	t.Helper()
+	f, root, _ := gascityFake(t)
+	if err := f.run("install", "gascity", "kit"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if err := f.run("pack", "-g", "new", "kit"); err != nil {
+		t.Fatal(err)
+	}
+	f.out.Reset()
+	return f, root, filepath.Join(root, ".ipm", ".gascity", "kit")
+}
+
+func TestInstallGascityRefusesAnotherPacksFolder(t *testing.T) {
+	f, root, folder := clashFake(t)
+	if err := f.run("pack", "new", "other"); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatal(err)
+	}
+	want := folder + " holds pack kit (project) — use --name to pick another folder, or --force to replace it"
+	err := f.run("install", "gascity", "other", "--name", "kit")
+	var usage *UsageError
+	if err == nil || err.Error() != want || errors.As(err, &usage) {
+		t.Fatalf("got %v", err)
+	}
+	// A dry run says so.
+	f.out.Reset()
+	if err := f.run("install", "gascity", "other", "--name", "kit", "--dry-run"); err == nil || !strings.Contains(f.out.String(), "would refuse: "+want+"\n") {
+		t.Errorf("dry run %v\n%s", err, f.out.String())
+	}
+	// The same pack again is a reinstall.
+	if err := f.run("install", "gascity", "kit"); err != nil {
+		t.Errorf("reinstall: %v", err)
+	}
+	// --force replaces it and keeps both records.
+	if err := f.run("install", "gascity", "other", "--name", "kit", "--force"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	data, _ := os.ReadFile(filepath.Join(root, project.File))
+	for _, name := range []string{"kit", "other"} {
+		if !strings.Contains(string(data), "[[packs."+name+".installs]]\ntarget = \"gascity\"\npath = \".ipm/.gascity\"\nname = \"kit\"\n") {
+			t.Errorf("ipm.toml lacks %s's record:\n%s", name, data)
+		}
+	}
+}
+
+func TestInstallGascityRefusesOtherScopesFolder(t *testing.T) {
+	f, _, folder := clashFake(t)
+	want := folder + " holds pack kit (project) — use --name to pick another folder, or --force to replace it"
+	if err := f.run("install", "gascity", "-g", "kit"); err == nil || err.Error() != want {
+		t.Fatalf("got %v", err)
+	}
+	// and every pack at once
+	f.out.Reset()
+	err := f.run("install", "gascity", "-g")
+	var exit *ExitError
+	if !errors.As(err, &exit) || !strings.Contains(f.out.String(), "✗ kit: "+want+"\n") {
+		t.Errorf("got %v\n%s", err, f.out.String())
+	}
+	// the other way round: a project pack over a user-scope pack's folder
+	if err := f.run("install", "gascity", "-g", "kit", "--name", "gk"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	want = filepath.Join(filepath.Dir(folder), "gk") + " holds pack kit (global) — use --name to pick another folder, or --force to replace it"
+	if err := f.run("install", "gascity", "kit", "--name", "gk"); err == nil || err.Error() != want {
+		t.Errorf("got %v", err)
+	}
+}

@@ -363,3 +363,12 @@ func TestTuiCatalogCounts(t *testing.T) {
 		t.Errorf("counts %v", got)
 	}
 }
+
+func TestTuiInstallerPlanRefusesAnotherPacksFolder(t *testing.T) {
+	f, _, folder := clashFake(t)
+	in := tuiInstaller{sys: f.system(), scope: scopeOf(t, f, false)}
+	_, _, err := in.Plan("kit", tui.Target{Kind: "gascity", Name: "kit", Global: true})
+	if err == nil || !strings.Contains(err.Error(), folder+" holds pack kit (project)") {
+		t.Errorf("got %v", err)
+	}
+}

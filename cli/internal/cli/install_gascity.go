@@ -154,13 +154,53 @@ func gascityPlace(sys System, scope project.Scope, pack string, in project.Insta
 	if err := gascityRefusal(sys, scope, filepath.Join(dir, name)); err != nil {
 		return gascityTarget{}, err
 	}
-	if err := assemble.CheckGascityTarget(dir, name, o.Force); err != nil {
+	err = gascityClash(sys, scope, pack, filepath.Join(dir, name), o.Force)
+	if err == nil {
+		err = assemble.CheckGascityTarget(dir, name, o.Force)
+	}
+	if err != nil {
 		if o.DryRun {
 			fmt.Fprintf(out, "would refuse: %s\n", err)
 		}
 		return gascityTarget{}, err
 	}
 	return gascityTarget{dir, name, create}, nil
+}
+
+// gascityClash refuses, unless force, an existing pack folder that a recorded
+// install of another pack, or of the same pack from the other scope, wrote:
+// the records are the local project's ipm.toml and $IPM_HOME/installs.json.
+func gascityClash(sys System, scope project.Scope, pack, folder string, force bool) error {
+	if force {
+		return nil
+	}
+	if _, err := os.Stat(folder); err != nil {
+		return nil
+	}
+	for _, s := range []project.Scope{{Root: localRoot(sys, scope)}, {Root: scope.Root, Global: true}} {
+		recs, err := loadInstalls(sys, s)
+		if err != nil {
+			return err
+		}
+		for _, r := range recs {
+			if r.Target != "gascity" || r.Pack == pack && s.Global == scope.Global {
+				continue
+			}
+			name := r.Name
+			if name == "" {
+				name = r.Pack
+			}
+			if realPath(filepath.Join(r.Path, name)) != realPath(folder) {
+				continue
+			}
+			label := "project"
+			if s.Global {
+				label = "global"
+			}
+			return fmt.Errorf("%s holds pack %s (%s) — use --name to pick another folder, or --force to replace it", folder, r.Pack, label)
+		}
+	}
+	return nil
 }
 
 // gascityBuild makes sure scope's build is current: with o.DryRun it only
