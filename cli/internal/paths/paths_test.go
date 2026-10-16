@@ -32,8 +32,8 @@ func TestResolveOverrides(t *testing.T) {
 	if err != nil || p.Home != "/h" || p.Cache != "/k" {
 		t.Fatalf("got %+v %v", p, err)
 	}
-	if p.Sources() != "/h/sources" || p.Store() != "/h/store" || p.Catalog() != "/k/catalog" || p.Typesense() != "/k/typesense" {
-		t.Errorf("subdirs: %s %s %s %s", p.Sources(), p.Store(), p.Catalog(), p.Typesense())
+	if p.Sources() != "/h/sources" || p.Store() != "/h/store" || p.Catalog() != "/k/catalog" || p.Typesense() != "/k/typesense" || p.Pinned() != "/h/pinned" {
+		t.Errorf("subdirs: %s %s %s %s %s", p.Sources(), p.Store(), p.Catalog(), p.Typesense(), p.Pinned())
 	}
 }
 

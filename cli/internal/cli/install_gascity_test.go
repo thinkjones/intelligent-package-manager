@@ -190,7 +190,7 @@ func TestInstallGascityDefaultSpelledWithC(t *testing.T) {
 func TestInstallGascityDefaultIgnoresFolder(t *testing.T) {
 	f, root, tmp := gascityFake(t)
 	gi := filepath.Join(root, ".ipm", ".gitignore")
-	const built = "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n.gascity/\n"
+	const built = "build.stamp\nplugins/\nplugins.tmp/\n.gascity/\n"
 	for _, tc := range []struct{ before, after string }{
 		{"build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n", "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n.gascity/\n"},
 		{"mine\nplugins/", "mine\nplugins/\n.gascity/\n"},
@@ -297,7 +297,7 @@ func TestInstallGascityDryRun(t *testing.T) {
 	if after, _ := os.ReadFile(filepath.Join(root, project.File)); string(after) != string(before) {
 		t.Errorf("ipm.toml changed:\n%s", after)
 	}
-	if pnpmCalls(f) != 0 {
+	if builds(f) != 0 {
 		t.Error("a dry run runs no pnpm")
 	}
 
@@ -306,7 +306,7 @@ func TestInstallGascityDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := f.run("install", "gascity", "kit", "-C", tmp, "--dry-run")
-	if err == nil || !strings.Contains(err.Error(), "--dry-run needs a current build — run ipm pack build first") || pnpmCalls(f) != 0 {
+	if err == nil || !strings.Contains(err.Error(), "--dry-run needs a current build — run ipm pack build first") || builds(f) != 0 {
 		t.Errorf("got %v", err)
 	}
 }
@@ -336,8 +336,8 @@ func TestInstallGascitySkipsCurrentBuild(t *testing.T) {
 	if err := f.run("install", "gascity", "kit", "-C", tmp); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if !strings.Contains(f.out.String(), "build is current") || pnpmCalls(f) != 0 {
-		t.Errorf("%d pnpm calls\n%s", pnpmCalls(f), f.out.String())
+	if !strings.Contains(f.out.String(), "build is current") || builds(f) != 0 {
+		t.Errorf("%d builds\n%s", builds(f), f.out.String())
 	}
 }
 
@@ -381,8 +381,8 @@ func TestInstallGascityDryRunRefusesForeignBeforeBuilding(t *testing.T) {
 	// A stale build is not rebuilt before the refusal.
 	os.Remove(filepath.Join(root, ".ipm", project.StampFile))
 	f.calls = nil
-	if err := f.run("install", "gascity", "kit", "-C", tmp); err == nil || err.Error() != want || pnpmCalls(f) != 0 {
-		t.Errorf("got %v, %d pnpm calls", err, pnpmCalls(f))
+	if err := f.run("install", "gascity", "kit", "-C", tmp); err == nil || err.Error() != want || builds(f) != 0 {
+		t.Errorf("got %v, %d builds", err, builds(f))
 	}
 }
 
@@ -519,7 +519,7 @@ func TestInstallGascityWholeLocalPlugin(t *testing.T) {
 	f, root := installFake(t)
 	const sha = "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
 	write(t, filepath.Join(cacheOf(root), "catalog", "plugins.jsonl"), `{"id":"plugin:o/r:q","type":"plugin","name":"q","repo":"o/r","commit":"`+sha+`","path":"q","skills":["skill:o/r:q/skills/qs"],"agents":["agent:o/r:q/agents/qa.md"],"commands":["command:o/r:q/commands/go.md"],"hooks":["hook:o/r:q/hooks/hooks.json#PreToolUse"],"mcp":["mcp:o/r:q/.mcp.json#srv"]}`+"\n")
-	nm := filepath.Join(root, ".ipm", "node_modules", "o--r", "q")
+	nm := filepath.Join(pinnedRepo(f, "o--r", sha), "q")
 	write(t, filepath.Join(nm, "skills", "qs", "SKILL.md"), "---\nname: qs\n---\n")
 	write(t, filepath.Join(nm, "agents", "qa.md"), "---\nname: qa\n---\nhi\n")
 	write(t, filepath.Join(nm, "commands", "go.md"), "go\n")
@@ -555,5 +555,19 @@ func TestInstallGascityWholeLocalPlugin(t *testing.T) {
 		if !strings.Contains(out, want) {
 			t.Errorf("output lacks %q:\n%s", want, out)
 		}
+	}
+}
+
+func TestInstallGascityReadsSyncedSources(t *testing.T) {
+	f, _ := syncedInstallFake(t)
+	tmp := t.TempDir()
+	if err := f.run("install", "gascity", "kit", "-C", tmp); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if data, err := os.ReadFile(filepath.Join(tmp, "kit", "skills", "s1", "SKILL.md")); err != nil || !strings.Contains(string(data), "name: s1") {
+		t.Errorf("skill %q %v", data, err)
+	}
+	if c := callWith(f, "pnpm install"); c != "" {
+		t.Errorf("pnpm ran: %q", c)
 	}
 }

@@ -19,12 +19,12 @@ Where `ipm` keeps its data, and every file it reads or writes in a project.
 
 | Folder | Holds | macOS | Linux | Windows | Override |
 | --- | --- | --- | --- | --- | --- |
-| Home | Your sources, the pnpm store, user-scope packs | `~/Library/ipm` | `$XDG_DATA_HOME/ipm`, else `~/.local/share/ipm` | `%LOCALAPPDATA%\ipm` | `IPM_HOME` |
+| Home | Your sources, the pin store, the pnpm store, user-scope packs | `~/Library/ipm` | `$XDG_DATA_HOME/ipm`, else `~/.local/share/ipm` | `%LOCALAPPDATA%\ipm` | `IPM_HOME` |
 | Cache | The catalog and search data | `~/Library/Caches/ipm` | `$XDG_CACHE_HOME/ipm`, else `~/.cache/ipm` | `%LOCALAPPDATA%\ipm\cache` | `IPM_CACHE_DIR` |
 
 Overrides must be absolute paths. `XDG_DATA_HOME` and `XDG_CACHE_HOME` are honoured on every OS.
 
-The home holds what you would lose: your list of sources and its pins. The cache holds only what `ipm` can rebuild, so you can delete it at any time (`ipm catalog sync` and `ipm catalog rebuild` rebuild it).
+The home holds what you would lose: your list of sources and its pins, and every repo a pack build reads. The cache holds only what `ipm` can rebuild, so you can delete it at any time (`ipm catalog sync` and `ipm catalog rebuild` rebuild it).
 
 ```text
 $IPM_HOME/
@@ -32,6 +32,10 @@ $IPM_HOME/
   sources/pnpm-lock.yaml      the commit each source is pinned to
   sources/node_modules/       each source as pnpm fetched it
   sources/.pnpmfile.cjs       pnpm hooks, rewritten by every sync
+  pinned/                     the pin store: repos pack builds need at commits your sources aren't at
+  pinned/package.json         one dependency per pin, <alias>--<sha12>; pins are added, never removed
+  pinned/node_modules/        each pin as pnpm fetched it
+  pinned/.lock                held while a build adds pins
   store/                      ipm's own pnpm content store
   global/                     user scope (-g): ipm.toml and .ipm/, as in a project
   installs.json               where user-scope packs are installed (ipm install -g)
@@ -48,18 +52,14 @@ $IPM_CACHE_DIR/
 <project>/
   ipm.toml                               your packs and their installs   commit
   .ipm/ipm.lock                          every item resolved to a commit commit
-  .ipm/package.json                      one dependency per repo         commit
-  .ipm/pnpm-lock.yaml                    pnpm's pins                     commit
-  .ipm/.pnpmfile.cjs                     pnpm hooks                      commit
-  .ipm/.gitignore                        ignores the last four           commit
+  .ipm/.gitignore                        ignores the last three          commit
   .ipm/.claude-plugin/marketplace.json   the marketplace                 commit
   .ipm/build.stamp                       what the last build used        ignored
-  .ipm/node_modules/                     pnpm's output                   ignored
   .ipm/plugins/<pack>/                   the built plugins               ignored
   .ipm/.gascity/<name>/                  Gas City pack folders           ignored
 ```
 
-The project is the nearest folder, at or above where you run `ipm`, that holds an `ipm.toml`. Everything under `.ipm/` is generated: `.ipm/.gascity/` by `ipm install gascity` (which `ipm pack build` leaves alone), the rest by `ipm pack build`; don't edit it by hand.
+The project is the nearest folder, at or above where you run `ipm`, that holds an `ipm.toml`. It holds no pnpm project: `ipm pack build` reads each repo from your home — the synced source when it is at the pinned commit, else `$IPM_HOME/pinned` — and removes the `package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs` and `node_modules/` older builds wrote to `.ipm/`. If you committed those, commit their removal. Everything under `.ipm/` is generated: `.ipm/.gascity/` by `ipm install gascity` (which `ipm pack build` leaves alone), the rest by `ipm pack build`; don't edit it by hand.
 
 ## `ipm.toml`
 
@@ -74,7 +74,7 @@ items = [
 ]
 ```
 
-One `[packs.<name>]` table per pack, with a `description` and a list of catalog IDs. `ipm pack` writes it with packs sorted by name and items in the order you added them. Unknown keys are an error.
+One `[packs.<name>]` table per pack, with a `description` and a list of catalog IDs. A name that isn't a bare TOML key (one with a `.`) is quoted: `[packs."my.pack"]`. `ipm pack new` without `--description` writes `ipm pack <name>`, and `ipm pack build` uses that for a pack whose description is empty. `ipm pack` writes it with packs sorted by name and items in the order you added them. Unknown keys are an error.
 
 `ipm install claude` adds a `[[packs.<name>.installs]]` table for each place a pack is installed, so a bare `ipm install` can replay them:
 

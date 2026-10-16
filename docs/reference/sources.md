@@ -24,7 +24,7 @@ Your **sources** are the repos of interest `ipm` fetches, pins and catalogs. The
 
 The home holds what you would lose (your list of sources and its pins); the cache holds only what `ipm` can rebuild.
 
-A project's `.ipm/` (`package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs`, `node_modules/`) is a second pnpm project of the same shape, written by `ipm pack build` from your packs and pinned to the commits in `.ipm/ipm.lock`; see [Build your own plugin](../guides/build-a-plugin.md).
+`$IPM_HOME/pinned/` (`package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs`, `node_modules/`) is a second pnpm project of the same shape, the pin store: `ipm pack build` reads a repo from your sources when they are at the commit in `.ipm/ipm.lock`, and otherwise adds `<alias>--<first 12 characters of the commit>` here and has pnpm fetch it, once for every project. Pins are never removed. See [Build your own plugin](../guides/build-a-plugin.md).
 
 ## `package.json`
 
@@ -64,7 +64,7 @@ Run `ipm catalog sync` after any change; `add`, `remove` and `import` only edit 
 
 ## What pnpm is allowed to do
 
-pnpm always runs with `--ignore-scripts --store-dir $IPM_HOME/store --dir $IPM_HOME/sources`, so no upstream file is ever executed. The generated `.pnpmfile.cjs` adds two hooks:
+pnpm always runs with `--ignore-scripts --store-dir $IPM_HOME/store --dir $IPM_HOME/sources` (or `--dir $IPM_HOME/pinned` for the pin store), so no upstream file is ever executed. The generated `.pnpmfile.cjs`, written to both, adds two hooks:
 
 - **No npm dependencies.** Sources are content, not code: their own `dependencies`, `optionalDependencies` and `peerDependencies` are emptied before pnpm resolves them.
 - **Every file kept.** pnpm treats a GitHub repo as a git-hosted package and re-packs it with npm's packing rules (`package.json` `files`, `.npmignore`), which strips repos that are also npm packages — `nizos/tdd-guard` went from 429 files to 3. The hook uses pnpm 12's custom fetcher (`{ delegate }`) to fetch the same commit as a plain GitHub tarball instead.

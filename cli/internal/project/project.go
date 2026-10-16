@@ -11,7 +11,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -133,6 +135,17 @@ func LoadPacks(root string) ([]Pack, error) {
 	return out, nil
 }
 
+var bareKey = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// tomlKey is name as a TOML key: bare when it can be, else quoted (a pack
+// name may hold '.').
+func tomlKey(name string) string {
+	if bareKey.MatchString(name) {
+		return name
+	}
+	return strconv.Quote(name)
+}
+
 // SavePacks writes root's ipm.toml: packs sorted by name, items in order.
 func SavePacks(root string, packs []Pack) error {
 	sorted := append([]Pack(nil), packs...)
@@ -140,13 +153,13 @@ func SavePacks(root string, packs []Pack) error {
 	var b strings.Builder
 	b.WriteString("# ipm packs: each becomes a Claude Code plugin under .ipm/plugins/ when you run `ipm pack build`.\n")
 	for _, p := range sorted {
-		fmt.Fprintf(&b, "\n[packs.%s]\ndescription = %q\nitems = [\n", p.Name, p.Description)
+		fmt.Fprintf(&b, "\n[packs.%s]\ndescription = %q\nitems = [\n", tomlKey(p.Name), p.Description)
 		for _, it := range p.Items {
 			fmt.Fprintf(&b, "  %q,\n", it)
 		}
 		b.WriteString("]\n")
 		for _, in := range p.Installs {
-			fmt.Fprintf(&b, "\n[[packs.%s.installs]]\ntarget = %q\npath = %q\n", p.Name, in.Target, in.Path)
+			fmt.Fprintf(&b, "\n[[packs.%s.installs]]\ntarget = %q\npath = %q\n", tomlKey(p.Name), in.Target, in.Path)
 			if in.Scope != "" {
 				fmt.Fprintf(&b, "scope = %q\n", in.Scope)
 			}

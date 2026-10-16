@@ -53,7 +53,7 @@ Paths are resolved in `internal/paths`, following pnpm's conventions. Both roots
 | Home | `IPM_HOME` | `~/Library/ipm` | `$XDG_DATA_HOME/ipm`, else `~/.local/share/ipm` | `%LOCALAPPDATA%\ipm` |
 | Cache | `IPM_CACHE_DIR` | `~/Library/Caches/ipm` | `$XDG_CACHE_HOME/ipm`, else `~/.cache/ipm` | `%LOCALAPPDATA%\ipm\cache` |
 
-`XDG_DATA_HOME` and `XDG_CACHE_HOME` are honoured on every OS. The home holds what a user would lose — `sources/` (`package.json`, `pnpm-lock.yaml`, `node_modules/`, the generated `.pnpmfile.cjs`) and `store/`, a pnpm store dedicated to `ipm` (pnpm's docs say a store is for mutually trusted users and processes). The cache holds what `ipm` can rebuild: `catalog/`, `typesense/` and `curated/` (the last curated list `ipm onboard` fetched).
+`XDG_DATA_HOME` and `XDG_CACHE_HOME` are honoured on every OS. The home holds what a user would lose — `sources/` (`package.json`, `pnpm-lock.yaml`, `node_modules/`, the generated `.pnpmfile.cjs`), `pinned/` (the pin store, the same shape: repos pack builds needed at commits the sources aren't at) and `store/`, a pnpm store dedicated to `ipm` (pnpm's docs say a store is for mutually trusted users and processes). The cache holds what `ipm` can rebuild: `catalog/`, `typesense/` and `curated/` (the last curated list `ipm onboard` fetched).
 
 Nothing is kept in the directory `ipm` runs from, so every command works anywhere. Packs live with the project that uses them (next section); user-scope packs live in `$IPM_HOME/global/`.
 
@@ -104,8 +104,8 @@ flowchart LR
   T["ipm.toml<br/>[packs.&lt;name&gt;] items"]
   CAT["$IPM_CACHE_DIR/catalog"]
   L[".ipm/ipm.lock<br/>items resolved to commits"]
-  PJ[".ipm/package.json<br/>one dependency per repo"]
-  NM[".ipm/node_modules"]
+  SRC["$IPM_HOME/sources/node_modules<br/>synced sources"]
+  PIN["$IPM_HOME/pinned/node_modules<br/>&lt;alias&gt;--&lt;sha12&gt;"]
   PL[".ipm/plugins/&lt;pack&gt;/"]
   MK[".ipm/.claude-plugin/marketplace.json"]
   C["Claude Code"]
@@ -113,9 +113,10 @@ flowchart LR
   PK["ipm pack"] -->|new / add / remove| T
   T -->|ipm pack build| L
   CAT -->|items not in the lock| L
-  L --> PJ
-  PJ -->|pnpm install| NM
-  NM -->|hard link or copy| PL
+  L -->|source at the pinned commit| SRC
+  L -->|else pnpm install, once per pin| PIN
+  SRC -->|hard link or copy| PL
+  PIN -->|hard link or copy| PL
   L -->|plugin.json, whole-plugin entries| MK
   PL --> MK
   MK -.->|ipm install claude| C
@@ -142,9 +143,9 @@ Items are catalog IDs and carry no commit. `ipm pack add` checks each against th
 
 1. **Resolve** (`internal/assemble`): every item from `.ipm/ipm.lock` first, then the catalog; an item in neither is an error that names it. Existing pins are kept; `--update` re-resolves every item from the current catalog.
 2. **Plan** (`assemble.Build`): each pack's files and whole-plugin dependencies. Refuses unpickable types, items with no usable name, and marketplace entry names that clash with each other or with a pack; warns about external plugins whose upstream entry names no commit.
-3. **Fetch**: write `.ipm/package.json` (one dependency per source repo, `github:Owner/Repo#<sha>` or `git+<url>#<sha>`, through `sources.WriteProject`), `.ipm/.pnpmfile.cjs` and `.ipm/.gitignore` (`build.stamp`, `node_modules/`, `plugins/`, `plugins.tmp/`, `.gascity/`), then run pnpm exactly as `ipm catalog sync` does, with `--dir <root>/.ipm`. Pins are per repo, not per item: the fetcher hook fetches whole commits, and the store shares them anyway.
-4. **Place**: build into `.ipm/plugins.tmp/<pack>/`, putting each picked skill folder, agent and command there (`skills/<name>/`, `agents/<name>.md`, `commands/<name>.md`) by hard link from `.ipm/node_modules`, copying (with the file's mode) when linking fails across volumes. Symlinks are resolved first and every source must stay inside its repo. A name clash within a pack gets `-<repo owner>` appended, then `-2`, `-3`. When every pack is placed, `plugins.tmp/` replaces `plugins/`.
-5. **plugin.json**: `name` = pack, `description`, `version` `0.0.0-ipm`, `author` (git `user.name` or `ipm`), `dependencies` (the pack's whole-plugin entries), and `metadata.ipm.items` — `{id, type, name, repo, path, sha, file}` per placed file, the provenance.
+3. **Find the repos** (`repoFolders`, `internal/cli/pinned.go`): each repo the plan reads (`github:Owner/Repo#<sha>` or `git+<url>#<sha>`) resolves to a folder in your home, never in the project. A synced source at exactly that commit (`sources.Installed`, which skips unsynced sources) is used as is: no pnpm, no network. Otherwise the repo comes from the pin store, `$IPM_HOME/pinned`: one pnpm project shared by every scope, whose `package.json` dependencies are `<alias>--<sha12>` → the pinned spec. Pins it lacks are added (`sources.AddPins`; entries are never removed), `.pnpmfile.cjs` is written there and pnpm runs once, exactly as `ipm catalog sync` does, with `--dir $IPM_HOME/pinned`. A pin already in `pinned/node_modules` runs no pnpm, so a second project with the same pins builds offline. The update holds an exclusive lock on `pinned/.lock` (`flock`, `LockFileEx` on Windows), so builds in two projects at once don't both run pnpm or corrupt the store; a build that waited re-checks before fetching. A pnpm failure prints pnpm's output and `✗ pnpm failed`, exits 1 and changes nothing in `.ipm/`. Pins are per repo, not per item: the fetcher hook fetches whole commits, and the store shares them anyway. The pin store is never pruned. Then the build removes `package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs` and `node_modules/` from `.ipm/` (older builds fetched there) and writes `.ipm/.gitignore` (`build.stamp`, `plugins/`, `plugins.tmp/`, `.gascity/`).
+4. **Place**: build into `.ipm/plugins.tmp/<pack>/`, putting each picked skill folder, agent and command there (`skills/<name>/`, `agents/<name>.md`, `commands/<name>.md`) by hard link from the repo's folder, copying (with the file's mode) when linking fails across volumes. Symlinks are resolved first and every source must stay inside its repo. A name clash within a pack gets `-<repo owner>` appended, then `-2`, `-3`. When every pack is placed, `plugins.tmp/` replaces `plugins/`.
+5. **plugin.json**: `name` = pack, `description` (`ipm pack <name>` when the pack has none: `claude plugin validate --strict` wants one), `version` `0.0.0-ipm`, `author` (git `user.name` or `ipm`), `dependencies` (the pack's whole-plugin entries), and `metadata.ipm.items` — `{id, type, name, repo, path, sha, file}` per placed file, the provenance.
 6. **Marketplace and lock**: `.ipm/.claude-plugin/marketplace.json`, named `<project dir>-ipm` (user scope `ipm-global`), listing each pack as `./plugins/<pack>` and each whole plugin as `<pack>-<name>`, pinned to its commit (a local plugin as a `git-subdir` source, an inline or external one as its upstream entry), all tagged `ipm`. Built by `internal/marketplace`. Then `.ipm/ipm.lock` (TOML, one `[[item]]` per picked item — id, type, name, repo, path, commit, and a whole plugin's marketplace source — sorted by id) is written last, so a failed build leaves the previous plugins and lock in place.
 7. **Validate**: `claude plugin validate --strict .ipm`, skipped with a note when `claude` is not on PATH or with `--no-validate`; a failure exits 1.
 8. **Stamp**: `.ipm/build.stamp`, written last, is the hex SHA-256 of the packs in `ipm.toml` (name, description and items; install records are left out), the `ipm.lock` bytes just written and the ipm version. `ipm install <target>` computes the same hash from the current `ipm.toml` and the existing `ipm.lock`; when it matches and `.ipm/plugins/` and the marketplace file exist it skips the build and prints `build is current`. `--update` always rebuilds. The stamp is part of the deterministic output.
@@ -196,7 +197,7 @@ cli/
 └── internal/
     ├── cli/                   the Cobra command tree (cli.go), one file per command (packcmd.go, install.go, …); pnpm.go (find pnpm, .pnpmfile.cjs)
     ├── paths/                 IPM_HOME, the cache dir, the folders under them
-    ├── sources/               sources/package.json, aliases, pnpm-lock.yaml commits; WriteProject for .ipm/package.json
+    ├── sources/               sources/package.json, aliases, pnpm-lock.yaml commits; AddPins for pinned/package.json
     ├── catalog/               walk, parse, link, build; *.jsonl read and write
     ├── github/                GitHub stats through gh
     ├── typesense/             Typesense HTTP client
@@ -226,7 +227,8 @@ Commands reach the outside world only through `cli.System` (stdout, stderr, envi
 | Sources and catalog per user, in platform data and cache folders | Like pnpm's registry config and metadata cache: one list of interests per person, usable from any project. The catalog is rebuildable, so it is cache, not data. |
 | Catalog kept separate from GitHub stats | The catalog is a pure function of the pinned commits; stars change daily and are refreshed on demand. |
 | Disposable search index | The catalog is the record; `ipm catalog rebuild` rebuilds the index rather than syncing it. |
-| Packs are built per project in `.ipm/`, committed except `plugins/` and `node_modules/` | A team shares the pack definition and its pins; anyone rebuilds the same plugin with `ipm pack build`, without the author's catalog. |
+| Packs are built per project in `.ipm/`, committed except `plugins/` | A team shares the pack definition and its pins; anyone rebuilds the same plugin with `ipm pack build`, without the author's catalog. |
+| Pack builds read repos from the home (synced sources, else the shared pin store), never a per-project pnpm project | A project needs no download when your sources already hold its pins, and projects sharing a pin share one copy. |
 | Picked files are hard-linked, not copied or symlinked | No extra disk and no new dependency; Claude Code loads them like any plugin files. Copy is the fallback across volumes. |
 | Whole plugins are marketplace dependencies, not copies | They keep their own namespace, hooks and MCP servers, and stay pinned to an upstream commit. |
 | `ipm` installs into Claude Code only on `ipm install claude` | Installing changes the user's Claude config, so it is an explicit command (or a confirmed step of the TUI's install form showing the exact `claude` commands), never a side effect of building. |
@@ -238,12 +240,12 @@ Commands reach the outside world only through `cli.System` (stdout, stderr, envi
 
 - `internal/paths` resolves defaults and overrides for macOS, Linux and Windows, and refuses relative paths and a missing home.
 - `internal/sources` tests aliases, the `package.json` round trip, duplicate and colliding repos, and reading commits from a fixture `pnpm-lock.yaml`, including unsynced cases.
-- `internal/project` tests the scope walk and the `ipm.toml` and lock round trips; `internal/assemble` tests resolving from lock then catalog, name clashes, Copilot plugins, whole-plugin entries, hard link falling back to copy, and stale files removed.
+- `internal/project` tests the scope walk and the `ipm.toml` and lock round trips; `internal/assemble` tests resolving from lock then catalog, name clashes, Copilot plugins, whole-plugin entries, hard link falling back to copy, stale files removed, and a repo missing from the folder lookup.
 - `internal/catalog`, `internal/catgraph`, `internal/search` and `internal/typesense` test the catalog, the graph and search against fixtures and an `httptest` server.
-- `internal/cli` drives every command in-process with a fake `System` and temp `IPM_HOME`/`IPM_CACHE_DIR`: the exact pnpm arguments, the generated `.pnpmfile.cjs`, the `npx` fallback for an old pnpm, a failed pnpm leaving the catalog intact, doctor rows, `ipm pack` refusals and scopes, and `ipm pack build` pins, determinism, installing from the lock alone and validation.
+- `internal/cli` drives every command in-process with a fake `System` and temp `IPM_HOME`/`IPM_CACHE_DIR`: the exact pnpm arguments, the generated `.pnpmfile.cjs`, the `npx` fallback for an old pnpm, a failed pnpm leaving the catalog intact, doctor rows, `ipm pack` refusals and scopes, and `ipm pack build` pins, determinism, installing from the lock alone, validation, reading synced sources without pnpm, fetching into the pin store once (and its lock), and removing old `.ipm` pnpm files.
 - `cmd/ipm` builds the real binary and checks exit codes.
 
-`mise run test:integration` adds the tests behind the `integration` build tag, also in `cmd/ipm`: with real pnpm and Node, `marketplace add`, `catalog sync`, `catalog sync --upgrade` and `ipm pack build` against local git repos over `file://`; with Docker as well, `ipm catalog serve`, `ipm catalog rebuild` and `ipm search` against a real Typesense. CI runs them; locally the search test refuses to run beside an existing `ipm-typesense` container.
+`mise run test:integration` adds the tests behind the `integration` build tag, also in `cmd/ipm`: with real pnpm and Node, `marketplace add`, `catalog sync`, `catalog sync --upgrade` and `ipm pack build` (from synced sources, then from the pin store after the source moves on) against local git repos over `file://`; with Docker as well, `ipm catalog serve`, `ipm catalog rebuild` and `ipm search` against a real Typesense. CI runs them; locally the search test refuses to run beside an existing `ipm-typesense` container.
 
 ## Extending
 

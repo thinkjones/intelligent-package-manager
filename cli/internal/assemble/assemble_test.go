@@ -138,6 +138,17 @@ func TestBuildExpandsCopilotPlugin(t *testing.T) {
 	}
 }
 
+// folders maps each repo folder in dir (named by alias) to its path, as the
+// build's repo lookup does.
+func folders(dir string) map[string]string {
+	out := map[string]string{}
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		out[e.Name()] = filepath.Join(dir, e.Name())
+	}
+	return out
+}
+
 func nodeModules(t *testing.T) string {
 	t.Helper()
 	nm := t.TempDir()
@@ -163,7 +174,7 @@ func TestPlaceLinksElseCopies(t *testing.T) {
 		"copy": func(string, string) error { return errors.New("cross-device link") },
 	} {
 		dir := filepath.Join(t.TempDir(), "kit")
-		if err := Place(plan.Packs[0], nm, dir, link); err != nil {
+		if err := Place(plan.Packs[0], folders(nm), dir, link); err != nil {
 			t.Fatalf("%s: %v", name, err)
 		}
 		for rel, want := range map[string]string{"skills/code-review/SKILL.md": "s", "skills/code-review/refs/x.md": "x", "agents/reviewer.md": "a"} {
@@ -180,7 +191,7 @@ func TestPlaceRemovesStaleFiles(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "kit")
 	os.MkdirAll(filepath.Join(dir, "skills", "old"), 0o755)
 	os.WriteFile(filepath.Join(dir, "skills", "old", "SKILL.md"), []byte("old"), 0o644)
-	if err := Place(plan.Packs[0], nodeModules(t), dir, os.Link); err != nil {
+	if err := Place(plan.Packs[0], folders(nodeModules(t)), dir, os.Link); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "skills", "old")); !os.IsNotExist(err) {
@@ -257,9 +268,30 @@ func TestPlaceRefusesEscapes(t *testing.T) {
 	os.Symlink(outside, filepath.Join(nm, "o--r", "agents", "link.md"))
 	for name, from := range map[string]string{"dotdot": "../../" + filepath.Base(filepath.Dir(outside)) + "/secret.md", "symlinked file": "agents/link.md"} {
 		pp := PackPlan{Name: "kit", Files: []Placed{{Alias: "o--r", From: from, To: "agents/x.md", Item: project.LockItem{ID: "agent:o/r:" + from}}}}
-		if err := Place(pp, nm, filepath.Join(t.TempDir(), "kit"), os.Link); err == nil {
+		if err := Place(pp, folders(nm), filepath.Join(t.TempDir(), "kit"), os.Link); err == nil {
 			t.Errorf("%s: escaped the repo", name)
 		}
+	}
+}
+
+func TestPlaceNeedsEveryRepo(t *testing.T) {
+	packs, items := resolved(t, "agent:o/r:agents/rev.md")
+	plan, _ := Build(packs, items)
+	err := Place(plan.Packs[0], map[string]string{}, filepath.Join(t.TempDir(), "kit"), os.Link)
+	if err == nil || !strings.Contains(err.Error(), "o/r") {
+		t.Errorf("got %v", err)
+	}
+}
+
+func TestPlanReposPinSpecs(t *testing.T) {
+	packs, items := resolved(t, "agent:o/r:agents/rev.md")
+	plan, _ := Build(packs, items)
+	it := items["agent:o/r:agents/rev.md"]
+	if want := map[string]string{"o--r": "github:o/r#" + it.SHA}; !reflect.DeepEqual(plan.Repos, want) || PinSpec(it) != want["o--r"] {
+		t.Errorf("repos %v", plan.Repos)
+	}
+	if got := PinSpec(project.LockItem{Repo: "https://git.test/o/r", SHA: it.SHA}); got != "git+https://git.test/o/r#"+it.SHA {
+		t.Errorf("git spec %q", got)
 	}
 }
 
@@ -270,7 +302,7 @@ func TestPlaceCopyKeepsMode(t *testing.T) {
 	packs, items := resolved(t, "skill:o/r:skills/code-review")
 	plan, _ := Build(packs, items)
 	dir := filepath.Join(t.TempDir(), "kit")
-	Place(plan.Packs[0], nm, dir, func(string, string) error { return errors.New("EXDEV") })
+	Place(plan.Packs[0], folders(nm), dir, func(string, string) error { return errors.New("EXDEV") })
 	if info, err := os.Stat(filepath.Join(dir, "skills", "code-review", "run.sh")); err != nil || info.Mode().Perm() != 0o755 {
 		t.Errorf("mode %v %v", info, err)
 	}

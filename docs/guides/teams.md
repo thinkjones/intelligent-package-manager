@@ -19,14 +19,13 @@ Commit a pack so everyone on the project builds the same plugin, at the same com
 | --- | --- | --- |
 | `ipm.toml` | Yes | The packs, the items in them and where each pack is installed (`[[packs.<name>.installs]]`) |
 | `.ipm/ipm.lock` | Yes | Every item resolved to a repo, path and commit |
-| `.ipm/package.json`, `.ipm/pnpm-lock.yaml`, `.ipm/.pnpmfile.cjs` | Yes | pnpm's pins for the repos the items come from |
 | `.ipm/.claude-plugin/marketplace.json` | Yes | The marketplace Claude Code reads |
 | `.ipm/.gitignore` | Yes | Keeps the next three rows out |
 | `.ipm/build.stamp` | No | A hash of the packs, the lock and the ipm version that describes your local `.ipm/plugins/`; it changes with the ipm version, so each teammate keeps their own |
-| `.ipm/node_modules/`, `.ipm/plugins/` | No | Built by `ipm pack build` |
+| `.ipm/plugins/` | No | Built by `ipm pack build` |
 | `.ipm/.gascity/` | No | Gas City pack folders written by `ipm install gascity`; a bare `ipm install` writes them again from the records in `ipm.toml` |
 
-`ipm pack build` writes `.ipm/.gitignore` for you.
+`ipm pack build` writes `.ipm/.gitignore` for you. Older versions of ipm also wrote `.ipm/package.json`, `.ipm/pnpm-lock.yaml`, `.ipm/.pnpmfile.cjs` and `.ipm/node_modules/`; `ipm pack build` now removes them, so commit their removal.
 
 ## What a teammate does
 
@@ -37,7 +36,7 @@ ipm install claude my-pack
 
 Or, to build without installing, `ipm pack build`; a bare `ipm install` replays the installs recorded in `ipm.toml`.
 
-They need `ipm` and pnpm 12+ (or Node), but not your sources or your catalog: `ipm pack build` builds from `ipm.toml` and `.ipm/ipm.lock` alone, so they get the same items at exactly the commits in the lock.
+They need `ipm`, but not your sources or your catalog: `ipm pack build` builds from `ipm.toml` and `.ipm/ipm.lock` alone, so they get the same items at exactly the commits in the lock. Repos come from their own home: their synced sources when they are at the locked commits, else `$IPM_HOME/pinned`, which needs pnpm 12+ (or Node) the first time a commit is fetched.
 
 {: .note }
 Two things in the build come from the person running it: the plugin and marketplace owner (their `git config user.name`) and the marketplace name (`<project folder>-ipm`). A teammate's build can therefore show a small diff in `.ipm/.claude-plugin/marketplace.json`; the plugin content is the same. Cloning into a folder with the same name keeps the `/plugin install` command the same for everyone.

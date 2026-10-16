@@ -242,15 +242,20 @@ func slug(s string) string {
 	return strings.Trim(unsafe.ReplaceAllString(strings.ToLower(s), "-"), "-.")
 }
 
+// PinSpec is the pnpm specifier for an item's repo at its commit.
+func PinSpec(it project.LockItem) string {
+	if ownerRepo.MatchString(it.Repo) {
+		return "github:" + it.Repo + "#" + it.SHA
+	}
+	return "git+" + it.Repo + "#" + it.SHA
+}
+
 // Build plans each pack. File names are the items' names; a clash within a
 // type gets -<repo owner>, then -2, -3.
 func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error) {
 	plan := Plan{Repos: map[string]string{}}
 	pin := func(it project.LockItem) error {
-		spec := "git+" + it.Repo + "#" + it.SHA
-		if ownerRepo.MatchString(it.Repo) {
-			spec = "github:" + it.Repo + "#" + it.SHA
-		}
+		spec := PinSpec(it)
 		a := sources.Alias(it.Repo)
 		if prev, ok := plan.Repos[a]; ok && prev != spec {
 			return fmt.Errorf("%s is pinned at two commits in ipm.lock — run `ipm pack build --update`", it.Repo)
@@ -366,14 +371,15 @@ func wholePlugin(packName string, it project.LockItem) (any, error) {
 	return entry, nil
 }
 
-// Place clears pluginDir and puts each planned file there, linking with link
-// (os.Link in production) and copying when linking fails.
-func Place(p PackPlan, nodeModules, pluginDir string, link func(oldname, newname string) error) error {
+// Place clears pluginDir and puts each planned file there from its repo's
+// folder in repos (alias → folder holding the repo at its pinned commit),
+// linking with link (os.Link in production) and copying when linking fails.
+func Place(p PackPlan, repos map[string]string, pluginDir string, link func(oldname, newname string) error) error {
 	if err := os.RemoveAll(pluginDir); err != nil {
 		return err
 	}
 	for _, f := range p.Files {
-		src, err := source(nodeModules, f)
+		src, err := source(repos, f)
 		if err != nil {
 			return err
 		}
@@ -400,10 +406,14 @@ func Place(p PackPlan, nodeModules, pluginDir string, link func(oldname, newname
 
 // source is the file or folder f names inside its installed repo, with
 // symlinks resolved; it refuses a path that leads outside the repo.
-func source(nodeModules string, f Placed) (string, error) {
-	root, err := filepath.EvalSymlinks(filepath.Join(nodeModules, f.Alias))
+func source(repos map[string]string, f Placed) (string, error) {
+	dir, ok := repos[f.Alias]
+	if !ok {
+		return "", fmt.Errorf("%s at %s is not fetched", f.Item.Repo, f.Item.SHA)
+	}
+	root, err := filepath.EvalSymlinks(dir)
 	if err != nil {
-		return "", fmt.Errorf("%s is not installed in %s: %v", f.Item.Repo, nodeModules, err)
+		return "", fmt.Errorf("%s is not installed in %s: %v", f.Item.Repo, dir, err)
 	}
 	from := filepath.FromSlash(f.From)
 	if !filepath.IsLocal(from) {

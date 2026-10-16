@@ -86,7 +86,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `no item … in the catalog — find IDs with ipm search` | The ID is mistyped, or its repo isn't one of your sources. `ipm marketplace add` it, then `ipm catalog sync`. |
 | `… comes only with its plugin: ipm pack add …` | Hooks, MCP servers and inline commands come with their plugin. Run the command it prints. |
 | `… is a repo …`, `… is a marketplace …` | Pick the items it holds; `ipm show tree <id>` lists them. |
-| `… can't be a pack name …` | Use letters, digits, `.`, `_` and `-`, starting with a letter or digit, and avoid `claude-…`, `anthropic-…` and `official`. |
+| `… can't be a pack name …` | `ipm pack new` (and the TUI) take kebab-case names only, which `claude plugin validate --strict` wants: lowercase letters, digits and single hyphens, such as `my-pack` (the message suggests one). Avoid `claude-…`, `anthropic-…` and `official`. A usage error, exit 2. |
 | `pack … already exists`, `no pack …` | `ipm pack list` shows the packs in this scope. Packs in your user scope need `-g`. |
 
 ## Build
@@ -100,7 +100,9 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `… is pinned at two commits in ipm.lock — run ipm pack build --update` | Two items from the same repo are locked at different commits, which one build can't hold. `--update` re-pins them together. |
 | `… would be published as "…", already used by …` | A whole plugin's entry name (`<pack>-<plugin>`) clashes with a pack or another plugin. Rename a pack. |
 | `… is not pinned upstream …` (a warning) | An external plugin's marketplace entry doesn't name a commit, so Claude Code installs whatever it points at that day. Nothing to fix in `ipm`; pick a different plugin if you need it pinned. |
-| `… is not installed in …/.ipm/node_modules` | pnpm didn't fetch a repo. Rerun `ipm pack build` and read pnpm's output. |
+| `✗ pnpm failed` from `ipm pack build` or `ipm install` | pnpm couldn't fetch a pin into the pin store, `$IPM_HOME/pinned` (pnpm's output is shown above it): often the network, or a commit that no longer exists upstream. Nothing in `.ipm/` changed, and the pin store's `package.json` is left as it was. Fix the cause and rerun; `ipm pack build --update` re-pins to your catalog if the commit is gone. |
+| `pnpm did not install … in …/pinned/node_modules` | pnpm ran but didn't install that pin. Rerun `ipm pack build` and read pnpm's output; if it persists, delete `$IPM_HOME/pinned` (every pin is fetched again when needed). |
+| `… at … is not fetched`, `… is not installed in …` | A repo a build or `ipm install gascity` reads is missing from your home, perhaps deleted by hand. Rerun `ipm pack build`. |
 | `claude plugin validate --strict failed` | Claude Code's output is shown above it. Rerun with `--no-validate` to inspect `.ipm/` yourself. |
 
 ## TUI
@@ -139,7 +141,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | --- | --- |
 | `<path> exists and was not written by ipm — use --force to replace it` | The folder exists, isn't empty, and its `pack.toml` doesn't start with ipm's header line. Pick another `--name` or `-C`, or add `--force` to replace it (everything in it is deleted). A folder ipm wrote itself is replaced without `--force`. |
 | `<path> holds pack <other> (project)` (or `(global)`) `— use --name to pick another folder, or --force to replace it` | A recorded install of another pack, or of the same pack from the other scope, wrote that folder: often a user-scope pack (`-g`) with the same name as a project pack, both writing to `.ipm/.gascity`. Add `--name` to give one a different folder. Or add `--force` to take the folder over: ipm replaces it and removes the other pack's install record, printing `replaced <other> (…)'s install at <path>`. In the TUI the message ends `— run ipm install gascity with --name or --force to change it`, since the form has neither. |
-| `pack name "<pack>" isn't a valid Gas City folder name — install it alone with --name` | `ipm install gascity` without a pack names each folder after its pack, and a Gas City folder name can't hold a `.`. Install that pack on its own with a folder name: `ipm install gascity <pack> --name <name>`. |
+| `pack name "<pack>" isn't a valid Gas City folder name — install it alone with --name` | `ipm install gascity` without a pack names each folder after its pack, and a Gas City folder name can't hold a `.` (only a hand-edited `ipm.toml` can name a pack so). Install that pack on its own with a folder name: `ipm install gascity <pack> --name <name>`. |
 | `refusing to replace <path>: it holds the project` (or `… ipm's home`) | The pack folder would be, or contain, your project or `$IPM_HOME`; `--force` doesn't override this. Pick another `-C` or `--name`. |
 | `--dry-run needs a current build — run ipm pack build first` | `--dry-run` writes nothing, so it won't build. Run `ipm pack build`, then repeat. |
 | `skipped <id>: external plugin — its files live in another repo; add its skills and agents directly` | A plugin whose files are in another repo can't be written. `ipm pack add` its skills and agents, and remove the plugin. |

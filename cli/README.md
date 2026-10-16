@@ -28,12 +28,13 @@ ipm pack remove <pack> <id>… [-g]             remove items
 ipm pack list [-g]                            PACK, ITEMS, DESCRIPTION
 ipm pack show <pack> [-g]                     TYPE, NAME, REPO, ★, ID of each item, then where the pack is installed
 ipm pack build [-g] [--update] [--no-validate]   build each pack into .ipm/plugins/<pack>/ and .ipm/.claude-plugin/marketplace.json,
+                               reading repos from your synced sources, else $IPM_HOME/pinned (fetched by pnpm once per commit),
                                then claude plugin validate --strict; --update re-pins to the current catalog; writes .ipm/build.stamp
 ipm install claude [pack] [-s|--scope user|project|local] [-p|--path DIR] [-g] [--update] [--dry-run]
                                build when .ipm/ is stale, then install a pack into Claude Code and record it (also ipm pack install claude)
 ipm install [-g]               reinstall every recorded install (ipm.toml, or $IPM_HOME/installs.json with -g)
 ipm tui [-g]                   search, see the tree, collect, build and deploy, in one screen
-ipm doctor                     check home, cache, pnpm, sources, catalog, docker, typesense, claude
+ipm doctor                     check home, cache, pnpm, sources, pin store, catalog, docker, typesense, claude
 ipm uninstall [--purge] [--yes] [--force]   remove the search container and the binary; --purge also deletes home and cache
 ipm version
 ipm help [command]             usage, or one command's flags (or ipm <command> --help)
@@ -55,7 +56,7 @@ Users install the same binary with `curl -fsSL https://raw.githubusercontent.com
 
 `bin/ipm` is a shell shim: it builds `cli/bin/ipm` on first use and whenever a Go source in `cli/` changes, then execs the binary. The binary reads `IPM_HOME` and `IPM_CACHE_DIR` (and `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `HOME`, `LOCALAPPDATA`) to find its data, so it works from any directory.
 
-`ipm catalog sync` and `ipm pack build` need pnpm 12 or later: pnpm from PATH when it is new enough, otherwise `npx -y pnpm@12.10.1`. Search needs Docker; `ipm marketplace stats` needs `gh`; `ipm pack build` validates with `claude` when it is on PATH, and `ipm install claude` needs it.
+`ipm catalog sync`, and `ipm pack build` when a pinned commit isn't in your sources or pin store yet, need pnpm 12 or later: pnpm from PATH when it is new enough, otherwise `npx -y pnpm@12.10.1`. Search needs Docker; `ipm marketplace stats` needs `gh`; `ipm pack build` validates with `claude` when it is on PATH, and `ipm install claude` needs it.
 
 ## Layout
 
@@ -63,7 +64,7 @@ Users install the same binary with `curl -fsSL https://raw.githubusercontent.com
 cmd/ipm/main.go           wires the process into cli.Run: argv, real commands, HTTP client, exit codes
 internal/cli/              the Cobra command tree (cli.go: newRootCmd, usage errors, argument checks) and one file per command (packcmd.go is ipm pack); pnpm.go finds pnpm and writes .pnpmfile.cjs
 internal/paths/            IPM_HOME and the cache dir: platform defaults, overrides, the folders under them
-internal/sources/          sources/package.json (aliases, specifiers), pnpm-lock.yaml commits, Checkouts; WriteProject for .ipm/package.json
+internal/sources/          sources/package.json (aliases, specifiers), pnpm-lock.yaml commits, Checkouts, Installed; AddPins for the pin store (pinned/package.json)
 internal/catalog/          walk, parse and link a source into catalog records; read and write *.jsonl
 internal/github/           GitHub stats through gh
 internal/typesense/        a plain net/http Typesense client
@@ -99,4 +100,4 @@ mise run cli:build         # cli/bin/ipm (bin/ipm also does this on demand)
 - `internal/catalog`, `internal/catgraph`, `internal/search` and `internal/typesense` test the catalog, the graph and search against fixtures and a fake server.
 - `internal/tui` drives the model with key presses against fake interfaces, and compares rendered screens with `testdata/*.golden` (`go test ./internal/tui -run Golden -update` rewrites them).
 - `internal/cli` drives every command in-process with a fake `System`, `IPM_HOME` and `IPM_CACHE_DIR` in temp dirs; no real pnpm, docker or claude.
-- `cmd/ipm` builds the real binary and checks exit codes; with pnpm installed it also runs `source add`, `sync` and `index` against a local git repo over `file://`.
+- `cmd/ipm` builds the real binary and checks exit codes; with pnpm installed it also runs `marketplace add`, `catalog sync` and `pack build` (from the sources, then from the pin store) against local git repos over `file://`.

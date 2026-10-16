@@ -100,11 +100,17 @@ func packNew(sys System, scope project.Scope, name, description string) error {
 	return nil
 }
 
-// createPack adds an empty pack to the scope's ipm.toml. ipm pack new and the
-// TUI share it.
+// createPack adds an empty pack to the scope's ipm.toml, with the default
+// description when none is given. ipm pack new and the TUI share it. A name
+// that isn't kebab-case (which claude plugin validate --strict wants) is a
+// usage error; ipm.toml can still hold other valid names by hand.
 func createPack(scope project.Scope, name, description string) error {
-	if !pack.ValidName(name) || pack.Reserved(name) {
-		return fmt.Errorf("%q can't be a pack name: use letters, digits, '.', '_' and '-', and avoid names Claude Code reserves (claude-…, anthropic-…, \"official\" beside claude or anthropic)", name)
+	if !pack.Kebab(name) || pack.Reserved(name) {
+		like := ""
+		if k := pack.KebabOf(name); k != "" && k != name && !pack.Reserved(k) {
+			like = fmt.Sprintf(", like %q", k)
+		}
+		return usagef("%q can't be a pack name: use lowercase letters, digits and single hyphens%s, and avoid names Claude Code reserves (claude-…, anthropic-…, \"official\" beside claude or anthropic)", name, like)
 	}
 	packs, err := project.LoadPacks(scope.Root)
 	if err != nil {
@@ -113,9 +119,16 @@ func createPack(scope project.Scope, name, description string) error {
 	if findPack(packs, name) >= 0 {
 		return fmt.Errorf("pack %s already exists", name)
 	}
+	if description == "" {
+		description = defaultDescription(name)
+	}
 	packs = append(packs, project.Pack{Name: name, Description: description})
 	return project.SavePacks(scope.Root, packs)
 }
+
+// defaultDescription is a pack's description when it has none: claude plugin
+// validate --strict refuses a plugin without one.
+func defaultDescription(name string) string { return "ipm pack " + name }
 
 // pickable checks that an item exists and can be picked on its own; when it
 // can't, the error says what to pick instead.

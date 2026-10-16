@@ -227,7 +227,7 @@ ipm pack install claude|gascity [pack] …      (same as ipm install claude|gasc
 
 | Subcommand | Does |
 | --- | --- |
-| `new` | Create a pack. Creates `ipm.toml` in the current folder if no folder above has one. |
+| `new` | Create a pack. Creates `ipm.toml` in the current folder if no folder above has one. The name must be kebab-case (lowercase letters, digits and single hyphens, as `claude plugin validate --strict` wants) and not one Claude Code reserves; otherwise it is a usage error (exit 2) that suggests the kebab form, e.g. `my-pack` for `my.pack`. |
 | `add` | Add catalog items. Every ID is checked first; if any is unknown or can't be picked, nothing is added. Duplicates are ignored. |
 | `remove` | Remove items. |
 | `list` | Every pack in the scope: name, item count, description. |
@@ -237,7 +237,7 @@ ipm pack install claude|gascity [pack] …      (same as ipm install claude|gasc
 
 | Flag | Does |
 | --- | --- |
-| `--description D` | The pack's description (`new`). |
+| `--description D` | The pack's description (`new`). Default: `ipm pack <name>`, since `claude plugin validate --strict` refuses a plugin without one. |
 | `-g` | Use your user scope (`$IPM_HOME/global`) instead of the project. |
 
 ### `ipm pack build`
@@ -246,7 +246,9 @@ ipm pack install claude|gascity [pack] …      (same as ipm install claude|gasc
 ipm pack build [-g] [--update] [--no-validate]
 ```
 
-Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, fetches the repos of any whole plugins you picked (so `ipm install gascity` can read their parts), writes `.ipm/.claude-plugin/marketplace.json` and `.ipm/ipm.lock` (which records each whole plugin's `parts`), and validates the result with `claude plugin validate --strict`. Last, it writes `.ipm/build.stamp`, a hash of the packs, the lock and the ipm version, which lets `ipm install` skip a build that is already current. A failure leaves the previous build and lock in place. It only builds: it never touches your Claude Code configuration.
+Builds every pack in the scope into a Claude Code plugin under `.ipm/plugins/`, makes sure the repos of any whole plugins you picked are fetched (so `ipm install gascity` can read their parts), writes `.ipm/.claude-plugin/marketplace.json` and `.ipm/ipm.lock` (which records each whole plugin's `parts`), and validates the result with `claude plugin validate --strict`. Last, it writes `.ipm/build.stamp`, a hash of the packs, the lock and the ipm version, which lets `ipm install` skip a build that is already current. A failure leaves the previous build and lock in place. It only builds: it never touches your Claude Code configuration. A pack with no description gets `ipm pack <name>` in its plugin and marketplace entry.
+
+Repos come from your home, not the project. A repo whose synced source (`$IPM_HOME/sources`) is at the pinned commit is read from there, with no pnpm and no network, so a project whose pins match your sources builds straight away. Any other pin is fetched into the pin store, `$IPM_HOME/pinned`, shared by every project: the build prints the pins it fetches and the pnpm command (`pnpm install … --store-dir $IPM_HOME/store --dir $IPM_HOME/pinned`), and a pin already there is never fetched again. If pnpm fails the build prints its output and `✗ pnpm failed`, exits 1 and changes nothing in `.ipm/`. Builds in several projects at once take turns on the pin store. `.ipm/` holds no pnpm files: the build removes `package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs` and `node_modules/` left there by older versions of ipm. The pin store is never pruned; `ipm uninstall --purge` deletes it with the rest of your home.
 
 | Flag | Does |
 | --- | --- |
@@ -289,7 +291,7 @@ Without `pack` it installs every pack of the scope (with `-g`, every user-scope 
 | `-g`, `--global` | Install packs from your user scope, into the project's `.ipm/.gascity`. The installs are recorded in `$IPM_HOME/installs.json` with the absolute folder, so `ipm install -g` replays them into that project from anywhere. |
 | `--force` | Replace a folder ipm did not write, or take over another pack's install folder, removing that pack's record (for every pack, without `pack`). |
 | `--update` | Re-pin every item to your current catalog and rebuild first. |
-| `--dry-run` | List the files that would be written (for every pack, without `pack`), without building, writing or recording anything. Needs a current build: `--dry-run needs a current build — run ipm pack build first`. If the folder would be refused, it prints `would refuse: <message>` and exits 1. Can't be combined with `--update` (usage error, exit 2: `install gascity: --dry-run and --update can't be used together`). |
+| `--dry-run` | List the files that would be written (for every pack, without `pack`), without building, writing or recording anything in the project (a repo missing from your home is still fetched into `$IPM_HOME/pinned`, to read it). Needs a current build: `--dry-run needs a current build — run ipm pack build first`. If the folder would be refused, it prints `would refuse: <message>` and exits 1. Can't be combined with `--update` (usage error, exit 2: `install gascity: --dry-run and --update can't be used together`). |
 
 The folder holds `pack.toml`, `skills/<name>/` (each skill folder copied whole), `agents/<name>/prompt.md` with `agents/<name>/agent.toml`, and `mcp/<name>.toml`. Files are copied, not hard-linked, and two runs give byte-identical folders. Names are lowercased. For skills and agents `_` is kept and other characters become `-`; MCP server names also turn `_` into `-` (they use only `a-z 0-9 -`). Clashes within a kind get `-<owner>`, then `-2`, `-3`. An agent's prompt is its body without the frontmatter, as plain markdown (Gas City does not template it).
 
@@ -341,7 +343,7 @@ Four tabs in one screen: **Catalog** (search every artifact, see its tree, add i
 ipm doctor
 ```
 
-Checks the home and cache folders, pnpm, sources, catalog, Docker, the search server and `claude`. `✓` is fine, `!` is a warning, `✗` is a problem; any problem makes it exit 1.
+Checks the home and cache folders, pnpm, sources, the pin store (`pinned`: how many commits `$IPM_HOME/pinned` holds, or `none yet`), catalog, Docker, the search server and `claude`. `✓` is fine, `!` is a warning, `✗` is a problem; any problem makes it exit 1.
 
 ### `ipm uninstall`
 

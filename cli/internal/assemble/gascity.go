@@ -33,7 +33,7 @@ const (
 type GasEntry struct {
 	Kind   GasKind
 	Name   string // sanitised, unique within Kind
-	Alias  string // node_modules folder (sources.Alias)
+	Alias  string // the repo's key in the folder lookup (sources.Alias)
 	From   string // repo-relative path: skill dir, agent .md, or MCP file
 	Server string // MCP server key inside From
 	Item   project.LockItem
@@ -45,6 +45,16 @@ type GascityPlan struct {
 	Picked            []project.LockItem // the pack's own items, for the header
 	Entries           []GasEntry         // sorted by Kind, then Name
 	Skips             []string           // "skipped <id>: …", in item order
+}
+
+// Repos is every repo the entries read: alias → pnpm spec pinned to a
+// commit, as Plan.Repos.
+func (gp GascityPlan) Repos() map[string]string {
+	out := map[string]string{}
+	for _, e := range gp.Entries {
+		out[e.Alias] = PinSpec(e.Item)
+	}
+	return out
 }
 
 var (
