@@ -216,15 +216,33 @@ func TestTuiInstallerGascityDefault(t *testing.T) {
 	if err := f.run("pack", "-g", "new", "gk"); err != nil {
 		t.Fatal(err)
 	}
-	gdef := filepath.Join(f.env["IPM_HOME"], "global", ".ipm", ".gascity")
+	// A user-scope pack goes into the project the TUI runs in.
 	got, plan, err := in.Plan("gk", tui.Target{Kind: "gascity", Name: "gk", Global: true})
-	if err != nil || !reflect.DeepEqual(plan, []string{"ipm install gascity gk -g"}) || got.Path != gdef {
+	if err != nil || !reflect.DeepEqual(plan, []string{"ipm install gascity gk -g"}) || got.Path != def {
 		t.Errorf("global plan %v %+v %v", plan, got, err)
 	}
 	gin := tuiInstaller{sys: f.system(), scope: scopeOf(t, f, true)}
-	if d := gin.Default("gk", "gascity"); d.Path != gdef || !d.Global {
+	if d := gin.Default("gk", "gascity"); d.Path != def || !d.Global {
 		t.Errorf("global default %+v", d)
 	}
+	if _, plan, err := gin.Plan("gk", tui.Target{Kind: "gascity", Path: def, Name: "gk", Global: true}); err != nil || !reflect.DeepEqual(plan, []string{"ipm install gascity gk -g"}) {
+		t.Errorf("ipm tui -g plan %v %v", plan, err)
+	}
+	if err := in.Install(context.Background(), "gk", tui.Target{Kind: "gascity", Name: "gk", Global: true}, io.Discard); err != nil {
+		t.Fatalf("global install: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(def, "gk", "pack.toml")); err != nil {
+		t.Error(err)
+	}
+	if recs, err := loadInstalls(f.system(), scopeOf(t, f, true)); err != nil || len(recs) != 1 || recs[0].Path != def {
+		t.Errorf("global records %+v %v", recs, err)
+	}
+	// ipm tui -g outside a project: the working directory.
+	f.cwd = t.TempDir()
+	if d := gin.Default("gk", "gascity"); d.Path != filepath.Join(f.cwd, ".ipm", ".gascity") {
+		t.Errorf("global default outside a project %+v", d)
+	}
+	f.cwd = ""
 	if err := in.Install(context.Background(), "kit", tui.Target{Kind: "gascity", Path: def, Name: "kit"}, io.Discard); err != nil {
 		t.Fatalf("install: %v", err)
 	}
