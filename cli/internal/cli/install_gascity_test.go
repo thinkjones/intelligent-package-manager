@@ -255,6 +255,10 @@ func TestInstallGascityGlobalDefault(t *testing.T) {
 func TestInstallGascityDryRunDefaultCreatesNothing(t *testing.T) {
 	f, root, _ := gascityFake(t)
 	dir := filepath.Join(root, ".ipm", ".gascity")
+	before, err := os.ReadFile(filepath.Join(root, project.File))
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := f.run("install", "gascity", "kit", "--dry-run"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
@@ -266,6 +270,9 @@ func TestInstallGascityDryRunDefaultCreatesNothing(t *testing.T) {
 	}
 	if _, err := os.Stat(dir); err == nil {
 		t.Error("a dry run created .ipm/.gascity")
+	}
+	if after, _ := os.ReadFile(filepath.Join(root, project.File)); string(after) != string(before) {
+		t.Errorf("a dry run changed ipm.toml:\n%s", after)
 	}
 }
 
