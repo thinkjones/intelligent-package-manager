@@ -211,3 +211,19 @@ func TestLockPartsNilVersusEmpty(t *testing.T) {
 		t.Errorf("not recorded came back as %#v", p)
 	}
 }
+
+func TestSavePacksQuotesDottedNames(t *testing.T) {
+	root := t.TempDir()
+	in := []Pack{{Name: "my.pack", Description: "d", Items: []string{"skill:o/r:s"}, Installs: []Install{{Target: "claude", Path: "/p", Scope: "user"}}}}
+	if err := SavePacks(root, in); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(filepath.Join(root, File))
+	if !strings.Contains(string(data), "\n[packs.\"my.pack\"]\n") || !strings.Contains(string(data), "\n[[packs.\"my.pack\".installs]]\n") {
+		t.Errorf("ipm.toml:\n%s", data)
+	}
+	got, err := LoadPacks(root)
+	if err != nil || !reflect.DeepEqual(got, in) {
+		t.Errorf("load: %+v %v", got, err)
+	}
+}
