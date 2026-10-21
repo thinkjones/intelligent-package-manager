@@ -17,3 +17,6 @@ CLAUDE.local.md
 docs/_site/
 docs/.jekyll-cache/
 docs/Gemfile.lock
+
+# Intelligent package manager
+.ipm/
