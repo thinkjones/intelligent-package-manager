@@ -64,7 +64,7 @@ In Claude Code the skill, agent and command load as `csharp-sdlc:<name>`, and th
 
 ## Install
 
-You need Go 1.26+, pnpm 12+ or Node (`ipm` then runs pnpm 12 through `npx`), and Docker for search.
+You need Go 1.26+, pnpm 12.16+ or Node (`ipm` then runs pnpm 12.16 through `npx`), and Docker for search.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/thinkjones/intelligent-package-manager/main/install.sh | bash

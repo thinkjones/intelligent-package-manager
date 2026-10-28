@@ -69,6 +69,6 @@ pnpm always runs with `--ignore-scripts --store-dir $IPM_HOME/store --dir $IPM_H
 - **No npm dependencies.** Sources are content, not code: their own `dependencies`, `optionalDependencies` and `peerDependencies` are emptied before pnpm resolves them.
 - **Every file kept.** pnpm treats a GitHub repo as a git-hosted package and re-packs it with npm's packing rules (`package.json` `files`, `.npmignore`), which strips repos that are also npm packages — `nizos/tdd-guard` went from 429 files to 3. The hook uses pnpm 12's custom fetcher (`{ delegate }`) to fetch the same commit as a plain GitHub tarball instead.
 
-This is why `ipm` needs pnpm 12 or later. It uses pnpm from PATH when that is 12+, and otherwise runs `npx -y pnpm@12.10.1`, so Node alone is enough.
+This is why `ipm` needs pnpm 12.16 or later. It uses pnpm from PATH when that is 12.16+, and otherwise runs `npx -y pnpm@12.16.1`, so Node alone is enough.
 
-**Known limitation:** sources that are not on GitHub (`git+https`, `git+ssh`, `git+file`) still go through pnpm's git fetcher, so npm's packing rules can drop files from them.
+**Known limitation:** sources that are not on GitHub (`git+https`, `git+ssh`, `git+file`) and **private GitHub repos** still go through pnpm's git fetcher, so npm's packing rules can drop files from them, and symlinks to directories are skipped. A private repo has no public tarball, so pnpm clones it with your own git credentials (whatever `git ls-remote` uses); pnpm older than 12.16 fails on such a repo when it holds a symlink to a directory.

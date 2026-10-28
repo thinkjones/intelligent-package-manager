@@ -56,7 +56,7 @@ Users install the same binary with `curl -fsSL https://raw.githubusercontent.com
 
 `bin/ipm` is a shell shim: it builds `cli/bin/ipm` on first use and whenever a Go source in `cli/` changes, then execs the binary. The binary reads `IPM_HOME` and `IPM_CACHE_DIR` (and `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `HOME`, `LOCALAPPDATA`) to find its data, so it works from any directory.
 
-`ipm catalog sync`, and `ipm pack build` when a pinned commit isn't in your sources or pin store yet, need pnpm 12 or later: pnpm from PATH when it is new enough, otherwise `npx -y pnpm@12.10.1`. Search needs Docker; `ipm marketplace stats` needs `gh`; `ipm pack build` validates with `claude` when it is on PATH, and `ipm install claude` needs it.
+`ipm catalog sync`, and `ipm pack build` when a pinned commit isn't in your sources or pin store yet, need pnpm 12.16 or later: pnpm from PATH when it is new enough, otherwise `npx -y pnpm@12.16.1`. Search needs Docker; `ipm marketplace stats` needs `gh`; `ipm pack build` validates with `claude` when it is on PATH, and `ipm install claude` needs it.
 
 ## Layout
 

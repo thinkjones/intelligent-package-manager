@@ -57,7 +57,7 @@ func doctor(sys System) error {
 	} else if pn.name == "pnpm" {
 		row(ok, "pnpm", pn.version)
 	} else {
-		row(ok, "pnpm", fmt.Sprintf("%s via `%s` (pnpm on PATH is older than %d or missing)", pn.version, pn, pnpmMajor))
+		row(ok, "pnpm", fmt.Sprintf("%s via `%s` (pnpm on PATH is older than %s or missing)", pn.version, pn, pnpmMin))
 	}
 
 	srcs, err := sources.Load(p.Sources())

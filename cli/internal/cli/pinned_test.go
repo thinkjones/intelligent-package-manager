@@ -16,7 +16,7 @@ func pinnedFake(t *testing.T) *fake {
 	t.Helper()
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"agents/a.md": "a"}})
 	return f
 }

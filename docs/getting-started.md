@@ -17,7 +17,7 @@ Install `ipm`, pick the repos to follow, search them and build your first plugin
 | You need | For | Notes |
 | --- | --- | --- |
 | [Go](https://go.dev/dl/) 1.26 or later | Building `ipm` | |
-| [pnpm](https://pnpm.io/installation) 12 or later, **or** [Node.js](https://nodejs.org) | `ipm catalog sync`, `ipm pack build` | With only Node, `ipm` runs `npx -y pnpm@12.10.1` for you. |
+| [pnpm](https://pnpm.io/installation) 12 or later, **or** [Node.js](https://nodejs.org) | `ipm catalog sync`, `ipm pack build` | With only Node, `ipm` runs `npx -y pnpm@12.16.1` for you. |
 | [Docker](https://www.docker.com) (or OrbStack) | `ipm catalog serve`, `ipm search` | Runs the local Typesense search server. Everything else works without it. |
 | [GitHub CLI](https://cli.github.com) `gh`, logged in | `ipm marketplace stats` | Optional: stars, topics and descriptions. |
 | [Claude Code](https://code.claude.com) `claude` | Validating and using the plugins you build | Needed for `ipm install claude`; optional for `ipm pack build`, which skips validation without it. |
