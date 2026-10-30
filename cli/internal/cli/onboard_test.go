@@ -160,7 +160,7 @@ func onboardFake(t *testing.T) (*fake, string) {
 	root := checkout(t)
 	f := newFake(root)
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	list := filepath.Join(root, "list.toml")
 	write(t, list, onboardList)
 	return f, list

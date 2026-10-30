@@ -10,12 +10,34 @@ import (
 )
 
 // pnpmPinned is the pnpm ipm runs through npx when the pnpm on PATH is older
-// than pnpmMajor. pnpm 12's custom fetchers (the { delegate } form) are what
-// let ipm keep upstream files intact.
+// than pnpmMin. pnpm 12's custom fetchers (the { delegate } form) are what
+// let ipm keep upstream files intact; 12.16 is the first whose git fetcher
+// survives a symlink to a directory, which private and non-GitHub sources
+// go through.
 const (
-	pnpmPinned = "pnpm@12.10.1"
-	pnpmMajor  = 12
+	pnpmPinned = "pnpm@12.16.1"
+	pnpmMin    = "12.16"
 )
+
+// atLeast reports whether version (major.minor.patch…) is at least min
+// (major.minor).
+func atLeast(version, min string) bool {
+	have, want := strings.SplitN(version, ".", 3), strings.SplitN(min, ".", 2)
+	for i := range want {
+		if i >= len(have) {
+			return false
+		}
+		h, err := strconv.Atoi(have[i])
+		w, _ := strconv.Atoi(want[i])
+		if err != nil || h < w {
+			return false
+		}
+		if h > w {
+			return true
+		}
+	}
+	return true
+}
 
 // pnpmCmd is how to run pnpm: the program, the arguments that precede pnpm's
 // own, and the version that will run.
@@ -43,7 +65,7 @@ func findPnpm(sys System) (pnpmCmd, error) {
 		if err != nil {
 			failed = strings.TrimSpace(out)
 		}
-		if major, _ := strconv.Atoi(strings.SplitN(have, ".", 2)[0]); err == nil && major >= pnpmMajor {
+		if err == nil && atLeast(have, pnpmMin) {
 			return pnpmCmd{name: "pnpm", version: have}, nil
 		}
 	}
@@ -54,9 +76,9 @@ func findPnpm(sys System) (pnpmCmd, error) {
 		return pnpmCmd{}, fmt.Errorf("`pnpm --version` failed: %s — fix pnpm, or install Node so ipm can run %s through npx", failed, pnpmPinned)
 	}
 	if have != "" {
-		return pnpmCmd{}, fmt.Errorf("ipm needs pnpm %d or later (found %s) — upgrade it (`npm i -g pnpm@%d`), or install Node so ipm can run %s through npx", pnpmMajor, have, pnpmMajor, pnpmPinned)
+		return pnpmCmd{}, fmt.Errorf("ipm needs pnpm %s or later (found %s) — upgrade it (`npm i -g %s`), or install Node so ipm can run it through npx", pnpmMin, have, pnpmPinned)
 	}
-	return pnpmCmd{}, fmt.Errorf("ipm fetches sources with pnpm %d or later — install it (https://pnpm.io/installation) or Node (so ipm can run %s through npx)", pnpmMajor, pnpmPinned)
+	return pnpmCmd{}, fmt.Errorf("ipm fetches sources with pnpm %s or later — install it (https://pnpm.io/installation) or Node (so ipm can run %s through npx)", pnpmMin, pnpmPinned)
 }
 
 // pnpmfile is written into the sources project on every sync, and into the

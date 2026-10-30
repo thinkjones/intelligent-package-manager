@@ -55,7 +55,7 @@ depends = ["verify"]
 [tasks."ci:integration"]
 description = "CI job integration: asserts the tools reached the runner, then test:integration"
 run = [
-  'test "$(pnpm --version)" = 12.10.1 || { echo "ci:integration: pnpm 12.10.1 is required" >&2; exit 1; }',
+  'test "$(pnpm --version)" = 12.16.1 || { echo "ci:integration: pnpm 12.16.1 is required" >&2; exit 1; }',
   'node --version >/dev/null || { echo "ci:integration: node is required" >&2; exit 1; }',
   'docker info >/dev/null || { echo "ci:integration: a running Docker is required" >&2; exit 1; }',
   "mise run test:integration",
@@ -83,7 +83,7 @@ actionlint = "1.7.12"
 go = "1.26.9"
 golangci-lint = "2.14.0"
 node = "24.21.0"
-pnpm = "12.10.1"
+pnpm = "12.16.1"
 shellcheck = "0.11.0"
 shfmt = "3.14.1"
 

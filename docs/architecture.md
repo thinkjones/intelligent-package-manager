@@ -63,7 +63,7 @@ Nothing is kept in the directory `ipm` runs from, so every command works anywher
 
 ## `ipm catalog sync`
 
-1. Find pnpm (`internal/cli/pnpm.go`): pnpm from PATH if its major version is 12 or more, else `npx -y pnpm@12.10.1`; with neither, an error naming pnpm.
+1. Find pnpm (`internal/cli/pnpm.go`): pnpm from PATH if it is 12.16 or later, else `npx -y pnpm@12.16.1`; with neither, an error naming pnpm.
 2. Write `sources/.pnpmfile.cjs`.
 3. Run `pnpm install` (with `--upgrade`, `pnpm update --latest`) with `--ignore-scripts --store-dir <home>/store --dir <home>/sources`.
 4. If pnpm fails, print its output and exit 1; the catalog is left as it was. Otherwise run `ipm catalog rebuild`'s indexing step, which also loads the search index when the search server is up (and prints a hint to run `ipm catalog serve` when it is not).

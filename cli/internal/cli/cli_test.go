@@ -203,7 +203,7 @@ func TestUsageErrors(t *testing.T) {
 func TestDoctorRows(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
 	f.run("catalog", "sync")
 	f.out.Reset()
@@ -211,7 +211,7 @@ func TestDoctorRows(t *testing.T) {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	out := f.out.String()
-	for _, want := range []string{"✓ home", "✓ cache", "✓ pnpm", "12.10.1", "✓ sources", "1 synced", "✓ pinned", "none yet", "✓ catalog", "! docker", "! typesense", "! claude", "0 problem(s)"} {
+	for _, want := range []string{"✓ home", "✓ cache", "✓ pnpm", "12.16.1", "✓ sources", "1 synced", "✓ pinned", "none yet", "✓ catalog", "! docker", "! typesense", "! claude", "0 problem(s)"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("doctor missing %q:\n%s", want, out)
 		}
@@ -1011,7 +1011,7 @@ func TestSourceImport(t *testing.T) {
 func TestSyncRunsPnpmThenIndexes(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {".claude-plugin/plugin.json": `{"name":"p"}`, "skills/one/SKILL.md": "---\nname: one\n---\n"}})
 	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
@@ -1031,7 +1031,7 @@ func TestSyncRunsPnpmThenIndexes(t *testing.T) {
 func TestSyncUpgrade(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
 	f.run("catalog", "sync", "--upgrade")
 	if !strings.HasPrefix(callWith(f, "pnpm update"), "pnpm update --latest --ignore-scripts") {
@@ -1042,7 +1042,7 @@ func TestSyncUpgrade(t *testing.T) {
 func TestSyncPnpmFailureKeepsCatalog(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
 	cat := filepath.Join(f.env["IPM_CACHE_DIR"], "catalog", "skills.jsonl")
 	write(t, cat, "old\n")
@@ -1062,7 +1062,7 @@ func TestSyncNeedsPnpmAndSources(t *testing.T) {
 		t.Errorf("no pnpm: %v", err)
 	}
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	if err := f.run("catalog", "sync"); err == nil || !strings.Contains(err.Error(), "ipm marketplace add") {
 		t.Errorf("no sources: %v", err)
 	}
@@ -1096,7 +1096,7 @@ func TestScanSources(t *testing.T) {
 func TestSyncWritesPnpmfile(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "x"}})
 	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatal(err)
@@ -1118,7 +1118,7 @@ func TestSyncFallsBackToNpxForOldPnpm(t *testing.T) {
 	if err := f.run("catalog", "sync"); err != nil {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
-	if !strings.HasPrefix(callWith(f, "npx "), "npx -y pnpm@12.10.1 install --no-frozen-lockfile --ignore-scripts") {
+	if !strings.HasPrefix(callWith(f, "npx "), "npx -y pnpm@12.16.1 install --no-frozen-lockfile --ignore-scripts") {
 		t.Errorf("calls %v", f.calls)
 	}
 	f = newFake(checkout(t))
@@ -1144,12 +1144,30 @@ func TestServeRemovesLegacyContainer(t *testing.T) {
 	}
 }
 
+func TestFindPnpmNeedsGitFetcherFix(t *testing.T) {
+	f := newFake(checkout(t))
+	f.onPath["pnpm"], f.onPath["npx"] = true, true
+	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	pn, err := findPnpm(f.system())
+	if err != nil || pn.name != "npx" || pn.String() != "npx -y pnpm@12.16.1" {
+		t.Errorf("pnpm 12.10 should fall back to npx: %+v %v", pn, err)
+	}
+	f.onPath["npx"] = false
+	if _, err := findPnpm(f.system()); err == nil || !strings.Contains(err.Error(), "12.16 or later (found 12.10.1)") {
+		t.Errorf("got %v", err)
+	}
+	f.results["pnpm --ve"] = result{"13.0.0\n", nil}
+	if pn, err := findPnpm(f.system()); err != nil || pn.name != "pnpm" {
+		t.Errorf("pnpm 13 should be used: %+v %v", pn, err)
+	}
+}
+
 func TestFindPnpmIgnoresWarnings(t *testing.T) {
 	f := newFake(checkout(t))
 	f.onPath["pnpm"], f.onPath["npx"] = true, true
-	f.results["pnpm --ve"] = result{"WARN corepack is enabled\n12.3.0\n", nil}
+	f.results["pnpm --ve"] = result{"WARN corepack is enabled\n12.16.0\n", nil}
 	pn, err := findPnpm(f.system())
-	if err != nil || pn.name != "pnpm" || pn.version != "12.3.0" {
+	if err != nil || pn.name != "pnpm" || pn.version != "12.16.0" {
 		t.Errorf("got %+v %v", pn, err)
 	}
 	f.results["pnpm --ve"] = result{"boom", errors.New("exit 1")}
@@ -1311,7 +1329,7 @@ func installFake(t *testing.T) (*fake, string) {
 	t.Helper()
 	f, root := packFake(t)
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	f.results["git conf"] = result{"Ada\n", nil}
 	write(t, filepath.Join(cacheOf(root), "catalog", "agents.jsonl"), `{"id":"agent:o/r:p/agents/rev.md","type":"agent","name":"reviewer","repo":"o/r","commit":"c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1","path":"p/agents/rev.md","plugins":["plugin:o/r:p"]}`+"\n")
 	write(t, filepath.Join(pinnedRepo(f, "o--r", installSHA), "p", "skills", "s1", "SKILL.md"), "---\nname: s1\n---\n")
@@ -2375,7 +2393,7 @@ func syncFake(t *testing.T) *fake {
 	t.Helper()
 	f := newFake(checkout(t))
 	f.onPath["pnpm"] = true
-	f.results["pnpm --ve"] = result{"12.10.1\n", nil}
+	f.results["pnpm --ve"] = result{"12.16.1\n", nil}
 	withSources(t, f, map[string]map[string]string{"o/r": {"skills/one/SKILL.md": "---\nname: one\n---\n"}})
 	return f
 }

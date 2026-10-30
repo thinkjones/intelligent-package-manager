@@ -36,7 +36,7 @@ ipm install claude my-pack
 
 Or, to build without installing, `ipm pack build`; a bare `ipm install` replays the installs recorded in `ipm.toml`.
 
-They need `ipm`, but not your sources or your catalog: `ipm pack build` builds from `ipm.toml` and `.ipm/ipm.lock` alone, so they get the same items at exactly the commits in the lock. Repos come from their own home: their synced sources when they are at the locked commits, else `$IPM_HOME/pinned`, which needs pnpm 12+ (or Node) the first time a commit is fetched.
+They need `ipm`, but not your sources or your catalog: `ipm pack build` builds from `ipm.toml` and `.ipm/ipm.lock` alone, so they get the same items at exactly the commits in the lock. Repos come from their own home: their synced sources when they are at the locked commits, else `$IPM_HOME/pinned`, which needs pnpm 12.16+ (or Node) the first time a commit is fetched.
 
 {: .note }
 Two things in the build come from the person running it: the plugin and marketplace owner (their `git config user.name`) and the marketplace name (`<project folder>-ipm`). A teammate's build can therefore show a small diff in `.ipm/.claude-plugin/marketplace.json`; the plugin content is the same. Cloning into a folder with the same name keeps the `/plugin install` command the same for everyone.

@@ -16,8 +16,8 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 
 | Message | Cause and fix |
 | --- | --- |
-| `ipm fetches sources with pnpm 12 or later …` | Neither pnpm nor `npx` is on your `PATH`. Install pnpm 12+ or Node. |
-| `ipm needs pnpm 12 or later (found …)` | Your pnpm is too old and `npx` is missing. Upgrade pnpm, or install Node so `ipm` can run pnpm 12 through `npx`. |
+| `ipm fetches sources with pnpm 12.16 or later …` | Neither pnpm nor `npx` is on your `PATH`. Install pnpm 12.16+ or Node. |
+| `ipm needs pnpm 12.16 or later (found …)` | Your pnpm is too old and `npx` is missing. Upgrade pnpm, or install Node so `ipm` can run pnpm 12.16 through `npx`. |
 | `IPM_HOME must be an absolute path` | Set `IPM_HOME` (or `IPM_CACHE_DIR`) to an absolute path, or unset it. |
 | `ipm is built with Go — install it from https://go.dev/dl, then rerun this script` | `install.sh` needs Go. Install it and run the script again. |
 | `! … is not on your PATH — add this line to …` | The folder `install.sh` installed into (`~/.local/bin`, or `$IPM_BIN_DIR`) isn't on your `PATH`. Add the `export PATH=…` line it prints to that file, then open a new shell. |
@@ -65,7 +65,9 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `… is not owner/repo or a git URL` | Use `owner/repo[@ref]`, or a URL starting `https://`, `ssh://`, `file://` or `git@`. |
 | `no plugin plugin:… in the catalog — run ipm catalog rebuild` | That plugin ID isn't in your catalog. Check it with `ipm search --type plugin`. |
 | `gh is not logged in` | Run `gh auth login`, then `ipm marketplace stats`. |
-| A non-GitHub source is missing files | pnpm applies npm's packing rules (`files`, `.npmignore`) to non-GitHub git sources. A known limitation: use a GitHub mirror if there is one. |
+| `ERR_PNPM_GIT_FETCHER_IO` … `Is a directory (os error 21)` | pnpm older than 12.16 fetched a private or non-GitHub repo that holds a symlink to a directory. Upgrade pnpm on your `PATH` to 12.16 or later, or remove the old one so `ipm` runs `npx -y pnpm@12.16.1`. |
+| A private GitHub repo fails to fetch | pnpm clones it with your git credentials. Check that `git ls-remote https://github.com/<owner>/<repo>` works for you. |
+| A non-GitHub or private source is missing files | pnpm applies npm's packing rules (`files`, `.npmignore`) to git sources that aren't public GitHub repos, and skips symlinks to directories. A known limitation: use a public GitHub mirror if there is one. |
 
 ## Search
 
