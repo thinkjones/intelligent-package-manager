@@ -79,6 +79,8 @@ items = [
 - **Whole plugins** become dependencies of the pack. They keep their own name, hooks and MCP servers, and Claude Code installs them with the pack.
 - **Hooks, MCP servers and inline commands** can't be picked on their own; they come with their plugin. `ipm pack add` tells you which plugin to add instead.
 
+`ipm install muse` installs the same pack into Muse Code, which reads Claude Code plugins but not their dependencies: ipm installs the pack's plugin and then each whole plugin from its own repo at the locked commit.
+
 `ipm install gascity` writes the same pack as a Gas City pack folder instead: skills, agents and the MCP servers of whole plugins you picked. Gas City has no slash commands or hooks, so those are skipped with a warning. ipm writes the folder and prints how to import it; it reads and edits no Gas City config.
 
 ## Scopes
@@ -99,4 +101,4 @@ Because the lock and pnpm's pins are committed, anyone with `ipm` can rebuild th
 - **Run upstream code.** pnpm runs with `--ignore-scripts`, and sources' npm dependencies are never installed.
 - **Modify upstream repos.** Picked files are hard-linked (or copied) from pnpm's fetched copy.
 - **Edit a Gas City city.** `ipm install gascity` writes a pack folder (in `.ipm/.gascity` unless you point it elsewhere) and prints the `[imports]` table to paste into the city's `pack.toml` or `city.toml`; ipm never edits a city.
-- **Install into Claude Code on its own.** Building writes only `.ipm/`; `ipm install claude` (or an install from the TUI's Packs or Installs tab) installs a pack, at the scope you choose, only when you ask. Each install is recorded (in the pack's `[[packs.<name>.installs]]` table in `ipm.toml`, or in `$IPM_HOME/installs.json` for user-scope packs), and a bare `ipm install` replays them.
+- **Install into Claude Code or Muse Code on its own.** Building writes only `.ipm/`; `ipm install claude` or `ipm install muse` (or an install from the TUI's Packs or Installs tab) installs a pack, at the scope you choose, only when you ask. Each install is recorded (in the pack's `[[packs.<name>.installs]]` table in `ipm.toml`, or in `$IPM_HOME/installs.json` for user-scope packs), and a bare `ipm install` replays them.

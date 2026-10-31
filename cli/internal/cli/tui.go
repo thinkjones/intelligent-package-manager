@@ -442,7 +442,7 @@ func strList(v any) []string {
 }
 
 // tuiInstaller installs the scope's packs with the code behind ipm install
-// claude and ipm install gascity.
+// claude, gascity and muse.
 type tuiInstaller struct {
 	sys   System
 	scope project.Scope
@@ -460,6 +460,9 @@ func (in tuiInstaller) scopeFor(global bool) (project.Scope, error) {
 }
 
 func (in tuiInstaller) Default(pack, kind string) tui.Target {
+	if kind == "muse" {
+		return tui.Target{Kind: kind, Global: in.scope.Global}
+	}
 	if kind == "gascity" {
 		return tui.Target{Kind: kind, Path: gascityDefault(in.sys, in.scope), Name: pack, Global: in.scope.Global}
 	}
@@ -533,6 +536,20 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 			line += " -g"
 		}
 		return tui.Target{Kind: "gascity", Path: dir, Name: name, Global: t.Global}, []string{line}, nil
+	case "muse":
+		if err := needMuse(in.sys); err != nil {
+			return t, nil, err
+		}
+		if _, err := pickPack(scope, "muse", pack); err != nil {
+			return t, nil, err
+		}
+		// The whole plugins' folders are known only after the build, so the
+		// plan is the one command that builds and installs them.
+		line := "ipm install muse " + shellQuote(pack)
+		if t.Global {
+			line += " -g"
+		}
+		return tui.Target{Kind: "muse", Global: t.Global}, []string{line}, nil
 	}
 	return t, nil, fmt.Errorf("can't install to %q — use %s", t.Kind, targetNames())
 }

@@ -159,7 +159,10 @@ func SavePacks(root string, packs []Pack) error {
 		}
 		b.WriteString("]\n")
 		for _, in := range p.Installs {
-			fmt.Fprintf(&b, "\n[[packs.%s.installs]]\ntarget = %q\npath = %q\n", tomlKey(p.Name), in.Target, in.Path)
+			fmt.Fprintf(&b, "\n[[packs.%s.installs]]\ntarget = %q\n", tomlKey(p.Name), in.Target)
+			if in.Path != "" {
+				fmt.Fprintf(&b, "path = %q\n", in.Path)
+			}
 			if in.Scope != "" {
 				fmt.Fprintf(&b, "scope = %q\n", in.Scope)
 			}

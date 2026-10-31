@@ -94,6 +94,31 @@ func TestInstallFormGascityFlow(t *testing.T) {
 	}
 }
 
+func TestInstallFormMuseFlow(t *testing.T) {
+	m, f := formModel(t)
+	f.in.plan = []string{"ipm install muse kit"}
+	press(t, m, "down", "down", "enter")
+	v := view(m)
+	if m.form.step != formConfirm {
+		t.Fatalf("muse goes straight to confirm: step %v\n%s", m.form.step, v)
+	}
+	for _, want := range []string{"Install kit to Muse Code", "ipm install muse kit", "y install · esc cancel"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("confirm lacks %q:\n%s", want, v)
+		}
+	}
+	if want := (Target{Kind: "muse"}); f.in.planned[0] != want {
+		t.Errorf("planned %+v, want %+v", f.in.planned[0], want)
+	}
+	press(t, m, "y")
+	if v := view(m); !strings.Contains(v, "✓ installed kit (muse)") {
+		t.Errorf("modal:\n%s", v)
+	}
+	if m.inst.command != "ipm install muse kit" {
+		t.Errorf("the run shows the confirmed command, got %q", m.inst.command)
+	}
+}
+
 func TestInstallFormGascityNameFallsBackToPack(t *testing.T) {
 	m, f := formModel(t)
 	press(t, m, "down", "enter")

@@ -251,7 +251,7 @@ type fakeInstaller struct {
 	listCalls      int
 }
 
-func (f *fakeInstaller) Targets() []string                { return []string{"claude", "gascity"} }
+func (f *fakeInstaller) Targets() []string                { return []string{"claude", "gascity", "muse"} }
 func (f *fakeInstaller) Default(pack, kind string) Target { return f.def }
 func (f *fakeInstaller) List(global bool) ([]Install, error) {
 	f.listCalls++

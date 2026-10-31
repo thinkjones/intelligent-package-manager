@@ -15,7 +15,7 @@ type formStep int
 
 const (
 	formPack   formStep = iota // which pack, when none was preset
-	formTarget                 // claude or gascity
+	formTarget                 // claude, gascity or muse
 	formScope                  // claude: user, project or local
 	formFolder                 // claude: the project folder
 	formConfirm
@@ -32,11 +32,12 @@ var claudeScopes = [][2]string{
 var targetHelp = map[string]string{
 	"claude":  "Claude Code, as a plugin",
 	"gascity": "a Gas City pack folder",
+	"muse":    "Muse Code, as plugins",
 }
 
 // installForm is the install form before it runs: pick a target, where it
-// goes (claude only: gascity goes to its default folder), then confirm the
-// commands.
+// goes (claude only: gascity goes to its default folder, and muse has one
+// set of plugins per user), then confirm the commands.
 type installForm struct {
 	pack    string
 	global  bool     // the pack is of the user scope, installed from a project
@@ -122,7 +123,7 @@ func (m *Model) formKey(msg keyMsg) tea.Cmd {
 	case formConfirm:
 		if k == "y" && !f.refused {
 			pack, t, command := f.pack, f.target, installCommand(f.pack, f.target)
-			if t.Kind == "gascity" && len(f.plan) == 1 {
+			if (t.Kind == "gascity" || t.Kind == "muse") && len(f.plan) == 1 {
 				// Its plan is the one command the user confirmed.
 				command = f.plan[0]
 			}
@@ -150,10 +151,14 @@ func (f *installForm) move(k string, n int) bool {
 // chooseKind takes the target kind and opens its first step, prefilled from
 // the installer's default. Gascity has no steps: it plans the default name
 // with no folder, which the installer reads as the default folder of the
-// pack's own scope, and goes to confirm.
+// pack's own scope, and goes to confirm. Muse has no steps either.
 func (m *Model) chooseKind(kind string) {
 	f := m.form
 	def := m.d.Installer.Default(f.pack, kind)
+	if kind == "muse" {
+		m.planForm(Target{Kind: "muse", Global: f.global})
+		return
+	}
 	if kind == "gascity" {
 		name := def.Name
 		if name == "" {
@@ -211,10 +216,12 @@ func (m *Model) reinstall(in Install) {
 	f.target, f.plan = cleaned, plan
 }
 
-// describe is a target as people read it: "claude user", "claude project /work"
-// or "gascity /work/kit".
+// describe is a target as people read it: "claude user", "claude project
+// /work", "gascity /work/kit" or "muse".
 func describe(t Target) string {
 	switch {
+	case t.Kind == "muse":
+		return "muse"
 	case t.Kind == "gascity":
 		return "gascity " + filepath.Join(t.Path, t.Name)
 	case t.Scope == "user":
@@ -226,9 +233,11 @@ func describe(t Target) string {
 // installCommand is the ipm command that installs pack at t.
 func installCommand(pack string, t Target) string {
 	parts := []string{"ipm install", t.Kind, quote(pack)}
-	if t.Kind == "gascity" {
+	switch t.Kind {
+	case "muse": // one set of plugins per user: nothing to name
+	case "gascity":
 		parts = append(parts, "-C", quote(t.Path), "--name", quote(t.Name))
-	} else {
+	default:
 		parts = append(parts, "--scope", t.Scope)
 		if t.Path != "" {
 			parts = append(parts, "--path", quote(t.Path))
@@ -306,6 +315,8 @@ func (m *Model) formLines(w, rows int) []string {
 			head = "Reinstall " + f.pack
 		} else if f.target.Kind == "gascity" {
 			head += "Gas City — " + filepath.Join(f.target.Path, f.target.Name)
+		} else if f.target.Kind == "muse" {
+			head += "Muse Code"
 		} else {
 			head += "Claude Code — " + f.target.Scope + " scope"
 			if f.target.Path != "" {
