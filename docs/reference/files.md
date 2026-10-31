@@ -85,7 +85,7 @@ path = "."
 scope = "project"
 ```
 
-`target` is `claude` or `gascity`; for `claude`, `scope` is `user`, `project` or `local`; `path` is the folder for project or local scope, stored relative to the project when it is inside it. Installing the same pack to the same target, path and scope again replaces its table; project and local scope at one folder are two tables. A user-scope pack's installs are kept in `$IPM_HOME/installs.json` instead: a JSON array of `{pack, target, path, scope, name}` objects sorted by pack, target, path and scope, with absolute paths.
+`target` is `claude`, `gascity` or `muse`; for `claude`, `scope` is `user`, `project` or `local`; `path` is the folder for project or local scope, stored relative to the project when it is inside it. Installing the same pack to the same target, path and scope again replaces its table; project and local scope at one folder are two tables. A user-scope pack's installs are kept in `$IPM_HOME/installs.json` instead: a JSON array of `{pack, target, path, scope, name}` objects sorted by pack, target, path and scope, with absolute paths.
 
 `ipm install gascity` records the folder it wrote into and the pack folder's name, with no scope:
 
@@ -97,6 +97,13 @@ name = "csharp-sdlc"
 ```
 
 The pack folder is `<path>/<name>`. A `gascity` record in `installs.json` has the same `target`, `path` and `name`, with an absolute `path`: the project's `.ipm/.gascity` by default, since `ipm install gascity -g` writes user-scope packs into the project it runs in. Installing the same pack to the same folder and name again replaces its record.
+
+`ipm install muse` records only the target, since Muse Code keeps one set of plugins per user:
+
+```toml
+[[packs.csharp-sdlc.installs]]
+target = "muse"
+```
 
 ## `.ipm/ipm.lock`
 

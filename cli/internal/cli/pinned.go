@@ -21,6 +21,12 @@ var pinnedSHA = regexp.MustCompile(`#([0-9a-f]{40})$`)
 // lock, for the pins neither holds; a failed run prints pnpm's output and
 // exits 1.
 func repoFolders(sys System, repos map[string]string) (map[string]string, error) {
+	return findRepoFolders(sys, repos, true)
+}
+
+// findRepoFolders is repoFolders; without fetch it runs no pnpm and names a
+// pin not fetched yet by its place in the pin store.
+func findRepoFolders(sys System, repos map[string]string, fetch bool) (map[string]string, error) {
 	p, err := ipmPaths(sys)
 	if err != nil {
 		return nil, err
@@ -55,6 +61,16 @@ func repoFolders(sys System, repos map[string]string) (map[string]string, error)
 	fetched := func(key string) (string, bool) {
 		dir, err := filepath.EvalSymlinks(filepath.Join(store, "node_modules", key))
 		return dir, err == nil
+	}
+	if !fetch {
+		for alias, key := range keys {
+			if dir, ok := fetched(key); ok {
+				out[alias] = dir
+			} else {
+				out[alias] = filepath.Join(store, "node_modules", key)
+			}
+		}
+		return out, nil
 	}
 	missing := func() map[string]string {
 		m := map[string]string{}

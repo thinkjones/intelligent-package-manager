@@ -1,6 +1,6 @@
 # ipm
 
-The Go CLI. Every command is Go code in this module; it keeps its data in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), installs into Claude Code only on `ipm install claude`, is separate from fsh, and writes Gas City pack folders on `ipm install gascity` but reads and edits no Gas City config. For using it see [the documentation](https://thinkjones.github.io/intelligent-package-manager/) (source in [`docs/`](../docs/)); for the design see [how it works](../docs/architecture.md).
+The Go CLI. Every command is Go code in this module; it keeps its data in `IPM_HOME` and `IPM_CACHE_DIR` (plus `ipm.toml` and `.ipm/` in a project), installs into Claude Code only on `ipm install claude` and into Muse Code only on `ipm install muse`, is separate from fsh, and writes Gas City pack folders on `ipm install gascity` but reads and edits no Gas City config. For using it see [the documentation](https://thinkjones.github.io/intelligent-package-manager/) (source in [`docs/`](../docs/)); for the design see [how it works](../docs/architecture.md).
 
 ## Usage
 

@@ -165,7 +165,7 @@ func TestBareInstallNothingRecorded(t *testing.T) {
 	f, _ := claudeFake(t)
 	err := f.run("install")
 	var usage *UsageError
-	want := "install: say claude or gascity — nothing is recorded for this scope yet. Try `ipm help install`."
+	want := "install: say claude, gascity or muse — nothing is recorded for this scope yet. Try `ipm help install`."
 	if !errors.As(err, &usage) || err.Error() != want {
 		t.Errorf("got %v", err)
 	}
@@ -178,7 +178,7 @@ func TestBareInstallUnknownTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	err := f.run("install")
-	if err == nil || !strings.Contains(err.Error(), "kit → zed "+root+`: unknown target "zed" (use claude or gascity)`) ||
+	if err == nil || !strings.Contains(err.Error(), "kit → zed "+root+`: unknown target "zed" (use claude, gascity or muse)`) ||
 		!strings.Contains(err.Error(), "ipm.toml ("+filepath.Join(root, project.File)+")") {
 		t.Errorf("got %v", err)
 	}

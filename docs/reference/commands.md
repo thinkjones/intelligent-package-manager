@@ -261,6 +261,7 @@ Repos come from your home, not the project. A repo whose synced source (`$IPM_HO
 ```text
 ipm install claude [pack] [--scope user|project|local] [--path DIR] [-g] [--update] [--dry-run]
 ipm install gascity [pack] [-C DIR] [--name NAME] [-g] [--force] [--update] [--dry-run]
+ipm install muse [pack] [-g] [--update] [--dry-run]
 ipm install [-g]
 ```
 
@@ -319,9 +320,31 @@ Import it into a city's pack.toml or city.toml:
   source = "<folder>"
 ```
 
+#### `ipm install muse`
+
+`ipm install muse` installs `pack` into [Muse Code](https://dev.meta.ai/docs/muse-code/extending). `pack` may be left out when the scope has only one. Like `install claude` it builds first unless the build is current, prints each `muse` command before running it, and records the install (`target = "muse"`, nothing else). Muse Code keeps one set of plugins per user, so there is no scope or folder: a project pack installed into Muse is in every project. `ipm pack install muse` is the same command. Needs `muse` on your `PATH`.
+
+Muse Code reads the pack's plugin, `.ipm/plugins/<pack>`, as a Claude Code plugin, but it doesn't install plugin dependencies, which is how a pack carries the whole plugins you picked. So ipm installs each whole plugin itself, from its own folder: the repo at the commit in `.ipm/ipm.lock`, from your synced sources, else fetched into `$IPM_HOME/pinned`. A plugin defined in another repo (say `"source": {"source": "url", …}` in its marketplace entry) is fetched from the repo and commit that entry names. The commands it runs are `muse plugins install <folder>`, the pack first; installing again replaces each plugin with the new folder. If Muse refuses the pack, the install stops and nothing is recorded. If it refuses a whole plugin (Muse checks manifests more strictly than Claude Code), ipm prints `✗ <id>: …` and goes on with the others, records the install, and exits 1 with `installed <pack> (muse), but N of M whole plugins failed: <ids> — muse's output above says why`.
+
+| Flag | Does |
+| --- | --- |
+| `-g`, `--global` | Install a pack from your user scope. |
+| `--update` | Re-pin every item to your current catalog and rebuild first. |
+| `--dry-run` | Print the `muse` commands without building, fetching, running or recording anything. Needs a current build: `--dry-run needs a current build — run ipm pack build first`. Can't be combined with `--update` (usage error, exit 2: `install muse: --dry-run and --update can't be used together`). |
+
+Some whole plugins can't be installed this way; ipm skips them and prints each as a warning:
+
+| Message | Meaning |
+| --- | --- |
+| `skipped <id>: its upstream entry names no commit, so ipm can't fetch a fixed copy` | The plugin's marketplace entry points at another repo without a commit (`sha`, or a 40-character `ref`). |
+| `skipped <id>: its source is "<kind>", which Muse Code can't get from git` | The entry's source is not `github`, `url` or `git-subdir` (an `npm` package, say). |
+| `skipped <id>: its folder has no plugin manifest (its marketplace entry defines it), which Muse Code can't install` | An inline plugin: its marketplace entry defines it, and its folder has no `.claude-plugin/plugin.json`, `.muse-plugin/plugin.json` or `.codex-plugin/plugin.json`. |
+
+Muse prints its own warnings too: that the pack's `dependencies` (and `author`) are not imported, and that a third-party plugin's hooks need review before they run (`muse plugins approve <plugin>`). Skills are active as soon as a plugin is installed. Removing a whole plugin from a pack doesn't remove it from Muse: use `muse plugins remove <id>`.
+
 #### Replay recorded installs
 
-Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `claude` or `gascity` is a usage error. Before running anything it checks every record's target: a record of a target this ipm doesn't know is reported as `<pack> → <target> …: unknown target`, and nothing is installed. A `gascity` record whose folder is `<root>/.ipm/.gascity`, for a `<root>` folder that exists (a project, a folder you ran `ipm install gascity -g` in, or `$IPM_HOME/global`, where ipm wrote user-scope packs before), recreates that folder when it is gone. A record that fails (a stale one whose folder was deleted, say) doesn't stop the others: its error is printed as `✗ <pack> → <target> <scope or name> <path>: <error>`, and the replay ends with exit 1 and `✗ N of M recorded installs failed; if a record is stale, remove it from <file>`, where the file is `ipm.toml` for a project or `$IPM_HOME/installs.json` with `-g`, each with its path. There is no command to forget a record: delete it from that file.
+Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `claude`, `gascity` or `muse` is a usage error. Before running anything it checks every record's target: a record of a target this ipm doesn't know is reported as `<pack> → <target> …: unknown target`, and nothing is installed. A `gascity` record whose folder is `<root>/.ipm/.gascity`, for a `<root>` folder that exists (a project, a folder you ran `ipm install gascity -g` in, or `$IPM_HOME/global`, where ipm wrote user-scope packs before), recreates that folder when it is gone. A record that fails (a stale one whose folder was deleted, say) doesn't stop the others: its error is printed as `✗ <pack> → <target> <scope or name> <path>: <error>`, and the replay ends with exit 1 and `✗ N of M recorded installs failed; if a record is stale, remove it from <file>`, where the file is `ipm.toml` for a project or `$IPM_HOME/installs.json` with `-g`, each with its path. There is no command to forget a record: delete it from that file.
 
 ## Tools
 

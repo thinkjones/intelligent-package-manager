@@ -364,7 +364,7 @@ func TestReplayInstallsGascity(t *testing.T) {
 func TestInstallTargetsHelp(t *testing.T) {
 	f, _ := claudeFake(t)
 	err := f.run("install", "bogus")
-	if err == nil || !strings.Contains(err.Error(), "claude or gascity") {
+	if err == nil || !strings.Contains(err.Error(), "claude, gascity or muse") {
 		t.Errorf("got %v", err)
 	}
 }

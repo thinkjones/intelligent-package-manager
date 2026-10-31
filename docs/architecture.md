@@ -164,7 +164,7 @@ Two runs give byte-identical output, and items removed from a pack leave no file
 | `Catalog` | `catgraph`: `Node(id)` with its fields, stars, and parents and children with their descriptions. |
 | `Packs` | `createPack`, `addToPack`, `removeFromPack`: the functions behind `ipm pack`, so the same pick rules apply; `List` reads the scope's packs with their build state and recorded installs, and the global packs too when asked. |
 | `Builder` | `runBuild` (`ipm pack build`) with its output piped into the modal line by line. |
-| `Installer` | `claudeDefaults`, `cleanTarget`, `planDeploy` and the `installers` table (`installClaude`, `installGascity`): the code behind `ipm install claude` and `ipm install gascity`; `List` is `tuiInstalls`, the recorded installs. |
+| `Installer` | `claudeDefaults`, `cleanTarget`, `planDeploy` and the `installers` table (`installClaude`, `installGascity`, `installMuse`): the code behind `ipm install claude`, `ipm install gascity` and `ipm install muse`; `List` is `tuiInstalls`, the recorded installs. |
 | `Marketplace` | The curated lists (`curated.Fetch`, `curated.Parse`) with the followed sources and the catalog's item counts; `sourceAdd` and `sourceRemove` follow and unfollow; `runSync` is `ipm catalog sync`. |
 
 Global packs and installs, listed from a project on request, are read-only there: changing them needs `ipm tui -g`. The TUI reads the catalog and the search index once, so after a sync from the Marketplace tab it asks you to restart.

@@ -133,11 +133,15 @@ scope = "project"
 target = "gascity"
 path = "city/packs/kit"
 name = "kit"
+
+[[packs.kit.installs]]
+target = "muse"
 `
 
 var installsPacks = []Pack{{Name: "kit", Description: "My kit", Items: []string{"skill:o/r:skills/a"}, Installs: []Install{
 	{Target: "claude", Path: ".", Scope: "project"},
 	{Target: "gascity", Path: "city/packs/kit", Name: "kit"},
+	{Target: "muse"},
 }}}
 
 func TestLoadPacksWithInstalls(t *testing.T) {

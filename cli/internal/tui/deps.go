@@ -111,17 +111,19 @@ type Builder interface {
 }
 
 // Target is where a pack is installed: Kind "claude" (Scope user, project or
-// local; Path the folder for project and local) or "gascity" (Path the parent
+// local; Path the folder for project and local), "gascity" (Path the parent
 // folder, empty for the project's .ipm/.gascity, even for Global; Name the
-// pack folder). Global installs a pack of the user scope.
+// pack folder) or "muse" (nothing else: Muse Code has one set of plugins per
+// user). Global installs a pack of the user scope.
 type Target struct {
 	Kind, Scope, Path, Name string
 	Global                  bool
 }
 
-// Installer installs built packs into Claude Code or as a Gas City pack folder.
+// Installer installs built packs into Claude Code or Muse Code, or as a Gas
+// City pack folder.
 type Installer interface {
-	// Targets are the kinds offered: "claude" and "gascity".
+	// Targets are the kinds offered: "claude", "gascity" and "muse".
 	Targets() []string
 	// Default is the target a pack installs to unless the user picks another.
 	Default(pack, kind string) Target

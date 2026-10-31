@@ -145,6 +145,19 @@ Import it into a city's pack.toml or city.toml:
 
 It builds first unless the build is current, then writes `.ipm/.gascity/csharp-sdlc/` in the project with your skills, agents and MCP servers in Gas City's layout. To write it somewhere else, name an existing folder with `-C`: `ipm install gascity csharp-sdlc -C ~/cities/dev` writes `~/cities/dev/csharp-sdlc/`. Leave out the pack to write every pack of the project, each in its own folder; `-g` writes your user-scope packs into the project's `.ipm/.gascity` the same way. Paste the `[imports]` table into the city's `pack.toml` or `city.toml`: ipm never edits a city. Gas City has no slash commands or hooks, so commands, hooks and plugins whose files live in another repo are skipped with a `skipped …` warning; agent and MCP settings Gas City has no equivalent for are dropped with a warning. `--dry-run` lists the files without writing. Rerun `ipm install gascity` (or a bare `ipm install`) after changing the pack: it replaces its own folder completely. See [the commands reference](../reference/commands.md#ipm-install-gascity) for every message.
 
+## Install into Muse Code
+
+[Muse Code](https://dev.meta.ai/docs/muse-code/extending) reads Claude Code plugins, so the same pack installs there too:
+
+```bash
+ipm install muse csharp-sdlc
+```
+
+It builds first unless the build is current, then runs `muse plugins install` on `.ipm/plugins/csharp-sdlc` and on each whole plugin you picked. Muse doesn't install a plugin's dependencies, so ipm installs the whole plugins itself, from the repo at its locked commit (fetched into `$IPM_HOME/pinned` when your sources aren't at it). Muse keeps one set of plugins per user, so the pack is in every project. A plugin ipm can't fetch at a fixed commit is skipped with a `skipped …` warning. `--dry-run` prints the commands without running them. See [the commands reference](../reference/commands.md#ipm-install-muse).
+
+{: .note }
+Installing changes your Muse Code configuration. To try it first, point `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` at an empty temporary folder.
+
 ## Change a pack
 
 ```bash

@@ -154,6 +154,22 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `install gascity: --name needs a pack — it names one pack folder` | Without a pack, `ipm install gascity` installs every pack, each in a folder of its own name. Name the pack to rename its folder: `ipm install gascity <pack> --name <name>`. |
 | `✗ N of M packs failed` | `ipm install gascity` without a pack installed the others; the `✗ <pack>: …` lines above say why each failed. Fix those and rerun. |
 
+## Install into Muse Code
+
+| Message | Cause and fix |
+| --- | --- |
+| `ipm install muse needs muse (Muse Code) on PATH` | Install Muse Code, or put `muse` on your `PATH`. |
+| `` `muse plugins install <folder>` failed: … `` | Muse refused the pack's own plugin; its output is printed above, and nothing is recorded. Check the folder with `muse plugins validate <folder>`. |
+| `installed <pack> (muse), but N of M whole plugins failed: …` | Muse refused those plugins, often a manifest Claude Code accepts but Muse doesn't (`Claude manifest field `` `skills` `` must be an array`, say). The pack and the other plugins are installed and recorded. Fix the plugin upstream, or remove it from the pack. |
+| `skipped <id>: its upstream entry names no commit, so ipm can't fetch a fixed copy` | The plugin's marketplace entry points at another repo with no commit. Install it in Muse yourself, or pick its skills instead. |
+| `skipped <id>: its source is "…", which Muse Code can't get from git` | The plugin comes from npm or another source ipm doesn't fetch. |
+| `skipped <id>: its folder has no plugin manifest …` | An inline plugin, defined only by its marketplace entry. Pick its skills and agents instead. |
+| `… is pinned at two commits by this pack's plugins — Muse Code can hold only one; drop one of them` | Two whole plugins in the pack read the same repo at different commits. Remove one from the pack, or `ipm pack build --update` to re-pin both to your catalog. |
+| Muse warns that `dependencies` is unsupported, or that a dependency is not installed | Expected: Muse doesn't install plugin dependencies, so ipm installs each whole plugin itself. Muse names the pack's dependency entries (`<pack>-<plugin>`), while the plugins install under their own names. |
+| A plugin's hooks don't run in Muse | Muse runs a third-party plugin's hooks only after you review them: `muse plugins approve <plugin>`. |
+| A plugin removed from a pack is still in Muse | ipm doesn't remove plugins from Muse. Run `muse plugins remove <id>`. |
+| `--dry-run needs a current build — run ipm pack build first` | As for Gas City: `--dry-run` won't build. Run `ipm pack build`, then repeat. |
+
 ## Claude Code
 
 | Symptom | Cause and fix |

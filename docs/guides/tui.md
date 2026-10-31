@@ -209,10 +209,11 @@ Like global packs, global installs listed from a project are read-only: `enter`,
 `i` on Packs, or `a` on Installs, opens the form in place of the tab. Each step shows its keys at the bottom; `enter` goes on, `esc` cancels.
 
 1. **Pack** (only from `a` with several packs): pick one of the scope's packs.
-2. **Target:** `claude` (Claude Code, as a plugin) or `gascity` (a Gas City pack folder).
+2. **Target:** `claude` (Claude Code, as a plugin), `gascity` (a Gas City pack folder) or `muse` (Muse Code, as plugins).
 3. **For `claude`, the scope:** **user** (every project, just you), **project** (a folder, shared through its `.claude/settings.json`) or **local** (a folder, just you). For project and local, then the folder (`~` works). The defaults are those of `ipm install claude`.
 4. **For `gascity`, nothing more:** the form goes straight to confirm, writing to `.ipm/.gascity/<pack>` in the project as `ipm install gascity <pack>` does; a global pack goes there too, as `ipm install gascity <pack> -g` does (with `ipm tui -g`, the project you started it in, else that folder). If `ipm install gascity` would refuse it (say a folder ipm didn't write is in the way, or another pack's install wrote it), the reason shows in red on the target step, before anything runs; pick another target or `esc` to cancel, and use `ipm install gascity -C` or `--name` from the command line for another folder.
-5. **Confirm:** the exact commands it will run, then `y` to install:
+5. **For `muse`, nothing more:** the form goes straight to confirm, showing `ipm install muse <pack>` (`-g` for a global pack), which builds when needed and installs the pack and each whole plugin. Muse Code keeps one set of plugins per user.
+6. **Confirm:** the exact commands it will run, then `y` to install:
 
    ```text
    Install csharp-sdlc to Claude Code — project scope in /work
@@ -226,7 +227,7 @@ The output streams into the modal and ends with `✓ installed csharp-sdlc (clau
 
 An install builds first when `.ipm/` is out of date, so Claude Code gets the current pack. Installing again adds the marketplace again (Claude Code accepts that), refreshes it, and updates the plugin instead of installing it. If Claude Code already has a marketplace of the same name from another folder, two projects in folders with the same name, the install stops rather than repoint it. Claude Code reads an ipm pack straight from `.ipm/plugins/`, so a later build takes effect at the next session or after `/reload-plugins`.
 
-The same works from the command line with [`ipm install claude`](../reference/commands.md#ipm-install) and `ipm install gascity`, and every install is recorded either way, so a bare `ipm install` replays what the Installs tab lists.
+The same works from the command line with [`ipm install claude`](../reference/commands.md#ipm-install), `ipm install gascity` and `ipm install muse`, and every install is recorded either way, so a bare `ipm install` replays what the Installs tab lists.
 
 ## Marketplace
 
