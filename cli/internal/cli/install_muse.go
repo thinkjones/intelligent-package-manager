@@ -91,9 +91,7 @@ func installMuse(sys System, scope project.Scope, pack string, _ project.Install
 			continue
 		}
 		res, err := sys.Output(scope.Root, "muse", args...)
-		if res = strings.TrimSpace(res); res != "" {
-			fmt.Fprintln(out, res)
-		}
+		museOutput(out, res, p.dir)
 		if err == nil {
 			continue
 		}
@@ -113,6 +111,23 @@ func installMuse(sys System, scope project.Scope, pack string, _ project.Install
 		return "", fmt.Errorf("installed %s, but %d of %d whole plugins failed: %s — muse's output above says why", desc, len(failed), len(plugins)-1, strings.Join(failed, ", "))
 	}
 	return desc, nil
+}
+
+// museOutput writes what muse printed for dir to out, without its warnings
+// (one line each, usually about Claude fields it ignores), which it counts.
+func museOutput(out io.Writer, res, dir string) {
+	hidden := 0
+	for line := range strings.Lines(strings.TrimSpace(res)) {
+		switch {
+		case strings.Contains(line, " severity=warning "):
+			hidden++
+		case strings.TrimSpace(line) != "":
+			fmt.Fprintln(out, strings.TrimRight(line, "\n"))
+		}
+	}
+	if hidden > 0 {
+		fmt.Fprintf(out, "%d muse warning(s) hidden — `muse plugins validate %s` shows them\n", hidden, dir)
+	}
 }
 
 // musePlugin is one folder ipm install muse installs: the pack's plugin, or

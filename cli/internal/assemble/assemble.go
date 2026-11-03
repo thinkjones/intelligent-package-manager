@@ -251,7 +251,9 @@ func PinSpec(it project.LockItem) string {
 }
 
 // Build plans each pack. File names are the items' names; a clash within a
-// type gets -<repo owner>, then -2, -3.
+// type gets -<repo owner>, then -2, -3. Skills are the exception: a runtime
+// knows a skill by its name, so a pack keeps the first skill of a name in
+// ipm.toml order and skips the rest with a warning.
 func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error) {
 	plan := Plan{Repos: map[string]string{}}
 	pin := func(it project.LockItem) error {
@@ -272,24 +274,29 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 		pp := PackPlan{Name: p.Name, Description: p.Description}
 		used := map[string]bool{}
 		placed := map[string]bool{}
+		skills := map[string]string{} // skill name → the first item ID with it
 		place := func(it project.LockItem) error {
 			if placed[it.ID] {
 				return nil
 			}
 			placed[it.ID] = true
+			base := FileName(it)
+			if base == "" {
+				return fmt.Errorf("%s has no name usable as a file name", it.ID)
+			}
+			if it.Type == catalog.TypeSkill {
+				if first, dup := skills[base]; dup {
+					plan.Warnings = append(plan.Warnings, p.Name+": "+DuplicateSkill(p.Name, it.ID, base, first))
+					return nil
+				}
+				skills[base] = it.ID
+			}
 			if err := pin(it); err != nil {
 				return err
 			}
 			dir, ext := map[string]string{catalog.TypeSkill: "skills", catalog.TypeAgent: "agents", catalog.TypeCommand: "commands"}[it.Type], ".md"
 			if it.Type == catalog.TypeSkill {
 				ext = ""
-			}
-			base := slug(it.Name)
-			if base == "" {
-				base = slug(strings.TrimSuffix(path.Base(it.Path), ".md"))
-			}
-			if base == "" {
-				return fmt.Errorf("%s has no name usable as a file name", it.ID)
 			}
 			name := uniqueName(used, dir, base, it.Repo, slug)
 			pp.Files = append(pp.Files, Placed{Alias: sources.Alias(it.Repo), From: it.Path, To: dir + "/" + name + ext, Dir: it.Type == catalog.TypeSkill, Item: it})
@@ -345,6 +352,21 @@ func Build(packs []project.Pack, items map[string]project.LockItem) (Plan, error
 		plan.Packs = append(plan.Packs, pp)
 	}
 	return plan, nil
+}
+
+// FileName is the name an item is placed under before clashes: its name, or
+// its file's, lowercased into a file name; empty when neither gives one.
+func FileName(it project.LockItem) string {
+	if base := slug(it.Name); base != "" {
+		return base
+	}
+	return slug(strings.TrimSuffix(path.Base(it.Path), ".md"))
+}
+
+// DuplicateSkill says why pack skips skill id: an earlier item, first, is a
+// skill named name.
+func DuplicateSkill(pack, id, name, first string) string {
+	return fmt.Sprintf("skipped %s: the pack already has a skill named %q (%s), and the first one listed wins — remove one with ipm pack remove %s <id>", id, name, first, pack)
 }
 
 // wholePlugin is a whole-plugin pick as a marketplace entry named

@@ -93,12 +93,15 @@ func TestBuildNamesAndClashes(t *testing.T) {
 	for _, f := range plan.Packs[0].Files {
 		to = append(to, f.To)
 	}
-	want := []string{"skills/code-review", "skills/code-review-mattpocock", "skills/go-expert", "agents/reviewer.md", "commands/ship.md"}
+	want := []string{"skills/code-review", "skills/go-expert", "agents/reviewer.md", "commands/ship.md"}
 	if !reflect.DeepEqual(to, want) {
 		t.Errorf("got  %v\nwant %v", to, want)
 	}
-	if plan.Repos["o--r"] != "github:o/r#"+shaA || plan.Repos["mattpocock--skills"] != "github:mattpocock/skills#"+shaB || len(plan.Repos) != 2 {
-		t.Errorf("repos %v", plan.Repos)
+	if plan.Repos["o--r"] != "github:o/r#"+shaA || len(plan.Repos) != 1 {
+		t.Errorf("a skipped skill's repo is not fetched: %v", plan.Repos)
+	}
+	if len(plan.Warnings) != 1 || !strings.Contains(plan.Warnings[0], "skipped skill:mattpocock/skills:skills/code-review") || !strings.Contains(plan.Warnings[0], "skill:o/r:skills/code-review") {
+		t.Errorf("warnings %v", plan.Warnings)
 	}
 }
 
@@ -369,10 +372,34 @@ func TestBuildFetchesWholePluginRepo(t *testing.T) {
 	}
 }
 
+// A skill is known by its name, so a pack keeps the first skill of a name
+// and skips the rest; agents and commands with one name are renamed.
+func TestBuildSkipsDuplicateSkills(t *testing.T) {
+	sk := func(repo, dir string) project.LockItem {
+		id := "skill:" + repo + ":" + dir + "/x"
+		return project.LockItem{ID: id, Type: "skill", Name: "x", Repo: repo, Path: dir + "/x", SHA: shaA}
+	}
+	a, b, c := sk("o/a", "skills"), sk("o/a", "plugins/p/skills"), sk("o/b", "skills")
+	plan, err := Build([]project.Pack{{Name: "kit", Items: []string{a.ID, b.ID, c.ID}}}, map[string]project.LockItem{a.ID: a, b.ID: b, c.ID: c})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f := plan.Packs[0].Files; len(f) != 1 || f[0].To != "skills/x" || f[0].Item.ID != a.ID {
+		t.Errorf("files %+v", f)
+	}
+	want := []string{
+		`kit: skipped ` + b.ID + `: the pack already has a skill named "x" (` + a.ID + `), and the first one listed wins — remove one with ipm pack remove kit <id>`,
+		`kit: skipped ` + c.ID + `: the pack already has a skill named "x" (` + a.ID + `), and the first one listed wins — remove one with ipm pack remove kit <id>`,
+	}
+	if !reflect.DeepEqual(plan.Warnings, want) {
+		t.Errorf("got  %q\nwant %q", plan.Warnings, want)
+	}
+}
+
 func TestBuildClashRule(t *testing.T) {
 	sk := func(repo string) project.LockItem {
-		id := "skill:" + repo + ":skills/x"
-		return project.LockItem{ID: id, Type: "skill", Name: "x", Repo: repo, Path: "skills/x", SHA: shaA}
+		id := "agent:" + repo + ":agents/x.md"
+		return project.LockItem{ID: id, Type: "agent", Name: "x", Repo: repo, Path: "agents/x.md", SHA: shaA}
 	}
 	a, b, c := sk("o/a"), sk("o/b"), sk("o/c")
 	plan, err := Build([]project.Pack{{Name: "kit", Items: []string{a.ID, b.ID, c.ID}}}, map[string]project.LockItem{a.ID: a, b.ID: b, c.ID: c})
@@ -383,7 +410,7 @@ func TestBuildClashRule(t *testing.T) {
 	for _, f := range plan.Packs[0].Files {
 		got = append(got, f.To)
 	}
-	if want := []string{"skills/x", "skills/x-o", "skills/x-2"}; !reflect.DeepEqual(got, want) {
+	if want := []string{"agents/x.md", "agents/x-o.md", "agents/x-2.md"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("got %v want %v", got, want)
 	}
 }

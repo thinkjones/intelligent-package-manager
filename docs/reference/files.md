@@ -135,7 +135,7 @@ One line: the hex SHA-256 of the packs in `ipm.toml` (name, description and item
   commands/<name>.md
 ```
 
-Files are named after the item, lowercased, with anything other than `a-z 0-9 . _ -` turned into `-` ("Go Expert" becomes `go-expert`). Two items with the same name in one pack get `-<repo owner>` appended, then `-2`, `-3`.
+Files are named after the item, lowercased, with anything other than `a-z 0-9 . _ -` turned into `-` ("Go Expert" becomes `go-expert`). Two agents or two commands with the same name in one pack get `-<repo owner>` appended, then `-2`, `-3`. Two skills with the same name can't both be kept, since a skill is known by its name: the first one listed in `ipm.toml` is built and the build warns about the rest.
 
 `plugin.json` records where every file came from under `metadata.ipm.items`:
 
