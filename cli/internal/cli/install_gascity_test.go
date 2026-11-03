@@ -190,7 +190,7 @@ func TestInstallGascityDefaultSpelledWithC(t *testing.T) {
 func TestInstallGascityDefaultIgnoresFolder(t *testing.T) {
 	f, root, tmp := gascityFake(t)
 	gi := filepath.Join(root, ".ipm", ".gitignore")
-	const built = "build.stamp\nplugins/\nplugins.tmp/\n.gascity/\n"
+	const built = "build.stamp\nplugins/\nplugins.tmp/\n.gascity/\nmuse/\n"
 	for _, tc := range []struct{ before, after string }{
 		{"build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n", "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n.gascity/\n"},
 		{"mine\nplugins/", "mine\nplugins/\n.gascity/\n"},

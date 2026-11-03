@@ -263,7 +263,7 @@ Repos come from your home, not the project. A repo whose synced source (`$IPM_HO
 ```text
 ipm install claude [pack] [--scope user|project|local] [--path DIR] [-g] [--update] [--dry-run]
 ipm install gascity [pack] [-C DIR] [--name NAME] [-g] [--force] [--update] [--dry-run]
-ipm install muse [pack] [-g] [--update] [--dry-run]
+ipm install muse [pack] [-g] [--force] [--update] [--dry-run]
 ipm install [-g]
 ```
 
@@ -326,13 +326,14 @@ Import it into a city's pack.toml or city.toml:
 
 `ipm install muse` installs `pack` into [Muse Code](https://dev.meta.ai/docs/muse-code/extending). `pack` may be left out when the scope has only one. Like `install claude` it builds first unless the build is current, prints each `muse` command before running it, and records the install (`target = "muse"`, nothing else). Muse Code keeps one set of plugins per user, so there is no scope or folder: a project pack installed into Muse is in every project. `ipm pack install muse` is the same command. Needs `muse` on your `PATH`.
 
-Muse Code reads the pack's plugin, `.ipm/plugins/<pack>`, as a Claude Code plugin, but it doesn't install plugin dependencies, which is how a pack carries the whole plugins you picked. So ipm installs each whole plugin itself, from its own folder: the repo at the commit in `.ipm/ipm.lock`, from your synced sources, else fetched into `$IPM_HOME/pinned`. A plugin defined in another repo (say `"source": {"source": "url", …}` in its marketplace entry) is fetched from the repo and commit that entry names. The commands it runs are `muse plugins install <folder>`, the pack first; installing again replaces each plugin with the new folder. If Muse refuses the pack, the install stops and nothing is recorded. If it refuses a whole plugin (Muse checks manifests more strictly than Claude Code), ipm prints `✗ <id>: …` and goes on with the others, records the install, and exits 1 with `installed <pack> (muse), but N of M whole plugins failed: <ids> — muse's output above says why`. ipm prints Muse's output except its `severity=warning` lines, mostly Claude fields Muse ignores, which it counts instead: ``N muse warning(s) hidden — `muse plugins validate <folder>` shows them``. Errors (`severity=error`) are always shown.
+Muse Code reads the pack's plugin, `.ipm/plugins/<pack>`, as a Claude Code plugin, but it doesn't install plugin dependencies, which is how a pack carries the whole plugins you picked. So ipm installs each whole plugin itself, from its own folder: the repo at the commit in `.ipm/ipm.lock`, from your synced sources, else fetched into `$IPM_HOME/pinned`. A plugin defined in another repo (say `"source": {"source": "url", …}` in its marketplace entry) is fetched from the repo and commit that entry names. Muse checks plugins more strictly than Claude Code, so ipm doesn't install these folders as they are: it installs a Muse copy of each, `.ipm/muse/<pack>/<plugin>` (the pack's own copy is `.ipm/muse/<pack>/<pack>`), fixed where the two differ; see [Muse copies](#muse-copies). The commands it runs are `muse plugins install <copy>`, the pack first. Installing again reinstalls each from the same copy. If Muse refuses the pack, the install stops and nothing is recorded. If it still refuses a whole plugin, ipm prints `✗ <id>: …` and goes on with the others, records the install, and exits 1 with `installed <pack> (muse), but N of M whole plugins failed: <ids> — muse's output above says why`. ipm prints Muse's output except its `severity=warning` lines, mostly Claude fields Muse ignores, which it counts instead: ``N muse warning(s) hidden — `muse plugins validate <folder>` shows them``. Errors (`severity=error`) are always shown.
 
 | Flag | Does |
 | --- | --- |
 | `-g`, `--global` | Install a pack from your user scope. |
+| `--force` | Replace a plugin Muse holds from a folder ipm didn't install it from; see below. |
 | `--update` | Re-pin every item to your current catalog and rebuild first. |
-| `--dry-run` | Print the `muse` commands without building, fetching, running or recording anything. Needs a current build: `--dry-run needs a current build — run ipm pack build first`. Can't be combined with `--update` (usage error, exit 2: `install muse: --dry-run and --update can't be used together`). |
+| `--dry-run` | Print the `muse` commands and the fixes, without building, fetching, writing, running or recording anything. Needs a current build: `--dry-run needs a current build — run ipm pack build first`. Can't be combined with `--update` (usage error, exit 2: `install muse: --dry-run and --update can't be used together`). |
 
 Some whole plugins can't be installed this way; ipm skips them and prints each as a warning:
 
@@ -342,7 +343,26 @@ Some whole plugins can't be installed this way; ipm skips them and prints each a
 | `skipped <id>: its source is "<kind>", which Muse Code can't get from git` | The entry's source is not `github`, `url` or `git-subdir` (an `npm` package, say). |
 | `skipped <id>: its folder has no plugin manifest (its marketplace entry defines it), which Muse Code can't install` | An inline plugin: its marketplace entry defines it, and its folder has no `.claude-plugin/plugin.json`, `.muse-plugin/plugin.json` or `.codex-plugin/plugin.json`. |
 
-Muse prints its own warnings too: that the pack's `dependencies` (and `author`) are not imported, and that a third-party plugin's hooks need review before they run (`muse plugins approve <plugin>`). Skills are active as soon as a plugin is installed. Removing a whole plugin from a pack doesn't remove it from Muse: use `muse plugins remove <id>`.
+##### Muse copies
+
+Each copy hard-links every file of the plugin except the ones ipm fixes, which it writes fresh, so the copy is cheap and the plugin in your sources or pin store is never changed. The copies are rewritten on every install, and `.ipm/.gitignore` ignores `muse/`. What ipm changes, each printed as it installs:
+
+| Printed | What Muse refuses, and what the copy does |
+| --- | --- |
+| ``fixed <id> for Muse Code: `skills` in .claude-plugin/plugin.json is now a list`` | `skills`, `commands` or `agents` given as one path (`"skills": "./skills/"`), which Muse requires to be a list. |
+| ``fixed <id> for Muse Code: wrapped .mcp.json in `mcpServers` `` | An MCP file whose servers sit at the top level (`{"playwright": {"command": …}}`), which Claude Code accepts and Muse doesn't. |
+| `fixed <id> for Muse Code: quoted <keys> in <file>` | Frontmatter in a skill, command or agent that isn't valid YAML, such as `argument-hint: [system] [--source <path>]`. ipm quotes each top-level value that fails to parse on its own; if the block still fails, it leaves it for Muse to report. |
+| `! <id>: left out MCP server "<name>" (<file>): it is http, and Muse Code runs only stdio servers` | An http or sse server. The rest of the plugin installs without it. |
+| `! <id>: left out <folder>: its SKILL.md has no frontmatter` | A skill with no `name` and `description`, which Muse refuses. The rest of the plugin installs. |
+| `! <id>: left out <folder>: <folder> already has the skill name "<name>"` | Two skills with one name; Muse refuses both. The skill in the default `skills/` folder wins, then the manifest's paths in order. |
+
+ipm checks only the folders a plugin loads from: `skills/`, `commands/` and `agents/`, and the paths its manifest adds. The pack's own copy also leaves out `dependencies`, since ipm installs each whole plugin itself. A plugin with its own `.muse-plugin/plugin.json` keeps its manifest and MCP files; only its frontmatter is fixed.
+
+##### A plugin Muse already holds
+
+Muse refuses to install a plugin it already holds from another folder (``plugin `<name>` is already installed from a different source``), as happens the first time after an earlier `ipm install muse` that installed from `.ipm/plugins/` or the pin store. ipm asks Muse where it came from (`muse plugins inspect <name> --json`). If ipm installed it, from a folder under a `.ipm/` or ipm's home, ipm prints `replacing <name> in Muse Code: it was installed from <folder>`, runs `muse plugins remove <name>` and installs again; Muse may then ask you to review its hooks again. Otherwise it refuses that plugin with `<name> is installed in Muse Code from <folder>, which ipm didn't install — use --force to replace it`.
+
+Muse prints its own warnings too: that fields like `author` are not imported, and that a third-party plugin's hooks need review before they run (`muse plugins approve <plugin>`). Skills are active as soon as a plugin is installed. Removing a whole plugin from a pack doesn't remove it from Muse: use `muse plugins remove <id>`.
 
 #### Replay recorded installs
 

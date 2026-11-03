@@ -29,15 +29,10 @@ func museFake(t *testing.T) (*fake, string) {
 	return f, root
 }
 
-// musePin is where the pin store holds plugin:o/r:p, with symlinks resolved
-// as repoFolders resolves them.
-func musePin(t *testing.T, f *fake) string {
-	t.Helper()
-	dir, err := filepath.EvalSymlinks(filepath.Join(pinnedRepo(f, "o--r", installSHA), "p"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	return dir
+// museCopy is the Muse copy of the plugin name that ipm install muse kit
+// installs.
+func museCopy(root, name string) string {
+	return filepath.Join(root, ".ipm", "muse", "kit", name)
 }
 
 // museRuns is the muse commands f ran.
@@ -57,11 +52,22 @@ func TestInstallMuseInstallsPackAndPlugins(t *testing.T) {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	want := []string{
-		"muse plugins install " + filepath.Join(root, ".ipm", "plugins", "kit"),
-		"muse plugins install " + musePin(t, f),
+		"muse plugins install " + museCopy(root, "kit"),
+		"muse plugins install " + museCopy(root, "p"),
 	}
 	if got := museRuns(f); !reflect.DeepEqual(got, want) {
 		t.Errorf("got  %v\nwant %v", got, want)
+	}
+	for _, p := range []string{"kit/.claude-plugin/plugin.json", "kit/skills/s1/SKILL.md", "p/.claude-plugin/plugin.json"} {
+		if _, err := os.Stat(museCopy(root, p)); err != nil {
+			t.Errorf("copy lacks %s", p)
+		}
+	}
+	if pj, _ := os.ReadFile(museCopy(root, "kit/.claude-plugin/plugin.json")); strings.Contains(string(pj), "dependencies") {
+		t.Errorf("the pack's copy keeps dependencies:\n%s", pj)
+	}
+	if gi, _ := os.ReadFile(filepath.Join(root, ".ipm", ".gitignore")); !strings.Contains(string(gi), "muse/\n") {
+		t.Errorf(".gitignore %q", gi)
 	}
 	out := f.out.String()
 	for _, s := range []string{"build is current", "skipped plugin:o/r#e: its upstream entry names no commit", "✓ installed kit (muse)"} {
@@ -118,7 +124,7 @@ func TestInstallMuseFails(t *testing.T) {
 // so it is recorded, and the install ends with an error naming the plugin.
 func TestInstallMuseKeepsGoingPastAPlugin(t *testing.T) {
 	f, root := museFake(t)
-	f.full = map[string]result{"muse plugins install " + musePin(t, f): {"skills must be an array", errors.New("exit 1")}}
+	f.full = map[string]result{"muse plugins install " + museCopy(root, "p"): {"skills must be an array", errors.New("exit 1")}}
 	err := f.run("install", "muse", "kit")
 	if err == nil || !strings.Contains(err.Error(), "1 of 1 whole plugins") || !strings.Contains(err.Error(), "plugin:o/r:p") {
 		t.Errorf("got %v", err)
@@ -135,7 +141,7 @@ func TestInstallMuseKeepsGoingPastAPlugin(t *testing.T) {
 // Muse's warnings are counted, not shown; its errors and other lines are.
 func TestInstallMuseHidesWarnings(t *testing.T) {
 	f, root := museFake(t)
-	pack := filepath.Join(root, ".ipm", "plugins", "kit")
+	pack := museCopy(root, "kit")
 	f.full = map[string]result{"muse plugins install " + pack: {
 		"diagnostic=unsupported-field severity=warning path=a message=one\n" +
 			"diagnostic=unsupported-field severity=warning path=b message=two\n" +
@@ -155,6 +161,76 @@ func TestInstallMuseHidesWarnings(t *testing.T) {
 	}
 }
 
+// The copies Muse installs are fixed where Muse differs from Claude Code;
+// the plugin in the pin store is not.
+func TestInstallMuseFixesCopies(t *testing.T) {
+	f, root := museFake(t)
+	pin := filepath.Join(pinnedRepo(f, "o--r", installSHA), "p")
+	write(t, filepath.Join(pin, ".claude-plugin", "plugin.json"), `{"name":"p","skills":"./skills/"}`)
+	write(t, filepath.Join(pin, ".mcp.json"), `{"a":{"command":"x"},"web":{"type":"http","url":"https://x"}}`)
+	if err := f.run("install", "muse", "kit"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	out := f.out.String()
+	for _, s := range []string{
+		"fixed plugin:o/r:p for Muse Code: `skills` in .claude-plugin/plugin.json is now a list",
+		"fixed plugin:o/r:p for Muse Code: wrapped .mcp.json in `mcpServers`",
+		`! plugin:o/r:p: left out MCP server "web" (.mcp.json): it is http`,
+	} {
+		if !strings.Contains(out, s) {
+			t.Errorf("output lacks %q:\n%s", s, out)
+		}
+	}
+	if mcp, _ := os.ReadFile(museCopy(root, "p/.mcp.json")); !strings.Contains(string(mcp), `"mcpServers"`) || strings.Contains(string(mcp), "web") {
+		t.Errorf("copy's .mcp.json %s", mcp)
+	}
+	if mcp, _ := os.ReadFile(filepath.Join(pin, ".mcp.json")); strings.Contains(string(mcp), "mcpServers") {
+		t.Error("the pin store was edited")
+	}
+}
+
+// Muse refuses to install a plugin it holds from another folder. ipm
+// replaces one it installed (from a .ipm/ folder or its home), and with
+// --force one it didn't.
+func TestInstallMuseReplacesItsOwnInstall(t *testing.T) {
+	for _, tc := range []struct {
+		from    string
+		force   bool
+		replace bool
+	}{
+		{"/work/.ipm/plugins/p", false, true},
+		{"/elsewhere/p", false, false},
+		{"/elsewhere/p", true, true},
+	} {
+		f, root := museFake(t)
+		install := "muse plugins install " + museCopy(root, "p")
+		f.queue = map[string][]result{install: {{"plugin `p` is already installed from a different source", errors.New("exit 1")}, {"installed\tp", nil}}}
+		f.full = map[string]result{"muse plugins inspect p --json": {`{"record":{"id":"p","source":{"path":"` + tc.from + `"}}}`, nil}}
+		args := []string{"install", "muse", "kit"}
+		if tc.force {
+			args = append(args, "--force")
+		}
+		err := f.run(args...)
+		runs := museRuns(f)
+		if tc.replace {
+			want := []string{"muse plugins install " + museCopy(root, "kit"), install, "muse plugins inspect p --json", "muse plugins remove p", install}
+			if err != nil || !reflect.DeepEqual(runs, want) {
+				t.Errorf("%+v: %v\ngot  %v\nwant %v\n%s", tc, err, runs, want, f.out.String())
+			}
+			if !strings.Contains(f.out.String(), "replacing p in Muse Code: it was installed from "+tc.from) {
+				t.Errorf("%+v: output:\n%s", tc, f.out.String())
+			}
+			continue
+		}
+		if err == nil || !strings.Contains(f.out.String(), "p is installed in Muse Code from /elsewhere/p, which ipm didn't install — use --force to replace it") {
+			t.Errorf("%+v: %v\n%s", tc, err, f.out.String())
+		}
+		if strings.Contains(strings.Join(runs, "\n"), "remove") {
+			t.Errorf("%+v: removed: %v", tc, runs)
+		}
+	}
+}
+
 func TestInstallMuseDryRun(t *testing.T) {
 	f, root := museFake(t)
 	before, _ := os.ReadFile(filepath.Join(root, project.File))
@@ -162,8 +238,11 @@ func TestInstallMuseDryRun(t *testing.T) {
 		t.Fatalf("%v\n%s", err, f.out.String())
 	}
 	out := f.out.String()
-	if !strings.Contains(out, "$ muse plugins install "+filepath.Join(root, ".ipm", "plugins", "kit")) || !strings.Contains(out, "$ muse plugins install "+musePin(t, f)) {
+	if !strings.Contains(out, "$ muse plugins install "+museCopy(root, "kit")) || !strings.Contains(out, "$ muse plugins install "+museCopy(root, "p")) {
 		t.Errorf("output:\n%s", out)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ipm", "muse")); err == nil {
+		t.Error("a dry run wrote the Muse copies")
 	}
 	if runs := museRuns(f); len(runs) != 0 {
 		t.Errorf("a dry run runs nothing: %v", runs)

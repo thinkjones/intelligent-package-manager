@@ -290,7 +290,7 @@ func writeGascityPack(sys System, scope project.Scope, pack string, t gascityTar
 		if err := os.MkdirAll(t.dir, 0o755); err != nil {
 			return "", err
 		}
-		if err := ignoreGascity(filepath.Dir(t.dir)); err != nil {
+		if err := ignoreIn(filepath.Dir(t.dir), ".gascity/"); err != nil {
 			return "", err
 		}
 	}
@@ -351,10 +351,10 @@ func isGascityDefault(dir string) bool {
 	return err == nil && info.IsDir()
 }
 
-// ignoreGascity adds .gascity/ to the .gitignore ipm pack build wrote in
-// ipmDir, which a build older than the default folder lacks. It keeps the rest
-// of the file and creates none: a build writes it.
-func ignoreGascity(ipmDir string) error {
+// ignoreIn adds entry (".gascity/", "muse/") to the .gitignore ipm pack build
+// wrote in ipmDir, which a build older than that folder lacks. It keeps the
+// rest of the file and creates none: a build writes it.
+func ignoreIn(ipmDir, entry string) error {
 	path := filepath.Join(ipmDir, ".gitignore")
 	data, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -364,14 +364,14 @@ func ignoreGascity(ipmDir string) error {
 		return err
 	}
 	for _, line := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(line) == ".gascity/" {
+		if strings.TrimSpace(line) == entry {
 			return nil
 		}
 	}
 	if len(data) > 0 && !bytes.HasSuffix(data, []byte("\n")) {
 		data = append(data, '\n')
 	}
-	return os.WriteFile(path, append(data, ".gascity/\n"...), 0o644)
+	return os.WriteFile(path, append(data, entry+"\n"...), 0o644)
 }
 
 // gascityFolder is the folder to write the pack folder into: p as gascityDir

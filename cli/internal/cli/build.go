@@ -143,7 +143,7 @@ func build(sys System, global, update, noValidate, hints bool) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(project.StampFile+"\nplugins/\nplugins.tmp/\n.gascity/\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(project.StampFile+"\nplugins/\nplugins.tmp/\n.gascity/\nmuse/\n"), 0o644); err != nil {
 		return err
 	}
 

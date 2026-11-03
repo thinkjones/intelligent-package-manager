@@ -57,9 +57,10 @@ $IPM_CACHE_DIR/
   .ipm/build.stamp                       what the last build used        ignored
   .ipm/plugins/<pack>/                   the built plugins               ignored
   .ipm/.gascity/<name>/                  Gas City pack folders           ignored
+  .ipm/muse/<pack>/<plugin>/             Muse copies of plugins          ignored
 ```
 
-The project is the nearest folder, at or above where you run `ipm`, that holds an `ipm.toml`. It holds no pnpm project: `ipm pack build` reads each repo from your home — the synced source when it is at the pinned commit, else `$IPM_HOME/pinned` — and removes the `package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs` and `node_modules/` older builds wrote to `.ipm/`. If you committed those, commit their removal. Everything under `.ipm/` is generated: `.ipm/.gascity/` by `ipm install gascity` (which `ipm pack build` leaves alone), the rest by `ipm pack build`; don't edit it by hand.
+The project is the nearest folder, at or above where you run `ipm`, that holds an `ipm.toml`. It holds no pnpm project: `ipm pack build` reads each repo from your home — the synced source when it is at the pinned commit, else `$IPM_HOME/pinned` — and removes the `package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs` and `node_modules/` older builds wrote to `.ipm/`. If you committed those, commit their removal. Everything under `.ipm/` is generated: `.ipm/.gascity/` by `ipm install gascity` and `.ipm/muse/` by `ipm install muse` (both left alone by `ipm pack build`), the rest by `ipm pack build`; don't edit it by hand.
 
 ## `ipm.toml`
 
