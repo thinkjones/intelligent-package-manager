@@ -101,6 +101,7 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `… pack name … must start with a letter or digit …` | A pack name in `ipm.toml` isn't valid, perhaps from a hand edit. Rename it in `ipm.toml`. |
 | `… is pinned at two commits in ipm.lock — run ipm pack build --update` | Two items from the same repo are locked at different commits, which one build can't hold. `--update` re-pins them together. |
 | `… would be published as "…", already used by …` | A whole plugin's entry name (`<pack>-<plugin>`) clashes with a pack or another plugin. Rename a pack. |
+| `<pack>: skipped <id>: the pack already has a skill named "…" (…), and the first one listed wins …` (a warning) | Two skills in the pack have the same name, often the same skill picked twice from a repo that keeps copies under `skills/` and `plugins/…/skills/`. The first one in `ipm.toml` is built. Remove the other with `ipm pack remove`, or move the one you want first. `ipm pack show` lists them. |
 | `… is not pinned upstream …` (a warning) | An external plugin's marketplace entry doesn't name a commit, so Claude Code installs whatever it points at that day. Nothing to fix in `ipm`; pick a different plugin if you need it pinned. |
 | `✗ pnpm failed` from `ipm pack build` or `ipm install` | pnpm couldn't fetch a pin into the pin store, `$IPM_HOME/pinned` (pnpm's output is shown above it): often the network, or a commit that no longer exists upstream. Nothing in `.ipm/` changed, and the pin store's `package.json` is left as it was. Fix the cause and rerun; `ipm pack build --update` re-pins to your catalog if the commit is gone. |
 | `pnpm did not install … in …/pinned/node_modules` | pnpm ran but didn't install that pin. Rerun `ipm pack build` and read pnpm's output; if it persists, delete `$IPM_HOME/pinned` (every pin is fetched again when needed). |
@@ -159,6 +160,8 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | Message | Cause and fix |
 | --- | --- |
 | `ipm install muse needs muse (Muse Code) on PATH` | Install Muse Code, or put `muse` on your `PATH`. |
+| `diagnostic=duplicate-capability-id severity=error … duplicate skill capability id` | The pack was built before ipm skipped duplicate skills; with the ipm version reported as `dev` (a build of a checkout), the stamp doesn't change on upgrade. Run `ipm pack build`, then install again. |
+| `N muse warning(s) hidden — …` | Muse's warnings, mostly Claude fields it ignores (`category`, `tags`, `dependencies`). Nothing is wrong; run the `muse plugins validate` command it prints to see them. |
 | `` `muse plugins install <folder>` failed: … `` | Muse refused the pack's own plugin; its output is printed above, and nothing is recorded. Check the folder with `muse plugins validate <folder>`. |
 | `installed <pack> (muse), but N of M whole plugins failed: …` | Muse refused those plugins, often a manifest Claude Code accepts but Muse doesn't (`Claude manifest field `` `skills` `` must be an array`, say). The pack and the other plugins are installed and recorded. Fix the plugin upstream, or remove it from the pack. |
 | `skipped <id>: its upstream entry names no commit, so ipm can't fetch a fixed copy` | The plugin's marketplace entry points at another repo with no commit. Install it in Muse yourself, or pick its skills instead. |

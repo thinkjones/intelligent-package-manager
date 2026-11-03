@@ -7,6 +7,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/thinkjones/intelligent-package-manager/cli/internal/assemble"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catalog"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/catgraph"
 	"github.com/thinkjones/intelligent-package-manager/cli/internal/pack"
@@ -266,6 +267,8 @@ func packShow(sys System, scope project.Scope, name string) error {
 	lock, _ := project.LoadLock(scope.IPMDir())
 	tw := tabwriter.NewWriter(sys.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "TYPE\tNAME\tREPO\t★\tID")
+	skills := map[string]string{} // skill name → the first item ID with it
+	var dups []string
 	for _, id := range packs[i].Items {
 		typ, nm, repo, stars := "?", "", "", ""
 		if g != nil {
@@ -284,8 +287,18 @@ func packShow(sys System, scope project.Scope, name string) error {
 			}
 		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", typ, nm, repo, stars, id)
+		if base := assemble.FileName(project.LockItem{Name: nm}); typ == catalog.TypeSkill && base != "" {
+			if first, dup := skills[base]; dup {
+				dups = append(dups, assemble.DuplicateSkill(name, id, base, first))
+			} else {
+				skills[base] = id
+			}
+		}
 	}
 	tw.Flush()
+	for _, d := range dups {
+		fmt.Fprintf(sys.Stdout, "%s %s\n", warn, d)
+	}
 	fmt.Fprintf(sys.Stdout, "\n%s — %d item(s)\n", packs[i].Description, len(packs[i].Items))
 	installs, err := loadInstalls(sys, scope)
 	if err != nil {

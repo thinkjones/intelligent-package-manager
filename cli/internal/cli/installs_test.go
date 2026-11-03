@@ -127,3 +127,34 @@ func TestPackShowListsInstalls(t *testing.T) {
 		t.Errorf("show:\n%s", f.out.String())
 	}
 }
+
+// pack show and pack build both name a skill a pack skips because an earlier
+// skill has its name.
+func TestPackShowAndBuildFlagDuplicateSkills(t *testing.T) {
+	f, root := installFake(t)
+	cat := filepath.Join(cacheOf(root), "catalog", "skills.jsonl")
+	data, _ := os.ReadFile(cat)
+	write(t, cat, string(data)+`{"id":"skill:o/r:skills/s1","type":"skill","name":"s1","repo":"o/r","commit":"c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1","path":"skills/s1"}`+"\n")
+	write(t, filepath.Join(pinnedRepo(f, "o--r", installSHA), "skills", "s1", "SKILL.md"), "---\nname: s1\n---\n")
+	if err := f.run("pack", "add", "kit", "skill:o/r:skills/s1"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	want := `skipped skill:o/r:skills/s1: the pack already has a skill named "s1" (skill:o/r:p/skills/s1), and the first one listed wins`
+	f.out.Reset()
+	if err := f.run("pack", "show", "kit"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(f.out.String(), want) {
+		t.Errorf("show:\n%s", f.out.String())
+	}
+	f.out.Reset()
+	if err := f.run("pack", "build"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	if !strings.Contains(f.out.String(), "kit: "+want) {
+		t.Errorf("build:\n%s", f.out.String())
+	}
+	if _, err := os.Stat(filepath.Join(root, ".ipm", "plugins", "kit", "skills", "s1-o")); err == nil {
+		t.Error("the second s1 is placed")
+	}
+}

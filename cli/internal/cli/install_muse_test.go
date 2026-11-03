@@ -132,6 +132,29 @@ func TestInstallMuseKeepsGoingPastAPlugin(t *testing.T) {
 	}
 }
 
+// Muse's warnings are counted, not shown; its errors and other lines are.
+func TestInstallMuseHidesWarnings(t *testing.T) {
+	f, root := museFake(t)
+	pack := filepath.Join(root, ".ipm", "plugins", "kit")
+	f.full = map[string]result{"muse plugins install " + pack: {
+		"diagnostic=unsupported-field severity=warning path=a message=one\n" +
+			"diagnostic=unsupported-field severity=warning path=b message=two\n" +
+			"diagnostic=duplicate-capability-id severity=error path=c message=duplicate skill capability id `x`\n" +
+			"installed kit\n", nil}}
+	if err := f.run("install", "muse", "kit"); err != nil {
+		t.Fatalf("%v\n%s", err, f.out.String())
+	}
+	out := f.out.String()
+	if strings.Contains(out, "severity=warning") {
+		t.Errorf("warnings shown:\n%s", out)
+	}
+	for _, s := range []string{"duplicate skill capability id `x`", "installed kit\n", "2 muse warning(s) hidden — `muse plugins validate " + pack + "` shows them"} {
+		if !strings.Contains(out, s) {
+			t.Errorf("output lacks %q:\n%s", s, out)
+		}
+	}
+}
+
 func TestInstallMuseDryRun(t *testing.T) {
 	f, root := museFake(t)
 	before, _ := os.ReadFile(filepath.Join(root, project.File))
