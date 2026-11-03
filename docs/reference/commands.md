@@ -264,6 +264,7 @@ Repos come from your home, not the project. A repo whose synced source (`$IPM_HO
 ipm install claude [pack] [--scope user|project|local] [--path DIR] [-g] [--update] [--dry-run]
 ipm install gascity [pack] [-C DIR] [--name NAME] [-g] [--force] [--update] [--dry-run]
 ipm install muse [pack] [-g] [--force] [--update] [--dry-run]
+ipm install agentskills [pack] [-C DIR] [-g] [--force] [--update] [--dry-run]
 ipm install [-g]
 ```
 
@@ -364,9 +365,29 @@ Muse refuses to install a plugin it already holds from another folder (``plugin 
 
 Muse prints its own warnings too: that fields like `author` are not imported, and that a third-party plugin's hooks need review before they run (`muse plugins approve <plugin>`). Skills are active as soon as a plugin is installed. Removing a whole plugin from a pack doesn't remove it from Muse: use `muse plugins remove <id>`.
 
+#### `ipm install agentskills`
+
+`ipm install agentskills` writes `pack`'s skills into a folder of skills in the [Agent Skills](https://agentskills.io/specification) format, which Muse Code and other agents read: `.agents/skills` in the project by default, or `~/.agents/skills` for a user-scope pack (`-g`). `pack` may be left out when the scope has only one. It builds first unless the build is current, writes each skill as `<folder>/<name>/` (every file of the skill's folder, copied), and records the install (`target = "agentskills"`, with `path` only when you gave `-C`). `ipm pack install agentskills` is the same command.
+
+The skills are the ones you picked, a Copilot plugin's skills, and the skills inside each whole plugin (from the parts `.ipm/ipm.lock` records). Agents, commands, hooks and MCP servers aren't skills, so they're skipped with a warning, as is a whole plugin whose files live in another repo.
+
+Each skill folder is named after the `name` in its `SKILL.md`, which the spec requires to match the folder. A name that isn't valid in the spec (lowercase letters, digits and single hyphens, at most 64 characters) is made valid, and the copy's `SKILL.md` gets the new name: `renamed <id> to "<name>": …`. Frontmatter that isn't valid YAML is quoted as for [Muse copies](#muse-copies). A skill whose `SKILL.md` has no frontmatter is skipped, and a skill whose name an earlier one has is skipped with the [pack build rule](#ipm-pack-build): the first one listed wins.
+
+The folder may hold skills that aren't ipm's. ipm lists the skill folders it wrote, by pack, in `.ipm-skills.json` in that folder, and touches only those: installing again replaces the pack's skill folders and removes the ones the pack no longer has (`removed <folder>: no longer in <pack>`). A skill folder that exists and isn't listed is refused with `<folder> exists and was not written by ipm — use --force to replace it`, and one listed for another pack with `<folder> holds pack <other>'s skill — use --force to replace it`; nothing is written. With `--force` the pack takes those folders over.
+
+| Flag | Does |
+| --- | --- |
+| `-C`, `--dir DIR` | Write into `DIR`, which must exist, instead of `.agents/skills`. |
+| `-g`, `--global` | Install a pack from your user scope, into `~/.agents/skills` unless `-C` says otherwise. |
+| `--force` | Replace skill folders ipm didn't write, or another pack's. |
+| `--update` | Re-pin every item to your current catalog and rebuild first. |
+| `--dry-run` | List the skill folders it would write, without writing or recording anything. Needs a current build. Can't be combined with `--update`. |
+
+`.agents/skills` is outside `.ipm/`, so ipm doesn't add it to a `.gitignore`: commit it to give teammates the skills without ipm, or ignore it yourself.
+
 #### Replay recorded installs
 
-Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `claude`, `gascity` or `muse` is a usage error. Before running anything it checks every record's target: a record of a target this ipm doesn't know is reported as `<pack> → <target> …: unknown target`, and nothing is installed. A `gascity` record whose folder is `<root>/.ipm/.gascity`, for a `<root>` folder that exists (a project, a folder you ran `ipm install gascity -g` in, or `$IPM_HOME/global`, where ipm wrote user-scope packs before), recreates that folder when it is gone. A record that fails (a stale one whose folder was deleted, say) doesn't stop the others: its error is printed as `✗ <pack> → <target> <scope or name> <path>: <error>`, and the replay ends with exit 1 and `✗ N of M recorded installs failed; if a record is stale, remove it from <file>`, where the file is `ipm.toml` for a project or `$IPM_HOME/installs.json` with `-g`, each with its path. There is no command to forget a record: delete it from that file.
+Bare `ipm install` replays every install recorded for the scope (`-g` for your user scope). With none recorded it is a usage error that names the targets. A target other than `agentskills`, `claude`, `gascity` or `muse` is a usage error. Before running anything it checks every record's target: a record of a target this ipm doesn't know is reported as `<pack> → <target> …: unknown target`, and nothing is installed. A `gascity` record whose folder is `<root>/.ipm/.gascity`, for a `<root>` folder that exists (a project, a folder you ran `ipm install gascity -g` in, or `$IPM_HOME/global`, where ipm wrote user-scope packs before), recreates that folder when it is gone. A record that fails (a stale one whose folder was deleted, say) doesn't stop the others: its error is printed as `✗ <pack> → <target> <scope or name> <path>: <error>`, and the replay ends with exit 1 and `✗ N of M recorded installs failed; if a record is stale, remove it from <file>`, where the file is `ipm.toml` for a project or `$IPM_HOME/installs.json` with `-g`, each with its path. There is no command to forget a record: delete it from that file.
 
 ## Tools
 

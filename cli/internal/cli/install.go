@@ -23,13 +23,14 @@ type installer func(sys System, scope project.Scope, pack string, in project.Ins
 // installers are the install targets, by the name ipm install takes and
 // records.
 var installers = map[string]installer{
-	"claude":  installClaude,
-	"gascity": installGascity,
-	"muse":    installMuse,
+	"claude":      installClaude,
+	"gascity":     installGascity,
+	"muse":        installMuse,
+	"agentskills": installAgentSkills,
 }
 
 // targetNames is the install targets for a message, sorted: "claude", or
-// "claude, gascity or muse".
+// "agentskills, claude, gascity or muse".
 func targetNames() string {
 	names := slices.Sorted(maps.Keys(installers))
 	if len(names) < 2 {
@@ -44,7 +45,7 @@ func newInstallCmd(sys System) *cobra.Command {
 	var global bool
 	cmd := &cobra.Command{
 		Use:   "install [target] [pack]",
-		Short: "install a pack into claude, gascity or muse (same as pack install)",
+		Short: "install a pack into agentskills, claude, gascity or muse (same as pack install)",
 		Args: func(c *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				return usagef("install: unknown target %q%s — use %s. Try `ipm help install`.", args[0], didYouMean(c, args[0]), targetNames())
@@ -54,7 +55,7 @@ func newInstallCmd(sys System) *cobra.Command {
 		RunE: func(*cobra.Command, []string) error { return replayInstalls(sys, global) },
 	}
 	cmd.Flags().BoolVarP(&global, "global", "g", false, "redo the installs of your user scope ($IPM_HOME/global)")
-	cmd.AddCommand(newInstallClaudeCmd(sys), newInstallGascityCmd(sys), newInstallMuseCmd(sys))
+	cmd.AddCommand(newInstallClaudeCmd(sys), newInstallGascityCmd(sys), newInstallMuseCmd(sys), newInstallAgentSkillsCmd(sys))
 	return cmd
 }
 

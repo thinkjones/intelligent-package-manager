@@ -155,6 +155,16 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `install gascity: --name needs a pack — it names one pack folder` | Without a pack, `ipm install gascity` installs every pack, each in a folder of its own name. Name the pack to rename its folder: `ipm install gascity <pack> --name <name>`. |
 | `✗ N of M packs failed` | `ipm install gascity` without a pack installed the others; the `✗ <pack>: …` lines above say why each failed. Fix those and rerun. |
 
+## Install as Agent Skills
+
+| Message | Cause and fix |
+| --- | --- |
+| `<folder> exists and was not written by ipm — use --force to replace it` | A skill folder of that name is already in the skills folder, and ipm's `.ipm-skills.json` doesn't list it. Keep yours and remove the skill from the pack, or rerun with `--force`. |
+| `<folder> holds pack <other>'s skill — use --force to replace it` | Another pack installed a skill of that name there. Remove it from one pack, or `--force` to move it to this one. |
+| `skipped <id>: its SKILL.md has no frontmatter, which Agent Skills requires` | The upstream skill has no `name` and `description`. Report it upstream. |
+| `renamed <id> to "<name>": …` (a warning) | The skill's name isn't valid in the spec (say `Go Expert`), so its folder and the copy's `SKILL.md` use the valid form. Nothing to fix. |
+| `skipped <id>: external plugin — its files live in another repo; add its skills directly` | ipm doesn't know which skills a plugin defined in another repo holds. Pick its skills directly. |
+
 ## Install into Muse Code
 
 | Message | Cause and fix |
