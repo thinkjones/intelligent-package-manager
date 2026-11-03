@@ -30,7 +30,7 @@ var installCols = []column{
 }
 
 // installAs is the AS cell: the claude scope or the gascity folder name;
-// empty for muse.
+// empty for muse and agentskills.
 func installAs(in Install) string {
 	if in.Kind == "gascity" {
 		return in.Name

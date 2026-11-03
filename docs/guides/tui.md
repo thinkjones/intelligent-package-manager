@@ -209,10 +209,11 @@ Like global packs, global installs listed from a project are read-only: `enter`,
 `i` on Packs, or `a` on Installs, opens the form in place of the tab. Each step shows its keys at the bottom; `enter` goes on, `esc` cancels.
 
 1. **Pack** (only from `a` with several packs): pick one of the scope's packs.
-2. **Target:** `claude` (Claude Code, as a plugin), `gascity` (a Gas City pack folder) or `muse` (Muse Code, as plugins).
+2. **Target:** `claude` (Claude Code, as a plugin), `gascity` (a Gas City pack folder), `muse` (Muse Code, as plugins) or `agentskills` (an Agent Skills folder, skills only).
 3. **For `claude`, the scope:** **user** (every project, just you), **project** (a folder, shared through its `.claude/settings.json`) or **local** (a folder, just you). For project and local, then the folder (`~` works). The defaults are those of `ipm install claude`.
 4. **For `gascity`, nothing more:** the form goes straight to confirm, writing to `.ipm/.gascity/<pack>` in the project as `ipm install gascity <pack>` does; a global pack goes there too, as `ipm install gascity <pack> -g` does (with `ipm tui -g`, the project you started it in, else that folder). If `ipm install gascity` would refuse it (say a folder ipm didn't write is in the way, or another pack's install wrote it), the reason shows in red on the target step, before anything runs; pick another target or `esc` to cancel, and use `ipm install gascity -C` or `--name` from the command line for another folder.
 5. **For `muse`, nothing more:** the form goes straight to confirm, showing `ipm install muse <pack>` (`-g` for a global pack), which builds when needed and installs the pack and each whole plugin. Muse Code keeps one set of plugins per user.
+   **For `agentskills`, nothing more either:** it confirms `ipm install agentskills <pack>` (`-g` for a global pack), writing into `.agents/skills` in the project, or `~/.agents/skills` for a global pack; use `-C` from the command line for another folder.
 6. **Confirm:** the exact commands it will run, then `y` to install:
 
    ```text

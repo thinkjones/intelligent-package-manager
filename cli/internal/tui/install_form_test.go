@@ -119,6 +119,28 @@ func TestInstallFormMuseFlow(t *testing.T) {
 	}
 }
 
+func TestInstallFormAgentSkillsFlow(t *testing.T) {
+	m, f := formModel(t)
+	f.in.plan = []string{"ipm install agentskills kit"}
+	press(t, m, "down", "down", "down", "enter")
+	v := view(m)
+	if m.form.step != formConfirm {
+		t.Fatalf("agentskills goes straight to confirm: step %v\n%s", m.form.step, v)
+	}
+	for _, want := range []string{"Install kit to Agent Skills", "ipm install agentskills kit"} {
+		if !strings.Contains(v, want) {
+			t.Errorf("confirm lacks %q:\n%s", want, v)
+		}
+	}
+	if want := (Target{Kind: "agentskills"}); f.in.planned[0] != want {
+		t.Errorf("planned %+v, want %+v", f.in.planned[0], want)
+	}
+	press(t, m, "y")
+	if m.inst.command != "ipm install agentskills kit" {
+		t.Errorf("the run shows the confirmed command, got %q", m.inst.command)
+	}
+}
+
 func TestInstallFormGascityNameFallsBackToPack(t *testing.T) {
 	m, f := formModel(t)
 	press(t, m, "down", "enter")

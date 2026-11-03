@@ -57,7 +57,7 @@ var packsKeys = [][2]string{
 var installsKeys = [][2]string{
 	{"↑ ↓  j k", "move through the installs"},
 	{"enter  i", "reinstall the selected install"},
-	{"a", "new install: claude, gascity or muse (the install form)"},
+	{"a", "new install: agentskills, claude, gascity or muse (the install form)"},
 	{"g", "include the global installs"},
 	{"/", "filter the installs; esc clears the filter"},
 }

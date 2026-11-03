@@ -5,12 +5,12 @@ CATALOG (2,024)  PACKS (2)  INSTALLS (…)  MARKETPLACE (…)
 ╭─ install ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
 │ Install csharp-sdlc to                                                                                               │
 │                                                                                                                      │
-│ ▶claude     Claude Code, as a plugin                                                                                 │
-│  gascity    a Gas City pack folder                                                                                   │
-│  muse       Muse Code, as plugins                                                                                    │
+│ ▶claude       Claude Code, as a plugin                                                                               │
+│  gascity      a Gas City pack folder                                                                                 │
+│  muse         Muse Code, as plugins                                                                                  │
+│  agentskills  an Agent Skills folder (.agents/skills), skills only                                                   │
 │                                                                                                                      │
 │ enter next · esc cancel                                                                                              │
-│                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │

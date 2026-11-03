@@ -145,6 +145,16 @@ Import it into a city's pack.toml or city.toml:
 
 It builds first unless the build is current, then writes `.ipm/.gascity/csharp-sdlc/` in the project with your skills, agents and MCP servers in Gas City's layout. To write it somewhere else, name an existing folder with `-C`: `ipm install gascity csharp-sdlc -C ~/cities/dev` writes `~/cities/dev/csharp-sdlc/`. Leave out the pack to write every pack of the project, each in its own folder; `-g` writes your user-scope packs into the project's `.ipm/.gascity` the same way. Paste the `[imports]` table into the city's `pack.toml` or `city.toml`: ipm never edits a city. Gas City has no slash commands or hooks, so commands, hooks and plugins whose files live in another repo are skipped with a `skipped …` warning; agent and MCP settings Gas City has no equivalent for are dropped with a warning. `--dry-run` lists the files without writing. Rerun `ipm install gascity` (or a bare `ipm install`) after changing the pack: it replaces its own folder completely. See [the commands reference](../reference/commands.md#ipm-install-gascity) for every message.
 
+## Install as Agent Skills
+
+[Agent Skills](https://agentskills.io/specification) is a folder of skills that Muse Code and other agents read. To put a pack's skills there:
+
+```bash
+ipm install agentskills csharp-sdlc
+```
+
+It writes each skill into `.agents/skills/<name>/` in the project (`~/.agents/skills` with `-g`, or `-C <folder>`), including the skills inside whole plugins you picked; agents, commands, hooks and MCP servers are skipped with a warning. A skill's folder is named after its `SKILL.md` name, made valid in the spec when it isn't. ipm only touches the skill folders it wrote (it lists them in `.ipm-skills.json`), so the folder can hold your own skills too; installing again removes skills the pack no longer has. See [the commands reference](../reference/commands.md#ipm-install-agentskills).
+
 ## Install into Muse Code
 
 [Muse Code](https://dev.meta.ai/docs/muse-code/extending) reads Claude Code plugins, so the same pack installs there too:
@@ -153,7 +163,7 @@ It builds first unless the build is current, then writes `.ipm/.gascity/csharp-s
 ipm install muse csharp-sdlc
 ```
 
-It builds first unless the build is current, then runs `muse plugins install` on `.ipm/plugins/csharp-sdlc` and on each whole plugin you picked. Muse doesn't install a plugin's dependencies, so ipm installs the whole plugins itself, from the repo at its locked commit (fetched into `$IPM_HOME/pinned` when your sources aren't at it). Muse keeps one set of plugins per user, so the pack is in every project. A plugin ipm can't fetch at a fixed commit is skipped with a `skipped …` warning. `--dry-run` prints the commands without running them. See [the commands reference](../reference/commands.md#ipm-install-muse).
+It builds first unless the build is current, then runs `muse plugins install` on the pack and on each whole plugin you picked. Muse doesn't install a plugin's dependencies, so ipm installs the whole plugins itself, from the repo at its locked commit (fetched into `$IPM_HOME/pinned` when your sources aren't at it). Muse checks plugins more strictly than Claude Code, so ipm installs a copy of each under `.ipm/muse/`, fixed where they differ: a `skills` path made a list, MCP servers wrapped in `mcpServers`, frontmatter quoted. It prints every change, and leaves out what Muse can't run, such as http MCP servers. Muse keeps one set of plugins per user, so the pack is in every project. A plugin ipm can't fetch at a fixed commit is skipped with a `skipped …` warning. `--dry-run` prints the commands without running them. See [the commands reference](../reference/commands.md#ipm-install-muse).
 
 {: .note }
 Installing changes your Muse Code configuration. To try it first, point `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_STATE_HOME` and `XDG_CACHE_HOME` at an empty temporary folder.

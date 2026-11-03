@@ -41,7 +41,10 @@ type fake struct {
 	results map[string]result
 	// full answers by the whole command line, before results; dirs records
 	// each call's working directory, in the same order as calls.
-	full  map[string]result
+	full map[string]result
+	// queue answers a whole command line once per entry, in order, before
+	// full.
+	queue map[string][]result
 	dirs  []string
 	mu    sync.Mutex
 	calls []string
@@ -103,6 +106,10 @@ func (f *fake) system() System {
 			line := name + " " + strings.Join(args, " ")
 			f.calls = append(f.calls, line)
 			f.dirs = append(f.dirs, dir)
+			if q := f.queue[line]; len(q) > 0 {
+				f.queue[line] = q[1:]
+				return q[0].out, q[0].err
+			}
 			if r, ok := f.full[line]; ok {
 				return r.out, r.err
 			}
@@ -1367,7 +1374,7 @@ func TestPackBuildBuildsPlugin(t *testing.T) {
 		t.Errorf("marketplace.json:\n%s", mp)
 	}
 	gi, _ := os.ReadFile(filepath.Join(ipm, ".gitignore"))
-	if string(gi) != "build.stamp\nplugins/\nplugins.tmp/\n.gascity/\n" {
+	if string(gi) != "build.stamp\nplugins/\nplugins.tmp/\n.gascity/\nmuse/\n" {
 		t.Errorf(".gitignore %q", gi)
 	}
 	if !strings.Contains(f.out.String(), "plugin:o/r#e is not pinned upstream") {

@@ -122,7 +122,7 @@ func TestTuiInstallerListAndInstall(t *testing.T) {
 	if err := in.Install(context.Background(), "kit", tui.Target{Kind: "zip"}, io.Discard); err == nil || !strings.Contains(err.Error(), "zip") {
 		t.Errorf("unknown kind: %v", err)
 	}
-	if got := in.Targets(); !reflect.DeepEqual(got, []string{"claude", "gascity", "muse"}) {
+	if got := in.Targets(); !reflect.DeepEqual(got, []string{"claude", "gascity", "muse", "agentskills"}) {
 		t.Errorf("targets %v", got)
 	}
 }

@@ -190,7 +190,7 @@ func TestInstallGascityDefaultSpelledWithC(t *testing.T) {
 func TestInstallGascityDefaultIgnoresFolder(t *testing.T) {
 	f, root, tmp := gascityFake(t)
 	gi := filepath.Join(root, ".ipm", ".gitignore")
-	const built = "build.stamp\nplugins/\nplugins.tmp/\n.gascity/\n"
+	const built = "build.stamp\nplugins/\nplugins.tmp/\n.gascity/\nmuse/\n"
 	for _, tc := range []struct{ before, after string }{
 		{"build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n", "build.stamp\nnode_modules/\nplugins/\nplugins.tmp/\n.gascity/\n"},
 		{"mine\nplugins/", "mine\nplugins/\n.gascity/\n"},
@@ -364,7 +364,7 @@ func TestReplayInstallsGascity(t *testing.T) {
 func TestInstallTargetsHelp(t *testing.T) {
 	f, _ := claudeFake(t)
 	err := f.run("install", "bogus")
-	if err == nil || !strings.Contains(err.Error(), "claude, gascity or muse") {
+	if err == nil || !strings.Contains(err.Error(), "agentskills, claude, gascity or muse") {
 		t.Errorf("got %v", err)
 	}
 }

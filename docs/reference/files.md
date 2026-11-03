@@ -57,9 +57,10 @@ $IPM_CACHE_DIR/
   .ipm/build.stamp                       what the last build used        ignored
   .ipm/plugins/<pack>/                   the built plugins               ignored
   .ipm/.gascity/<name>/                  Gas City pack folders           ignored
+  .ipm/muse/<pack>/<plugin>/             Muse copies of plugins          ignored
 ```
 
-The project is the nearest folder, at or above where you run `ipm`, that holds an `ipm.toml`. It holds no pnpm project: `ipm pack build` reads each repo from your home — the synced source when it is at the pinned commit, else `$IPM_HOME/pinned` — and removes the `package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs` and `node_modules/` older builds wrote to `.ipm/`. If you committed those, commit their removal. Everything under `.ipm/` is generated: `.ipm/.gascity/` by `ipm install gascity` (which `ipm pack build` leaves alone), the rest by `ipm pack build`; don't edit it by hand.
+The project is the nearest folder, at or above where you run `ipm`, that holds an `ipm.toml`. It holds no pnpm project: `ipm pack build` reads each repo from your home — the synced source when it is at the pinned commit, else `$IPM_HOME/pinned` — and removes the `package.json`, `pnpm-lock.yaml`, `.pnpmfile.cjs` and `node_modules/` older builds wrote to `.ipm/`. If you committed those, commit their removal. Everything under `.ipm/` is generated: `.ipm/.gascity/` by `ipm install gascity` and `.ipm/muse/` by `ipm install muse` (both left alone by `ipm pack build`), the rest by `ipm pack build`; don't edit it by hand.
 
 ## `ipm.toml`
 
@@ -85,7 +86,7 @@ path = "."
 scope = "project"
 ```
 
-`target` is `claude`, `gascity` or `muse`; for `claude`, `scope` is `user`, `project` or `local`; `path` is the folder for project or local scope, stored relative to the project when it is inside it. Installing the same pack to the same target, path and scope again replaces its table; project and local scope at one folder are two tables. A user-scope pack's installs are kept in `$IPM_HOME/installs.json` instead: a JSON array of `{pack, target, path, scope, name}` objects sorted by pack, target, path and scope, with absolute paths.
+`target` is `claude`, `gascity`, `muse` or `agentskills`; for `claude`, `scope` is `user`, `project` or `local`; `path` is the folder for project or local scope, stored relative to the project when it is inside it. Installing the same pack to the same target, path and scope again replaces its table; project and local scope at one folder are two tables. A user-scope pack's installs are kept in `$IPM_HOME/installs.json` instead: a JSON array of `{pack, target, path, scope, name}` objects sorted by pack, target, path and scope, with absolute paths.
 
 `ipm install gascity` records the folder it wrote into and the pack folder's name, with no scope:
 
@@ -103,6 +104,16 @@ The pack folder is `<path>/<name>`. A `gascity` record in `installs.json` has th
 ```toml
 [[packs.csharp-sdlc.installs]]
 target = "muse"
+```
+
+`ipm install agentskills` records the target, and the skills folder only when you named one with `-C` (stored relative to the project when inside it); without a `path` the install goes to `.agents/skills` in the project, or `~/.agents/skills` for a user-scope pack. The folder holds `.ipm-skills.json`, which ipm writes and reads to know which skill folders are its own:
+
+```json
+{
+  "packs": {
+    "csharp-sdlc": ["dotnet-backend-patterns", "test-driven-development"]
+  }
+}
 ```
 
 ## `.ipm/ipm.lock`

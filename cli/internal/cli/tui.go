@@ -5,10 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"maps"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -442,13 +440,16 @@ func strList(v any) []string {
 }
 
 // tuiInstaller installs the scope's packs with the code behind ipm install
-// claude, gascity and muse.
+// claude, gascity, muse and agentskills.
 type tuiInstaller struct {
 	sys   System
 	scope project.Scope
 }
 
-func (in tuiInstaller) Targets() []string { return slices.Sorted(maps.Keys(installers)) }
+// Targets is the install targets, Claude Code first and the newest last.
+func (in tuiInstaller) Targets() []string {
+	return []string{"claude", "gascity", "muse", "agentskills"}
+}
 
 // scopeFor is the scope a pack to install lives in: the user scope for a
 // global target, even from a project.
@@ -460,7 +461,7 @@ func (in tuiInstaller) scopeFor(global bool) (project.Scope, error) {
 }
 
 func (in tuiInstaller) Default(pack, kind string) tui.Target {
-	if kind == "muse" {
+	if kind == "muse" || kind == "agentskills" {
 		return tui.Target{Kind: kind, Global: in.scope.Global}
 	}
 	if kind == "gascity" {
@@ -550,6 +551,16 @@ func (in tuiInstaller) Plan(pack string, t tui.Target) (tui.Target, []string, er
 			line += " -g"
 		}
 		return tui.Target{Kind: "muse", Global: t.Global}, []string{line}, nil
+	case "agentskills":
+		if _, err := pickPack(scope, "agentskills", pack); err != nil {
+			return t, nil, err
+		}
+		// Which skills go in, and their names, are known only after the build.
+		line := "ipm install agentskills " + shellQuote(pack)
+		if t.Global {
+			line += " -g"
+		}
+		return tui.Target{Kind: "agentskills", Path: skillsFolder(in.sys, scope, ""), Global: t.Global}, []string{line}, nil
 	}
 	return t, nil, fmt.Errorf("can't install to %q — use %s", t.Kind, targetNames())
 }

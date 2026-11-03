@@ -15,7 +15,7 @@ type formStep int
 
 const (
 	formPack   formStep = iota // which pack, when none was preset
-	formTarget                 // claude, gascity or muse
+	formTarget                 // agentskills, claude, gascity or muse
 	formScope                  // claude: user, project or local
 	formFolder                 // claude: the project folder
 	formConfirm
@@ -30,13 +30,14 @@ var claudeScopes = [][2]string{
 
 // targetHelp says what each install target is, for the target step.
 var targetHelp = map[string]string{
-	"claude":  "Claude Code, as a plugin",
-	"gascity": "a Gas City pack folder",
-	"muse":    "Muse Code, as plugins",
+	"claude":      "Claude Code, as a plugin",
+	"gascity":     "a Gas City pack folder",
+	"muse":        "Muse Code, as plugins",
+	"agentskills": "an Agent Skills folder (.agents/skills), skills only",
 }
 
 // installForm is the install form before it runs: pick a target, where it
-// goes (claude only: gascity goes to its default folder, and muse has one
+// goes (claude only: gascity and agentskills go to their default folder, and muse has one
 // set of plugins per user), then confirm the commands.
 type installForm struct {
 	pack    string
@@ -123,7 +124,7 @@ func (m *Model) formKey(msg keyMsg) tea.Cmd {
 	case formConfirm:
 		if k == "y" && !f.refused {
 			pack, t, command := f.pack, f.target, installCommand(f.pack, f.target)
-			if (t.Kind == "gascity" || t.Kind == "muse") && len(f.plan) == 1 {
+			if t.Kind != "claude" && len(f.plan) == 1 {
 				// Its plan is the one command the user confirmed.
 				command = f.plan[0]
 			}
@@ -155,8 +156,8 @@ func (f *installForm) move(k string, n int) bool {
 func (m *Model) chooseKind(kind string) {
 	f := m.form
 	def := m.d.Installer.Default(f.pack, kind)
-	if kind == "muse" {
-		m.planForm(Target{Kind: "muse", Global: f.global})
+	if kind == "muse" || kind == "agentskills" {
+		m.planForm(Target{Kind: kind, Global: f.global})
 		return
 	}
 	if kind == "gascity" {
@@ -222,6 +223,8 @@ func describe(t Target) string {
 	switch {
 	case t.Kind == "muse":
 		return "muse"
+	case t.Kind == "agentskills":
+		return "agentskills " + t.Path
 	case t.Kind == "gascity":
 		return "gascity " + filepath.Join(t.Path, t.Name)
 	case t.Scope == "user":
@@ -234,7 +237,7 @@ func describe(t Target) string {
 func installCommand(pack string, t Target) string {
 	parts := []string{"ipm install", t.Kind, quote(pack)}
 	switch t.Kind {
-	case "muse": // one set of plugins per user: nothing to name
+	case "muse", "agentskills": // a default folder, or one set of plugins per user
 	case "gascity":
 		parts = append(parts, "-C", quote(t.Path), "--name", quote(t.Name))
 	default:
@@ -317,6 +320,8 @@ func (m *Model) formLines(w, rows int) []string {
 			head += "Gas City — " + filepath.Join(f.target.Path, f.target.Name)
 		} else if f.target.Kind == "muse" {
 			head += "Muse Code"
+		} else if f.target.Kind == "agentskills" {
+			head += "Agent Skills — " + f.target.Path
 		} else {
 			head += "Claude Code — " + f.target.Scope + " scope"
 			if f.target.Path != "" {

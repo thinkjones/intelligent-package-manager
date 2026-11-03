@@ -155,6 +155,16 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `install gascity: --name needs a pack — it names one pack folder` | Without a pack, `ipm install gascity` installs every pack, each in a folder of its own name. Name the pack to rename its folder: `ipm install gascity <pack> --name <name>`. |
 | `✗ N of M packs failed` | `ipm install gascity` without a pack installed the others; the `✗ <pack>: …` lines above say why each failed. Fix those and rerun. |
 
+## Install as Agent Skills
+
+| Message | Cause and fix |
+| --- | --- |
+| `<folder> exists and was not written by ipm — use --force to replace it` | A skill folder of that name is already in the skills folder, and ipm's `.ipm-skills.json` doesn't list it. Keep yours and remove the skill from the pack, or rerun with `--force`. |
+| `<folder> holds pack <other>'s skill — use --force to replace it` | Another pack installed a skill of that name there. Remove it from one pack, or `--force` to move it to this one. |
+| `skipped <id>: its SKILL.md has no frontmatter, which Agent Skills requires` | The upstream skill has no `name` and `description`. Report it upstream. |
+| `renamed <id> to "<name>": …` (a warning) | The skill's name isn't valid in the spec (say `Go Expert`), so its folder and the copy's `SKILL.md` use the valid form. Nothing to fix. |
+| `skipped <id>: external plugin — its files live in another repo; add its skills directly` | ipm doesn't know which skills a plugin defined in another repo holds. Pick its skills directly. |
+
 ## Install into Muse Code
 
 | Message | Cause and fix |
@@ -163,7 +173,10 @@ Start with `ipm doctor`: it checks everything `ipm` depends on and says what to 
 | `diagnostic=duplicate-capability-id severity=error … duplicate skill capability id` | The pack was built before ipm skipped duplicate skills; with the ipm version reported as `dev` (a build of a checkout), the stamp doesn't change on upgrade. Run `ipm pack build`, then install again. |
 | `N muse warning(s) hidden — …` | Muse's warnings, mostly Claude fields it ignores (`category`, `tags`, `dependencies`). Nothing is wrong; run the `muse plugins validate` command it prints to see them. |
 | `` `muse plugins install <folder>` failed: … `` | Muse refused the pack's own plugin; its output is printed above, and nothing is recorded. Check the folder with `muse plugins validate <folder>`. |
-| `installed <pack> (muse), but N of M whole plugins failed: …` | Muse refused those plugins, often a manifest Claude Code accepts but Muse doesn't (`Claude manifest field `` `skills` `` must be an array`, say). The pack and the other plugins are installed and recorded. Fix the plugin upstream, or remove it from the pack. |
+| `installed <pack> (muse), but N of M whole plugins failed: …` | Muse refused those plugins for something ipm's Muse copy doesn't fix; Muse's error is printed above. The pack and the other plugins are installed and recorded. Fix the plugin upstream, or remove it from the pack. |
+| `<name> is installed in Muse Code from <folder>, which ipm didn't install — use --force to replace it` | Muse holds a plugin of that name that you installed yourself. Keep it and remove the plugin from the pack, or rerun with `--force` to replace it with the pack's copy. |
+| `! <id>: left out MCP server … it is http, and Muse Code runs only stdio servers` | Muse can't run remote MCP servers, so the Muse copy installs without it. Nothing to fix in ipm. |
+| `! <id>: left out <folder>: its SKILL.md has no frontmatter` | Upstream skill with no `name` and `description`; the rest of the plugin installs. Report it upstream. |
 | `skipped <id>: its upstream entry names no commit, so ipm can't fetch a fixed copy` | The plugin's marketplace entry points at another repo with no commit. Install it in Muse yourself, or pick its skills instead. |
 | `skipped <id>: its source is "…", which Muse Code can't get from git` | The plugin comes from npm or another source ipm doesn't fetch. |
 | `skipped <id>: its folder has no plugin manifest …` | An inline plugin, defined only by its marketplace entry. Pick its skills and agents instead. |

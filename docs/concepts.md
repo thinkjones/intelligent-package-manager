@@ -81,6 +81,8 @@ items = [
 
 `ipm install muse` installs the same pack into Muse Code, which reads Claude Code plugins but not their dependencies: ipm installs the pack's plugin and then each whole plugin from its own repo at the locked commit.
 
+`ipm install agentskills` writes just the pack's skills, as folders in the [Agent Skills](https://agentskills.io/specification) format, into `.agents/skills`, which Muse Code and other agents read.
+
 `ipm install gascity` writes the same pack as a Gas City pack folder instead: skills, agents and the MCP servers of whole plugins you picked. Gas City has no slash commands or hooks, so those are skipped with a warning. ipm writes the folder and prints how to import it; it reads and edits no Gas City config.
 
 ## Scopes
